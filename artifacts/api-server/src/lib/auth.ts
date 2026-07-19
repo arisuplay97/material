@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 
 const ACCESS_SECRET = process.env.SESSION_SECRET ?? "pdam-access-secret-dev";
-const REFRESH_SECRET = process.env.SESSION_SECRET + "-refresh" ?? "pdam-refresh-secret-dev";
+const REFRESH_SECRET = process.env.SESSION_SECRET ? process.env.SESSION_SECRET + "-refresh" : "pdam-refresh-secret-dev";
 const ACCESS_EXPIRES = "1h";
 const REFRESH_EXPIRES = "7d";
 
