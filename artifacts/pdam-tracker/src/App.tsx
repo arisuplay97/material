@@ -16,6 +16,12 @@ import Receive from '@/pages/receive';
 import Lapangan from '@/pages/lapangan';
 import LapanganUpload from '@/pages/lapangan-upload';
 import FlaggedProofs from '@/pages/flagged-proofs';
+import Branches from '@/pages/branches';
+import Materials from '@/pages/materials';
+import MaterialRequests from '@/pages/material-requests';
+import Reports from '@/pages/reports';
+import Users from '@/pages/users';
+import Settings from '@/pages/settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,7 +58,13 @@ function Router() {
       <ProtectedRoute path="/lapangan" component={Lapangan} />
       <ProtectedRoute path="/lapangan/upload/:id" component={LapanganUpload} />
       <ProtectedRoute path="/spi/flagged" component={FlaggedProofs} />
-      
+      <ProtectedRoute path="/branches" component={Branches} />
+      <ProtectedRoute path="/materials" component={Materials} />
+      <ProtectedRoute path="/material-requests" component={MaterialRequests} />
+      <ProtectedRoute path="/reports" component={Reports} />
+      <ProtectedRoute path="/users" component={Users} />
+      <ProtectedRoute path="/settings" component={Settings} />
+
       {/* Defaults/Fallbacks */}
       <Route path="/">
         {() => {
