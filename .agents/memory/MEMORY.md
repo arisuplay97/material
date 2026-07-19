@@ -1,0 +1,2 @@
+- [PDAM Tracker Stack](pdam-tracker-stack.md) — custom JWT RBAC (no Clerk), React+Vite frontend on `/`, Express API on `/api`, Drizzle+PG, orval-generated client
+- [PDAM Tracker Zod Compat](pdam-tracker-zod.md) — Orval targets Zod v3.25.76; avoid format:email, looseObject, and File/Blob in spec

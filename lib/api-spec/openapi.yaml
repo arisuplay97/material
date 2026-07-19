@@ -3,20 +3,38 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PDAM Tiara Material Tracking & Verification System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: branches
+    description: Branch management
+  - name: materials
+    description: Material master data
+  - name: workOrders
+    description: Work orders
+  - name: materialRequests
+    description: Material requests
+  - name: trackings
+    description: Material tracking
+  - name: dashboard
+    description: Dashboard & analytics
+  - name: reports
+    description: Reports & exports
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +42,967 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenInput"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # Users
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete/deactivate a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # Branches
+  /branches:
+    get:
+      operationId: listBranches
+      tags: [branches]
+      summary: List all branches
+      responses:
+        "200":
+          description: List of branches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Branch"
+    post:
+      operationId: createBranch
+      tags: [branches]
+      summary: Create a branch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BranchInput"
+      responses:
+        "201":
+          description: Branch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+
+  /branches/{id}:
+    get:
+      operationId: getBranch
+      tags: [branches]
+      summary: Get branch by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Branch details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+    put:
+      operationId: updateBranch
+      tags: [branches]
+      summary: Update a branch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BranchInput"
+      responses:
+        "200":
+          description: Updated branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+
+  # Materials
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [materials]
+      summary: List all materials
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Material"
+    post:
+      operationId: createMaterial
+      tags: [materials]
+      summary: Create a material
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialInput"
+      responses:
+        "201":
+          description: Material created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+
+  /materials/{id}:
+    get:
+      operationId: getMaterial
+      tags: [materials]
+      summary: Get material by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Material details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+    put:
+      operationId: updateMaterial
+      tags: [materials]
+      summary: Update a material
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialInput"
+      responses:
+        "200":
+          description: Updated material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+
+  # Work Orders
+  /work-orders:
+    get:
+      operationId: listWorkOrders
+      tags: [workOrders]
+      summary: List work orders
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of work orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkOrder"
+    post:
+      operationId: createWorkOrder
+      tags: [workOrders]
+      summary: Create a work order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkOrderInput"
+      responses:
+        "201":
+          description: Work order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /work-orders/{id}:
+    get:
+      operationId: getWorkOrder
+      tags: [workOrders]
+      summary: Get work order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Work order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  # Material Requests
+  /material-requests:
+    get:
+      operationId: listMaterialRequests
+      tags: [materialRequests]
+      summary: List material requests
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: requestedBy
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of material requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaterialRequest"
+    post:
+      operationId: createMaterialRequest
+      tags: [materialRequests]
+      summary: Create a material request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialRequestInput"
+      responses:
+        "201":
+          description: Material request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRequest"
+
+  /material-requests/{id}:
+    get:
+      operationId: getMaterialRequest
+      tags: [materialRequests]
+      summary: Get material request by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Material request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRequest"
+
+  /material-requests/{id}/approve:
+    post:
+      operationId: approveMaterialRequest
+      tags: [materialRequests]
+      summary: Approve a material request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalInput"
+      responses:
+        "200":
+          description: Request approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRequest"
+
+  /material-requests/{id}/reject:
+    post:
+      operationId: rejectMaterialRequest
+      tags: [materialRequests]
+      summary: Reject a material request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalInput"
+      responses:
+        "200":
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRequest"
+
+  # Trackings
+  /trackings:
+    get:
+      operationId: listTrackings
+      tags: [trackings]
+      summary: List trackings
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: isOverdue
+          in: query
+          schema:
+            type: boolean
+        - name: assignedTo
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of trackings with pagination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackingListResponse"
+    post:
+      operationId: createTracking
+      tags: [trackings]
+      summary: Issue material from warehouse and create tracking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrackingInput"
+      responses:
+        "201":
+          description: Tracking created with QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tracking"
+
+  /trackings/{id}:
+    get:
+      operationId: getTracking
+      tags: [trackings]
+      summary: Get tracking by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tracking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackingDetail"
+
+  /trackings/by-code/{code}:
+    get:
+      operationId: getTrackingByCode
+      tags: [trackings]
+      summary: Get tracking by tracking code (for QR scan)
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tracking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackingDetail"
+
+  /trackings/{id}/receive:
+    post:
+      operationId: receiveTracking
+      tags: [trackings]
+      summary: Confirm branch reception by scanning QR
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiveInput"
+      responses:
+        "200":
+          description: Reception confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tracking"
+
+  /trackings/{id}/proof:
+    post:
+      operationId: submitInstallationProof
+      tags: [trackings]
+      summary: Submit installation proof (photo + GPS)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallationProofInput"
+      responses:
+        "201":
+          description: Proof submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationProof"
+    get:
+      operationId: getInstallationProof
+      tags: [trackings]
+      summary: Get installation proof for a tracking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Installation proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationProof"
+
+  /trackings/{id}/events:
+    get:
+      operationId: getTrackingEvents
+      tags: [trackings]
+      summary: Get event timeline for a tracking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tracking events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrackingEvent"
+
+  /trackings/{id}/flag:
+    post:
+      operationId: flagTracking
+      tags: [trackings]
+      summary: Flag tracking for audit review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagInput"
+      responses:
+        "200":
+          description: Tracking flagged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /trackings/{id}/qr:
+    get:
+      operationId: getQrCode
+      tags: [trackings]
+      summary: Get QR code image for a tracking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QR code data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCodeResponse"
+
+  # Dashboard
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Overall tracking summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/branch-status:
+    get:
+      operationId: getBranchStatus
+      tags: [dashboard]
+      summary: Status breakdown per branch
+      responses:
+        "200":
+          description: Per-branch status list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BranchStatus"
+
+  /dashboard/risk-scores:
+    get:
+      operationId: getRiskScores
+      tags: [dashboard]
+      summary: Risk scores per branch for audit prioritization
+      responses:
+        "200":
+          description: Branch risk scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BranchRiskScore"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent tracking activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recent activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/sla-overview:
+    get:
+      operationId: getSlaOverview
+      tags: [dashboard]
+      summary: SLA countdown and overdue summary
+      responses:
+        "200":
+          description: SLA overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaOverview"
+
+  /dashboard/flagged-proofs:
+    get:
+      operationId: getFlaggedProofs
+      tags: [dashboard]
+      summary: Proofs flagged for anti-fake-GPS review
+      parameters:
+        - name: reviewStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Flagged proofs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlaggedProof"
+
+  /dashboard/installation-map:
+    get:
+      operationId: getInstallationMap
+      tags: [dashboard]
+      summary: GPS coordinates of all installations for map view
+      responses:
+        "200":
+          description: Map data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MapPoint"
+
+  # Proofs review
+  /proofs/{id}/review:
+    post:
+      operationId: reviewProof
+      tags: [dashboard]
+      summary: SPI reviews a flagged proof (approve/reject)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofReviewInput"
+      responses:
+        "200":
+          description: Proof reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallationProof"
+
+  # Reports
+  /reports/material-accountability:
+    get:
+      operationId: getMaterialAccountabilityReport
+      tags: [reports]
+      summary: Material accountability report for a period
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: branchId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accountability report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountabilityReport"
+
+  /reports/audit-trail:
+    get:
+      operationId: getAuditTrail
+      tags: [reports]
+      summary: Audit log for a tracking or date range
+      parameters:
+        - name: trackingId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: actorId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit trail entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
+  # Upload
+  /upload/photo:
+    post:
+      operationId: uploadPhoto
+      tags: [trackings]
+      summary: Upload installation photo (base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoUploadInput"
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1013,825 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    # Auth
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RefreshTokenInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    # User
+    User:
+      type: object
+      required: [id, name, email, role, isActive, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin_gudang, petugas_lapangan, spi, direksi, superadmin]
+        branchId:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UserInput:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin_gudang, petugas_lapangan, spi, direksi, superadmin]
+        branchId:
+          type: ["string", "null"]
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin_gudang, petugas_lapangan, spi, direksi, superadmin]
+        branchId:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    # Branch
+    Branch:
+      type: object
+      required: [id, name, code, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        activeTrackings:
+          type: ["integer", "null"]
+        criticalCount:
+          type: ["integer", "null"]
+
+    BranchInput:
+      type: object
+      required: [name, code]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+
+    # Material
+    Material:
+      type: object
+      required: [id, code, name, category, unit, currentStock, createdAt]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [valve, pipe, fitting, meter, other]
+        unit:
+          type: string
+        unitPrice:
+          type: ["number", "null"]
+        currentStock:
+          type: integer
+        branchId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    MaterialInput:
+      type: object
+      required: [code, name, category, unit]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          enum: [valve, pipe, fitting, meter, other]
+        unit:
+          type: string
+        unitPrice:
+          type: ["number", "null"]
+        currentStock:
+          type: integer
+        branchId:
+          type: ["string", "null"]
+
+    # Work Order
+    WorkOrder:
+      type: object
+      required: [id, woNumber, branchId, createdAt]
+      properties:
+        id:
+          type: string
+        woNumber:
+          type: string
+        description:
+          type: ["string", "null"]
+        branchId:
+          type: string
+        branchName:
+          type: ["string", "null"]
+        createdById:
+          type: ["string", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    WorkOrderInput:
+      type: object
+      required: [woNumber, branchId]
+      properties:
+        woNumber:
+          type: string
+        description:
+          type: ["string", "null"]
+        branchId:
+          type: string
+
+    # Material Request
+    MaterialRequest:
+      type: object
+      required: [id, requestNumber, materialId, qtyRequested, status, createdAt]
+      properties:
+        id:
+          type: string
+        requestNumber:
+          type: string
+        workOrderId:
+          type: ["string", "null"]
+        workOrderNumber:
+          type: ["string", "null"]
+        materialId:
+          type: string
+        materialName:
+          type: ["string", "null"]
+        materialCode:
+          type: ["string", "null"]
+        qtyRequested:
+          type: integer
+        requestedById:
+          type: ["string", "null"]
+        requestedByName:
+          type: ["string", "null"]
+        approvedById:
+          type: ["string", "null"]
+        approvedByName:
+          type: ["string", "null"]
+        approvedAt:
+          type: ["string", "null"]
+          format: date-time
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    MaterialRequestInput:
+      type: object
+      required: [materialId, qtyRequested]
+      properties:
+        workOrderId:
+          type: ["string", "null"]
+        materialId:
+          type: string
+        qtyRequested:
+          type: integer
+
+    ApprovalInput:
+      type: object
+      properties:
+        notes:
+          type: ["string", "null"]
+
+    # Tracking
+    Tracking:
+      type: object
+      required: [id, trackingCode, qtyIssued, issuedAt, slaDeadline, status, createdAt]
+      properties:
+        id:
+          type: string
+        trackingCode:
+          type: string
+        materialRequestId:
+          type: ["string", "null"]
+        materialName:
+          type: ["string", "null"]
+        materialCode:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        branchId:
+          type: ["string", "null"]
+        qtyIssued:
+          type: integer
+        issuedById:
+          type: ["string", "null"]
+        issuedByName:
+          type: ["string", "null"]
+        issuedAt:
+          type: string
+          format: date-time
+        slaDeadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [dikirim, diterima_cabang, menunggu_verifikasi, terverifikasi, kritis]
+        qrCodeUrl:
+          type: ["string", "null"]
+        riskScore:
+          type: ["number", "null"]
+        hoursRemaining:
+          type: ["number", "null"]
+        isOverdue:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    TrackingDetail:
+      type: object
+      required: [id, trackingCode, qtyIssued, issuedAt, slaDeadline, status, createdAt, events]
+      properties:
+        id:
+          type: string
+        trackingCode:
+          type: string
+        materialRequestId:
+          type: ["string", "null"]
+        materialName:
+          type: ["string", "null"]
+        materialCode:
+          type: ["string", "null"]
+        materialUnit:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        branchId:
+          type: ["string", "null"]
+        qtyIssued:
+          type: integer
+        issuedById:
+          type: ["string", "null"]
+        issuedByName:
+          type: ["string", "null"]
+        issuedAt:
+          type: string
+          format: date-time
+        slaDeadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [dikirim, diterima_cabang, menunggu_verifikasi, terverifikasi, kritis]
+        qrCodeUrl:
+          type: ["string", "null"]
+        riskScore:
+          type: ["number", "null"]
+        hoursRemaining:
+          type: ["number", "null"]
+        isOverdue:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackingEvent"
+        proof:
+          $ref: "#/components/schemas/InstallationProof"
+
+    TrackingListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tracking"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TrackingInput:
+      type: object
+      required: [materialRequestId, qtyIssued, slaDays]
+      properties:
+        materialRequestId:
+          type: string
+        qtyIssued:
+          type: integer
+        slaDays:
+          type: integer
+        notes:
+          type: ["string", "null"]
+
+    ReceiveInput:
+      type: object
+      required: [qrScannedCode]
+      properties:
+        qrScannedCode:
+          type: string
+        qtyReceived:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+
+    # Tracking Events
+    TrackingEvent:
+      type: object
+      required: [id, trackingId, step, occurredAt]
+      properties:
+        id:
+          type: string
+        trackingId:
+          type: string
+        step:
+          type: string
+          enum: [keluar_gudang, diterima_cabang, dipasang, selesai]
+        actorId:
+          type: ["string", "null"]
+        actorName:
+          type: ["string", "null"]
+        gpsLat:
+          type: ["number", "null"]
+        gpsLng:
+          type: ["number", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        qrScannedCode:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        occurredAt:
+          type: string
+          format: date-time
+
+    # Installation Proof
+    InstallationProof:
+      type: object
+      required: [id, trackingId, qtyUsed, qtyReturned, photoUrl, photoTakenAt, gpsLat, gpsLng, submittedAt]
+      properties:
+        id:
+          type: string
+        trackingId:
+          type: string
+        submittedById:
+          type: ["string", "null"]
+        submittedByName:
+          type: ["string", "null"]
+        qtyUsed:
+          type: integer
+        qtyReturned:
+          type: integer
+        photoUrl:
+          type: string
+        photoTakenAt:
+          type: string
+          format: date-time
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        gpsAccuracyMeters:
+          type: ["number", "null"]
+        gpsProvider:
+          type: ["string", "null"]
+        isMockLocation:
+          type: boolean
+        withinServiceArea:
+          type: ["boolean", "null"]
+        flaggedForReview:
+          type: boolean
+        reviewStatus:
+          type: ["string", "null"]
+          enum: [pending, approved, rejected, null]
+        reviewedByName:
+          type: ["string", "null"]
+        flagReasons:
+          type: array
+          items:
+            type: string
+        submittedAt:
+          type: string
+          format: date-time
+
+    InstallationProofInput:
+      type: object
+      required: [qtyUsed, qtyReturned, photoUrl, photoTakenAt, gpsLat, gpsLng]
+      properties:
+        qtyUsed:
+          type: integer
+        qtyReturned:
+          type: integer
+        photoUrl:
+          type: string
+        photoTakenAt:
+          type: string
+          format: date-time
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        gpsAccuracyMeters:
+          type: ["number", "null"]
+        gpsProvider:
+          type: ["string", "null"]
+        isMockLocation:
+          type: boolean
+        deviceFingerprint:
+          type: ["string", "null"]
+
+    FlagInput:
+      type: object
+      properties:
+        reason:
+          type: string
+
+    QrCodeResponse:
+      type: object
+      required: [trackingCode, qrCodeDataUrl, qrCodeUrl]
+      properties:
+        trackingCode:
+          type: string
+        qrCodeDataUrl:
+          type: string
+        qrCodeUrl:
+          type: string
+
+    # Dashboard
+    DashboardSummary:
+      type: object
+      required: [totalActive, totalDikirim, totalDiterimaCabang, totalMenungguVerifikasi, totalTerverifikasi, totalKritis, totalOverdue, totalValueAtRisk]
+      properties:
+        totalActive:
+          type: integer
+        totalDikirim:
+          type: integer
+        totalDiterimaCabang:
+          type: integer
+        totalMenungguVerifikasi:
+          type: integer
+        totalTerverifikasi:
+          type: integer
+        totalKritis:
+          type: integer
+        totalOverdue:
+          type: integer
+        totalValueAtRisk:
+          type: number
+        pendingApprovals:
+          type: integer
+        flaggedForReview:
+          type: integer
+
+    BranchStatus:
+      type: object
+      required: [branchId, branchName, branchCode, active, dikirim, diterimaCabang, kritis, terverifikasi, riskScore]
+      properties:
+        branchId:
+          type: string
+        branchName:
+          type: string
+        branchCode:
+          type: string
+        active:
+          type: integer
+        dikirim:
+          type: integer
+        diterimaCabang:
+          type: integer
+        kritis:
+          type: integer
+        terverifikasi:
+          type: integer
+        riskScore:
+          type: number
+        overdueCount:
+          type: integer
+
+    BranchRiskScore:
+      type: object
+      required: [branchId, branchName, riskScore, riskLevel, factors]
+      properties:
+        branchId:
+          type: string
+        branchName:
+          type: string
+        riskScore:
+          type: number
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+        factors:
+          type: object
+          properties:
+            overdueRatio:
+              type: number
+            flaggedProofs:
+              type: integer
+            avgSlaUsed:
+              type: number
+            kritisCount:
+              type: integer
+
+    ActivityItem:
+      type: object
+      required: [id, type, trackingCode, description, actorName, occurredAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [issued, received, installed, verified, flagged, overdue]
+        trackingCode:
+          type: string
+        materialName:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        description:
+          type: string
+        actorName:
+          type: ["string", "null"]
+        occurredAt:
+          type: string
+          format: date-time
+
+    SlaOverview:
+      type: object
+      required: [criticalCount, warningCount, onTrackCount, overdueCount]
+      properties:
+        criticalCount:
+          type: integer
+        warningCount:
+          type: integer
+        onTrackCount:
+          type: integer
+        overdueCount:
+          type: integer
+        nearingDeadline:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tracking"
+
+    FlaggedProof:
+      type: object
+      required: [id, trackingCode, trackingId, submittedByName, flagReasons, submittedAt]
+      properties:
+        id:
+          type: string
+        trackingCode:
+          type: string
+        trackingId:
+          type: string
+        materialName:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        submittedByName:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        gpsLat:
+          type: ["number", "null"]
+        gpsLng:
+          type: ["number", "null"]
+        gpsAccuracyMeters:
+          type: ["number", "null"]
+        withinServiceArea:
+          type: ["boolean", "null"]
+        isMockLocation:
+          type: boolean
+        flagReasons:
+          type: array
+          items:
+            type: string
+        reviewStatus:
+          type: ["string", "null"]
+        submittedAt:
+          type: string
+          format: date-time
+
+    MapPoint:
+      type: object
+      required: [trackingId, trackingCode, gpsLat, gpsLng, status]
+      properties:
+        trackingId:
+          type: string
+        trackingCode:
+          type: string
+        materialName:
+          type: ["string", "null"]
+        branchName:
+          type: ["string", "null"]
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        status:
+          type: string
+        flaggedForReview:
+          type: boolean
+        installedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    ProofReviewInput:
+      type: object
+      required: [reviewStatus]
+      properties:
+        reviewStatus:
+          type: string
+          enum: [approved, rejected]
+        notes:
+          type: ["string", "null"]
+
+    # Reports
+    AccountabilityReport:
+      type: object
+      required: [period, totalIssued, totalVerified, totalKritis, totalValueIssued, totalValueVerified, rows]
+      properties:
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+          required: [from, to]
+        totalIssued:
+          type: integer
+        totalVerified:
+          type: integer
+        totalKritis:
+          type: integer
+        totalValueIssued:
+          type: number
+        totalValueVerified:
+          type: number
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountabilityRow"
+
+    AccountabilityRow:
+      type: object
+      required: [trackingCode, materialName, branchName, qtyIssued, qtyUsed, qtyReturned, status, issuedAt]
+      properties:
+        trackingCode:
+          type: string
+        woNumber:
+          type: ["string", "null"]
+        materialCode:
+          type: ["string", "null"]
+        materialName:
+          type: string
+        branchName:
+          type: string
+        qtyIssued:
+          type: integer
+        qtyUsed:
+          type: ["integer", "null"]
+        qtyReturned:
+          type: ["integer", "null"]
+        unitPrice:
+          type: ["number", "null"]
+        totalValue:
+          type: ["number", "null"]
+        status:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    AuditLog:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: string
+        trackingId:
+          type: ["string", "null"]
+        trackingCode:
+          type: ["string", "null"]
+        actorId:
+          type: ["string", "null"]
+        actorName:
+          type: ["string", "null"]
+        action:
+          type: string
+        metadata:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    # Upload
+    PhotoUploadInput:
+      type: object
+      required: [photo]
+      properties:
+        photo:
+          type: string
+          description: Base64-encoded photo data
+
+    PhotoUploadResponse:
+      type: object
+      required: [url, takenAt]
+      properties:
+        url:
+          type: string
+        takenAt:
+          type: string
+          format: date-time
+        width:
+          type: ["integer", "null"]
+        height:
+          type: ["integer", "null"]

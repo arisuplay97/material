@@ -3,8 +3,14 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { seedDatabase } from "./lib/seed";
 
 const app: Express = express();
+
+// Seed demo data on first boot (no-op if already seeded)
+seedDatabase().catch((err) => {
+  logger.error({ err }, "Seed failed");
+});
 
 app.use(
   pinoHttp({

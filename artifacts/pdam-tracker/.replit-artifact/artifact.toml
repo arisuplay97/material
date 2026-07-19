@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "PDAM Material Tracker"
+version = "1.0.0"
+id = "artifacts/pdam-tracker"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23931
+
+[services.development]
+run = "pnpm --filter @workspace/pdam-tracker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pdam-tracker", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pdam-tracker/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23931"
+BASE_PATH = "/"

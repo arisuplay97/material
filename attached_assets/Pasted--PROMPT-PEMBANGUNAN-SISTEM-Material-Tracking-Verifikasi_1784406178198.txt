@@ -1,0 +1,264 @@
+# PROMPT PEMBANGUNAN SISTEM — Material Tracking & Verifikasi Pemasangan PDAM Tiara
+
+Gunakan prompt ini sebagai instruksi lengkap untuk AI coding assistant (Claude Code, Cursor, dsb.) membangun aplikasi web dari nol.
+
+---
+
+## 1. KONTEKS PROYEK
+
+Bangun aplikasi web internal untuk PDAM Tiara (Perumda Air Minum Tirta Ardhia Rinjani, Lombok Tengah) yang menutup celah antara **material keluar dari gudang** dan **bukti bahwa material tersebut benar-benar terpasang di lapangan**. Saat ini proses berhenti tercatat begitu barang diambil dari gudang — tidak ada bukti pemasangan, tidak ada batas waktu pelaporan, dan SPI (Satuan Pengawasan Internal) baru tahu ada masalah setelah kerugian terjadi.
+
+Alur lengkap yang harus didukung sistem, dari surat permintaan sampai status terverifikasi:
+1. Petugas cabang mengajukan permintaan material (nomor WO, kode barang, qty).
+2. ACC digital dari direktur utama / pejabat berwenang.
+3. Barang dikeluarkan dari gudang → sistem generate **Tracking ID unik** + **QR Code**.
+4. Timer SLA mulai berjalan sejak barang keluar.
+5. **Cabang menerima barang** — petugas cabang wajib **scan QR Code** yang tertera di material sebagai konfirmasi serah terima. Ini menutup celah "barang hilang di perjalanan" antara gudang dan cabang, karena tanpa scan ini status tetap "dalam pengiriman", bukan "diterima".
+6. Petugas lapangan wajib upload **bukti pemasangan**: foto (diambil langsung dari kamera in-app, bukan galeri) + GPS + timestamp otomatis + jumlah barang yang benar-benar terpakai.
+7. Sisa material (jika ada) wajib diretur dan tercatat balik ke stok gudang.
+8. Status berubah jadi **Terverifikasi**, atau **Kritis** kalau SLA terlewati tanpa laporan.
+9. SPI memantau semuanya lewat dashboard real-time, dengan prioritas audit ke cabang berstatus merah / skor risiko tinggi.
+
+---
+
+## 2. TECH STACK
+
+- **Frontend**: React (Vite) + TypeScript. Styling pakai Tailwind CSS murni (tanpa komponen generik ala shadcn "default" yang terkesan template) — lihat panduan desain di bagian 6.
+- **Backend**: Node.js (Express atau Fastify) + TypeScript, atau alternatif: Laravel/PHP kalau tim lebih familiar dengan stack itu — **tapi database tetap PostgreSQL**.
+- **Database**: **PostgreSQL** (versi 15+). Gunakan PostGIS extension untuk data koordinat GPS (tipe data `geography(Point, 4326)`), bukan hanya kolom float lat/lng biasa — supaya query jarak/geofence bisa native lewat SQL.
+- **File storage**: foto bukti pemasangan disimpan di object storage (S3-compatible / MinIO), path dan metadata disimpan di PostgreSQL.
+- **Auth**: JWT dengan refresh token, role-based access control (RBAC).
+- **Real-time**: WebSocket (Socket.IO) untuk update dashboard SPI secara live tanpa refresh manual.
+- **QR Code**: generate QR code di sisi server saat Tracking ID dibuat (pakai library seperti `qrcode` untuk Node, atau `endroid/qr-code` untuk PHP). **Hanya QR code — jangan buat fitur barcode.**
+
+---
+
+## 3. ROLE & AKSES (RBAC)
+
+| Role | Akses |
+|---|---|
+| **Admin Gudang** | Input pengeluaran barang, generate tracking ID, lihat stok |
+| **Petugas Lapangan** | Lihat tracking ID miliknya, upload bukti pemasangan, lapor retur |
+| **SPI** | Dashboard penuh semua cabang, lihat semua bukti, tandai kasus untuk audit lanjutan, tidak bisa edit data transaksi |
+| **Direksi** | Akses read-only ke dashboard ringkasan & laporan finansial |
+| **Superadmin/IT** | Kelola user, kelola cabang, kelola master data barang |
+
+---
+
+## 4. SKEMA DATABASE (PostgreSQL)
+
+Rancang minimal tabel berikut (sesuaikan penamaan sesuai konvensi tim, tapi pertahankan relasi dan kolom kunci ini):
+
+```sql
+-- Master data
+CREATE TABLE branches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    service_area GEOGRAPHY(POLYGON, 4326), -- untuk geofence anti-fake-GPS
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('admin_gudang','petugas_lapangan','spi','direksi','superadmin')),
+    branch_id UUID REFERENCES branches(id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE materials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT UNIQUE NOT NULL,       -- e.g. VLV-004
+    name TEXT NOT NULL,              -- e.g. Gate Valve 4"
+    category TEXT NOT NULL,          -- valve / pipe / fitting / meter
+    unit TEXT NOT NULL,              -- Unit / Meter / dll
+    unit_price NUMERIC(14,2),
+    current_stock INTEGER NOT NULL DEFAULT 0,
+    branch_id UUID REFERENCES branches(id)
+);
+
+-- Alur utama
+CREATE TABLE work_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wo_number TEXT UNIQUE NOT NULL,
+    description TEXT,
+    branch_id UUID REFERENCES branches(id),
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE material_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_number TEXT UNIQUE NOT NULL, -- MPG-2026-00001
+    work_order_id UUID REFERENCES work_orders(id),
+    material_id UUID REFERENCES materials(id),
+    qty_requested INTEGER NOT NULL,
+    requested_by UUID REFERENCES users(id),
+    approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE trackings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_code TEXT UNIQUE NOT NULL,     -- TRK-260716-000125
+    material_request_id UUID REFERENCES material_requests(id),
+    qty_issued INTEGER NOT NULL,
+    issued_by UUID REFERENCES users(id),
+    issued_at TIMESTAMPTZ DEFAULT now(),
+    sla_deadline TIMESTAMPTZ NOT NULL,       -- issued_at + SLA duration
+    status TEXT NOT NULL DEFAULT 'dikirim' CHECK (status IN ('dikirim','diterima_cabang','menunggu_verifikasi','terverifikasi','kritis')),
+    qr_code_url TEXT,                        -- path ke file QR yang di-generate
+    risk_score NUMERIC(5,2) DEFAULT 0        -- dihitung sistem, untuk prioritas audit SPI
+);
+
+-- Log setiap tahap alur (dipakai langsung untuk render timeline animasi di dashboard)
+CREATE TABLE tracking_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_id UUID REFERENCES trackings(id) ON DELETE CASCADE,
+    step TEXT NOT NULL CHECK (step IN ('keluar_gudang','diterima_cabang','dipasang','selesai')),
+    actor_id UUID REFERENCES users(id),
+    gps_lat DOUBLE PRECISION,
+    gps_lng DOUBLE PRECISION,
+    photo_url TEXT,               -- diisi khusus untuk step 'dipasang'
+    qr_scanned_code TEXT,         -- diisi khusus untuk step 'diterima_cabang', hasil scan QR
+    notes TEXT,
+    occurred_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Satu tracking otomatis punya event 'keluar_gudang' saat dibuat.
+-- Event berikutnya (diterima_cabang, dipasang, selesai) ditambahkan seiring alur berjalan,
+-- dan urutan+timestamp inilah yang jadi sumber data untuk timeline di dashboard (lihat bagian 7).
+
+CREATE TABLE installation_proofs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_id UUID REFERENCES trackings(id),
+    submitted_by UUID REFERENCES users(id),
+    qty_used INTEGER NOT NULL,
+    qty_returned INTEGER NOT NULL DEFAULT 0,
+    photo_url TEXT NOT NULL,
+    photo_taken_at TIMESTAMPTZ NOT NULL,       -- dari EXIF / metadata kamera in-app
+    gps_lat DOUBLE PRECISION NOT NULL,
+    gps_lng DOUBLE PRECISION NOT NULL,
+    gps_location GEOGRAPHY(POINT,4326) NOT NULL,
+    gps_accuracy_meters NUMERIC(6,2),          -- akurasi sinyal GPS saat itu
+    gps_provider TEXT,                          -- gps / network / fused
+    is_mock_location BOOLEAN DEFAULT false,     -- hasil deteksi mock provider
+    device_fingerprint TEXT,                    -- device id / IMEI hash
+    ip_address INET,
+    within_service_area BOOLEAN,                -- hasil cek geofence vs branches.service_area
+    flagged_for_review BOOLEAN DEFAULT false,   -- auto-flag kalau ada indikasi manipulasi
+    reviewed_by UUID REFERENCES users(id),
+    review_status TEXT CHECK (review_status IN ('pending','approved','rejected')),
+    submitted_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tracking_id UUID REFERENCES trackings(id),
+    actor_id UUID REFERENCES users(id),
+    action TEXT NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index penting
+CREATE INDEX idx_trackings_status ON trackings(status);
+CREATE INDEX idx_trackings_sla ON trackings(sla_deadline);
+CREATE INDEX idx_proofs_gps ON installation_proofs USING GIST(gps_location);
+CREATE INDEX idx_branches_area ON branches USING GIST(service_area);
+CREATE INDEX idx_events_tracking ON tracking_events(tracking_id, occurred_at);
+```
+
+---
+
+## 5. FITUR ANTI-FAKE-GPS (WAJIB)
+
+Ini bagian paling kritis. Implementasikan **berlapis** (defense in depth) — jangan andalkan satu metode saja, karena masing-masing bisa dilewati sendiri-sendiri:
+
+1. **Wajib kamera in-app, larang upload dari galeri.** Foto harus diambil langsung lewat komponen kamera aplikasi (`getUserMedia` di web, atau native camera intent kalau nanti dibuat versi mobile). Nonaktifkan tombol pilih dari galeri sepenuhnya.
+
+2. **Deteksi mock location provider.** Di sisi client (kalau nanti ada versi Android native/PWA dengan akses native), cek `Location.isFromMockProvider()`. Untuk versi web murni, karena browser tidak selalu bisa deteksi mock GPS langsung, kombinasikan dengan poin 3–6 di bawah sebagai lapisan tambahan.
+
+3. **Threshold akurasi GPS.** Tolak submission kalau `gps_accuracy_meters` lebih besar dari ambang batas wajar (misal >50 meter) — akurasi buruk sering jadi indikasi spoofing atau sinyal lemah yang mencurigakan.
+
+4. **Geofence terhadap area layanan cabang.** Simpan `service_area` tiap cabang sebagai polygon di PostgreSQL/PostGIS. Saat foto disubmit, jalankan query `ST_Within(gps_location, service_area)` — kalau lokasi jauh di luar area kerja cabang tersebut, otomatis set `flagged_for_review = true`, jangan langsung ditolak (supaya tidak salah blokir kasus sah seperti pekerjaan lintas-cabang).
+
+5. **Cross-check timestamp foto vs waktu submit.** Kalau `photo_taken_at` jauh berbeda dari waktu submit ke server (misal foto diambil 3 hari lalu tapi baru disubmit sekarang), tandai untuk review — indikasi foto lama dipakai ulang.
+
+6. **Movement/kecepatan tidak wajar.** Kalau user submit dua lokasi berjauhan dalam waktu yang secara fisik mustahil ditempuh (misal 50 km dalam 5 menit), flag otomatis.
+
+7. **Device fingerprint & IP logging.** Simpan `device_fingerprint` dan `ip_address` di setiap submission sebagai jejak sekunder — berguna kalau SPI perlu menelusuri pola submission mencurigakan dari device yang sama untuk banyak lokasi berbeda.
+
+8. **Random re-verifikasi.** SPI bisa memicu permintaan verifikasi ulang acak: kirim notifikasi ke petugas lapangan minta share lokasi live dalam X menit sebagai silang cek terhadap laporan sebelumnya.
+
+9. **Jangan auto-reject — flag untuk review manusia.** Semua indikasi kecurigaan (poin 3–6) sebaiknya **menandai** data untuk ditinjau SPI, bukan otomatis menolak. Ini penting karena sinyal GPS lemah di lapangan (area terpencil, bangunan beton, cuaca) itu wajar dan bukan berarti kecurangan — sistem yang terlalu agresif menolak justru bikin petugas jujur frustrasi.
+
+---
+
+## 6. PANDUAN UI/UX — JANGAN AI SLOP
+
+Yang dimaksud "AI slop" di sini: tampilan generic SaaS dashboard dengan gradient ungu-biru klise, kartu rounded-2xl dengan shadow tebal di mana-mana, ikon emoji berlebihan, font default (Inter di semua tempat tanpa hierarki), dan layout yang terasa di-generate tanpa niat desain. Hindari itu semua. Sebagai gantinya:
+
+- **Bahasa desain**: editorial, presisi, seperti dashboard command-center — bukan seperti landing page startup. Referensi: warna dasar krem/paper (`#F7F5F0`-an) untuk latar, aksen navy gelap (`#0E1726`) untuk elemen penting, hijau untuk status baik, amber untuk peringatan, merah untuk kritis. Jangan pakai gradient dekoratif.
+- **Tipografi**: kombinasikan serif display (untuk angka besar/heading, misal Fraunces atau Newsreader) dengan monospace (untuk label, kode tracking, data teknis — misal IBM Plex Mono atau JetBrains Mono) dan sans-serif netral untuk body text. Hierarki tipografi harus terlihat sengaja, bukan satu ukuran font untuk semua.
+- **Data density**: SPI adalah pengguna power-user yang butuh melihat banyak data sekaligus. Jangan buat tiap angka jadi "kartu besar dengan padding raksasa" ala landing page — gunakan tabel padat, bar chart tipis, dan grid yang efisien.
+- **Micro-interaction bermakna**: animasi hanya untuk memberi informasi (progress bar SLA berjalan, count-up angka statistik, reveal saat scroll) — bukan animasi dekoratif tanpa tujuan.
+- **Jangan pakai ikon emoji sebagai pengganti ikon UI** di aplikasi produksi (beda dengan mockup/prototype). Gunakan icon set konsisten seperti Lucide atau Phosphor.
+- **Mobile-first untuk petugas lapangan.** Form upload bukti pemasangan akan dipakai dari HP di lokasi kerja (sering sinyal lemah) — desain harus toleran ke koneksi lambat, dengan indikator upload yang jelas dan opsi retry otomatis.
+
+---
+
+## 7. FITUR UTAMA YANG HARUS DIBANGUN
+
+1. **Autentikasi & manajemen user** (login, role-based routing, reset password).
+2. **Modul Gudang**: input pengeluaran barang, generate Tracking ID otomatis (format `TRK-YYMMDD-NNNNNN`), generate **QR Code** yang mengandung tracking code, cetak/unduh QR untuk ditempel di material.
+3. **Modul Penerimaan Cabang**: petugas cabang scan QR Code material yang datang lewat kamera HP untuk konfirmasi serah terima (`step: diterima_cabang`). Kalau ada selisih qty saat serah terima, wajib input catatan selisih sebelum konfirmasi bisa disimpan. Tanpa langkah ini, status tracking tetap "Dikirim", bukan "Diterima".
+4. **Modul Lapangan**: daftar tracking ID milik petugas yang bersangkutan, form upload bukti pemasangan (kamera in-app + GPS otomatis + qty terpakai + qty retur), status real-time.
+5. **Timer SLA & eskalasi**: hitung mundur otomatis sejak barang keluar, notifikasi berjenjang (H-1, saat lewat tenggat), auto-ubah status jadi "Kritis" kalau lewat tanpa laporan.
+6. **Dashboard SPI**: ringkasan status semua cabang real-time (WebSocket), tabel tracking dengan filter & sorting, skor risiko per cabang untuk prioritas audit, panel review untuk kasus yang di-flag sistem anti-fake-GPS, peta GIS sebaran lokasi pemasangan (pakai Leaflet + data dari PostGIS).
+
+   **Detail interaksi — baris tracking bisa di-expand (dropdown/accordion):**
+   Setiap baris di tabel tracking (misal: kode barang `VLV-004`, qty `3 Unit`) bisa diklik untuk membuka detail berupa **timeline horizontal beranimasi** yang menunjukkan progres barang tersebut melalui 4 tahap:
+
+   ```
+   ① Barang Keluar Gudang → ② Cabang Terima (scan QR) → ③ Barang Dipasang (foto + koordinat) → ④ Selesai
+   ```
+
+   Spesifikasi perilaku:
+   - Setiap tahap yang sudah selesai ditampilkan dengan ikon centang hijau + nama petugas + timestamp, dan **garis penghubung ke tahap berikutnya animasi "mengisi"** dari kiri ke kanan (pakai transisi `stroke-dashoffset` atau `width` dengan easing, bukan langsung muncul instan).
+   - Tahap yang sedang berjalan (misal sudah keluar gudang tapi belum di-scan cabang) ditampilkan dengan indikator pulsing/berdenyut warna amber, menandakan "menunggu aksi berikutnya".
+   - Tahap yang belum tercapai ditampilkan abu-abu/pudar.
+   - Klik pada tahap **② Cabang Terima** menampilkan detail kecil: siapa yang scan, kode QR yang di-scan, dan waktunya.
+   - Klik pada tahap **③ Barang Dipasang** menampilkan thumbnail foto bukti (bisa diperbesar jadi modal), koordinat GPS dalam format desimal + alamat perkiraan (reverse geocoding), serta badge jika lokasi ter-flag oleh sistem anti-fake-GPS.
+   - Data timeline diambil langsung dari tabel `tracking_events` (urut berdasarkan `occurred_at`) — jangan hardcode 4 tahap di frontend, render dinamis dari data supaya tetap konsisten kalau nanti step ditambah/dikurangi.
+   - Animasi trigger sekali saat accordion dibuka (bukan replay terus-menerus), dan harus tetap smooth walau tabel menampilkan puluhan baris tracking sekaligus (gunakan lazy render — animasi timeline hanya dibangun saat baris benar-benar di-expand, bukan untuk semua baris sekaligus di background).
+7. **Laporan & ekspor**: laporan pertanggungjawaban material per periode (PDF/Excel), laporan khusus untuk kebutuhan audit BPK.
+8. **Audit trail**: semua aksi penting (approve, edit, delete) tercatat di `audit_logs`, tidak bisa dihapus oleh siapapun kecuali superadmin dengan log terpisah.
+
+---
+
+## 8. NON-FUNGSIONAL
+
+- **Keamanan**: hash password dengan bcrypt/argon2, rate limiting pada endpoint sensitif, validasi input ketat di server (jangan percaya validasi client saja), HTTPS wajib di produksi.
+- **Skalabilitas**: sistem harus tetap responsif untuk 12+ cabang dengan ratusan tracking aktif bersamaan — desain query database dengan index yang tepat (sudah dicontohkan di skema).
+- **Observability**: logging terstruktur (JSON logs), health check endpoint, monitoring dasar (bisa pakai Grafana + Prometheus kalau ada resource).
+- **Testing**: unit test untuk logika kritis (perhitungan SLA, deteksi geofence, risk scoring), integration test untuk alur utama end-to-end.
+- **Deployment**: siapkan Docker Compose untuk PostgreSQL + backend + frontend, supaya mudah dijalankan di server internal PDAM tanpa dependency cloud yang rumit.
+
+---
+
+## 9. YANG TIDAK PERLU DIBANGUN (SCOPE GUARD)
+
+- Jangan buat fitur barcode terpisah — cukup QR code saja untuk identifikasi material.
+- Jangan over-engineer dengan microservices di tahap awal — mulai dari monolith yang rapi, pisahkan jadi service terpisah nanti kalau memang terbukti perlu.
+- Jangan bangun native mobile app dulu — web app yang mobile-responsive sudah cukup untuk MVP; native app bisa jadi fase lanjutan kalau dibutuhkan akses native (kamera lebih dalam, deteksi mock location lebih akurat).
+
+---
+
+*Catatan: skema database dan daftar fitur di atas adalah kerangka awal. Sesuaikan detail kolom/tabel dengan kebutuhan spesifik yang muncul saat development, tapi pertahankan prinsip: setiap material yang keluar gudang harus punya jejak yang bisa ditelusuri sampai titik pemasangan, dengan bukti yang sulit dipalsukan.*
