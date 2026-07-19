@@ -14,7 +14,7 @@ export default function LapanganUpload() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: tracking, isLoading: isLoadingTracking } = useGetTracking(params.id as string, {
-    query: { enabled: !!params.id }
+    query: { enabled: !!params.id, queryKey: ['tracking', params.id as string] }
   });
 
   const [qtyUsed, setQtyUsed] = useState<string>('');
@@ -115,6 +115,7 @@ export default function LapanganUpload() {
       
       // 2. Submit Proof
       await submitMutation.mutateAsync({
+        id: params.id as string,
         data: {
           qtyUsed: used,
           qtyReturned: (tracking?.qtyIssued || 0) - used,

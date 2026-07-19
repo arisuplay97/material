@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 
 /* ─── step type ─── */
 type Step = 'scan' | 'preview' | 'foto' | 'success';
@@ -60,7 +60,7 @@ export default function Receive() {
   /* ── look up tracking from scanned code ── */
   const { data: tracking, isFetching: isLookingUp, error: lookupError } = useGetTrackingByCode(
     scannedCode,
-    { query: { enabled: !!scannedCode && step === 'preview' } }
+    { query: { enabled: !!scannedCode && step === 'preview', queryKey: ['tracking-code', scannedCode] } }
   );
 
   const receiveMutation = useReceiveTracking();
@@ -340,7 +340,7 @@ export default function Receive() {
             ) : tracking ? (
               <>
                 {/* Already received guard */}
-                {tracking.status !== 'keluar_gudang' && (
+                {tracking.status !== 'dikirim' && (
                   <div className="bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
                     <p className="font-mono text-xs text-amber-700">
@@ -394,7 +394,7 @@ export default function Receive() {
 
                 <Button
                   onClick={() => setStep('foto')}
-                  disabled={tracking.status !== 'keluar_gudang'}
+                  disabled={tracking.status !== 'dikirim'}
                   className="w-full h-14 rounded-none font-mono uppercase tracking-widest text-sm font-bold"
                 >
                   <Camera className="w-4 h-4 mr-2" /> Lanjut — Foto Dokumentasi

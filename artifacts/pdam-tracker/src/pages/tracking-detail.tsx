@@ -1,4 +1,3 @@
-import { useGetTrackingDetail } from '@workspace/api-client-react'; // Wait, let's check exact hook name from API schema
 // I'll import just the tracking by id hook.
 import { useGetTracking } from '@workspace/api-client-react'; // Let me check api.ts
 
@@ -18,7 +17,8 @@ export default function TrackingDetail() {
   // Note: API schema actually generates useGetTracking but the detailed endpoint might return the full tracking detail.
   const { data: tracking, isLoading } = useGetTracking(trackingId as string, {
     query: {
-      enabled: !!trackingId
+      enabled: !!trackingId,
+      queryKey: ['tracking', trackingId as string]
     }
   });
 

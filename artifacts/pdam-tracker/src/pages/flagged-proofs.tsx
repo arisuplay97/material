@@ -13,23 +13,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import TrackingTimeline from '@/components/TrackingTimeline';
 
 /* ─── animation variants ─── */
-const pageVariants = {
+const pageVariants: any = {
   hidden: { opacity: 0, y: 20 },
   show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
 };
 
-const listVariants = {
+const listVariants: any = {
   hidden: {},
   show:   { transition: { staggerChildren: 0.1 } },
 };
 
-const cardVariants = {
+const cardVariants: any = {
   hidden: { opacity: 0, y: 24, scale: 0.98 },
   show:   { opacity: 1, y: 0,  scale: 1,    transition: { type: 'spring', stiffness: 220, damping: 24 } },
   exit:   { opacity: 0, x: -40, transition: { duration: 0.25 } },
 };
 
-const timelineWrapVariants = {
+const timelineWrapVariants: any = {
   hidden: { opacity: 0, height: 0 },
   show:   { opacity: 1, height: 'auto', transition: { duration: 0.35, ease: 'easeOut' } },
   exit:   { opacity: 0, height: 0,      transition: { duration: 0.2 } },
