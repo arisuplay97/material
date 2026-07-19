@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     query: {
       enabled: !!token && user === null,
       retry: false,
+      queryKey: ['currentUser']
     }
   });
 

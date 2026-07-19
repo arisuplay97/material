@@ -22,28 +22,28 @@ function riskMeta(score: number): { level: RiskLevel; label: string; color: stri
 }
 
 /* ─── animation variants ─── */
-const pageVariants = {
+const pageVariants: any = {
   hidden: { opacity: 0, y: 16 },
   show:   { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' } },
 };
 
-const listVariants = {
+const listVariants: any = {
   hidden: {},
   show:   { transition: { staggerChildren: 0.09 } },
 };
 
-const cardVariants = {
+const cardVariants: any = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
   show:   { opacity: 1, y: 0,  scale: 1, transition: { type: 'spring', stiffness: 220, damping: 22 } },
 };
 
-const timelineWrapVariants = {
+const timelineWrapVariants: any = {
   hidden: { opacity: 0, height: 0 },
   show:   { opacity: 1, height: 'auto', transition: { duration: 0.35, ease: 'easeOut' } },
   exit:   { opacity: 0, height: 0,      transition: { duration: 0.22 } },
 };
 
-const trackingRowVariants = {
+const trackingRowVariants: any = {
   hidden: { opacity: 0, x: -12 },
   show:   { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 300, damping: 26 } },
 };
@@ -129,7 +129,7 @@ function BranchCard({ branch }: { branch: any }) {
 
   const { data: trackingData, isLoading: isLoadingTrackings } = useListTrackings(
     { branchId: branch.branchId, limit: 20 },
-    { query: { enabled: open } }
+    { query: { enabled: open, queryKey: ['trackings', branch.branchId] } }
   );
 
   const trackings = trackingData?.data ?? [];

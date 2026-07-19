@@ -19,29 +19,29 @@ const STEP_META: Record<string, { label: string; icon: React.ElementType; color:
   selesai:         { label: 'Terverifikasi',    icon: ShieldCheck,  color: 'text-green-600' },
 };
 
-const containerVariants = {
+const containerVariants: any = {
   hidden: {},
   show: { transition: { staggerChildren: 0.18, delayChildren: 0.1 } },
 };
 
-const nodeVariants = {
+const nodeVariants: any = {
   hidden: { opacity: 0, y: 16 },
   show:   { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 22 } },
 };
 
-const lineVariants = {
+const lineVariants: any = {
   hidden: { scaleX: 0 },
   show:   { scaleX: 1, transition: { duration: 0.6, ease: 'easeOut' } },
 };
 
-const detailVariants = {
+const detailVariants: any = {
   hidden: { opacity: 0, height: 0 },
   show:   { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: 'easeOut' } },
 };
 
 export default function TrackingTimeline({ trackingId }: { trackingId: string }) {
   const { data: events, isLoading } = useGetTrackingEvents(trackingId, {
-    query: { enabled: !!trackingId },
+    query: { enabled: !!trackingId, queryKey: ['trackingEvents', trackingId] },
   });
 
   if (isLoading) {
