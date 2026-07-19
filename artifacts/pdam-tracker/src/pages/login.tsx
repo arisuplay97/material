@@ -27,7 +27,7 @@ export default function Login() {
       { data: { email, password } },
       {
         onSuccess: (data) => {
-          login(data.accessToken, data.refreshToken);
+          login(data.accessToken, data.refreshToken, data.user);
           // Redirect based on role
           const role = data.user.role;
           if (role === 'petugas_lapangan') {

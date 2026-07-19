@@ -1,32 +1,28 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useGetCurrentUser, User, setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
+import { useGetCurrentUser, User, setAuthTokenGetter } from '@workspace/api-client-react';
 import { useLocation } from 'wouter';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (token: string, refreshToken: string) => void;
+  login: (token: string, refreshToken: string, userData: User) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Initialize token getter for the API client
-setAuthTokenGetter(() => {
-  return localStorage.getItem('access_token');
-});
-
-// Since the API server is on a different port/path, we might need to set baseUrl.
-// Wait, the vite proxy usually handles `/api`. If so, baseUrl can be left as default.
+// Always read token from localStorage so API calls work immediately after login
+setAuthTokenGetter(() => localStorage.getItem('access_token'));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [user, setUser] = useState<User | null>(null);
   const [, setLocation] = useLocation();
 
+  // Only fetch /auth/me on initial page load (when token exists but user not yet set)
   const { data: currentUser, isLoading: isUserLoading, isError } = useGetCurrentUser({
     query: {
-      enabled: !!token,
+      enabled: !!token && user === null,
       retry: false,
     }
   });
@@ -43,10 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isError]);
 
-  const handleLogin = (newToken: string, newRefreshToken: string) => {
+  // Accept user data directly so state is set synchronously before navigation
+  const handleLogin = (newToken: string, newRefreshToken: string, userData: User) => {
     localStorage.setItem('access_token', newToken);
     localStorage.setItem('refresh_token', newRefreshToken);
     setToken(newToken);
+    setUser(userData); // set immediately — no race condition
   };
 
   const handleLogout = () => {
@@ -57,8 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLocation('/login');
   };
 
+  const isLoading = !!token && user === null && isUserLoading;
+
   return (
-    <AuthContext.Provider value={{ user, isLoading: !!token && isUserLoading, login: handleLogin, logout: handleLogout }}>
+    <AuthContext.Provider value={{ user, isLoading, login: handleLogin, logout: handleLogout }}>
       {children}
     </AuthContext.Provider>
   );
