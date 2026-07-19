@@ -2,19 +2,21 @@ import { defineConfig } from "drizzle-kit";
 import fs from "fs";
 import path from "path";
 
-// Manual .env parser to avoid external dependencies
-const envPath = path.resolve(__dirname, "../../.env");
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  envContent.split("\n").forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return;
-    const [key, ...valParts] = trimmed.split("=");
-    if (key && valParts.length > 0) {
-      const val = valParts.join("=").trim().replace(/^['"]|['"]$/g, "");
-      process.env[key.trim()] = val;
-    }
-  });
+// Manual .env parser using process.cwd() instead of __dirname
+if (!process.env.DATABASE_URL) {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    envContent.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return;
+      const [key, ...valParts] = trimmed.split("=");
+      if (key && valParts.length > 0) {
+        const val = valParts.join("=").trim().replace(/^['"]|['"]$/g, "");
+        process.env[key.trim()] = val;
+      }
+    });
+  }
 }
 
 if (!process.env.DATABASE_URL) {
