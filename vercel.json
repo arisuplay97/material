@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "outputDirectory": "artifacts/pdam-tracker/dist/public",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
