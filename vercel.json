@@ -1,11 +1,6 @@
 {
   "version": 2,
   "outputDirectory": "artifacts/pdam-tracker/dist/public",
-  "functions": {
-    "api/**/*.ts": {
-      "includeFiles": "artifacts/api-server/src/**"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
