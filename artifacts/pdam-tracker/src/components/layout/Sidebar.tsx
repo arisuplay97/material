@@ -1,15 +1,15 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useLocation } from 'wouter';
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarGroup, 
-  SidebarGroupContent, 
-  SidebarGroupLabel, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu, 
-  SidebarMenuButton, 
-  SidebarMenuItem, 
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarProvider,
   SidebarFooter
 } from '@/components/ui/sidebar';
@@ -26,7 +26,8 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
-  ScanLine
+  ScanLine,
+  Map
 } from 'lucide-react';
 import { useLogout } from '@workspace/api-client-react';
 import React from 'react';
@@ -51,6 +52,12 @@ export function AppSidebar() {
       title: "Dashboard",
       path: "/dashboard",
       icon: LayoutDashboard,
+      roles: ['spi', 'direksi', 'superadmin', 'admin_gudang']
+    },
+    {
+      title: "Peta GIS",
+      path: "/gis-map",
+      icon: Map,
       roles: ['spi', 'direksi', 'superadmin', 'admin_gudang']
     },
     {
@@ -122,7 +129,7 @@ export function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent className="bg-card">
         <SidebarGroup>
           <SidebarGroupLabel className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-4">Menu Utama</SidebarGroupLabel>
@@ -130,8 +137,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={location === item.path || location.startsWith(item.path + '/')}
                     className="font-medium data-[active=true]:bg-primary/5 data-[active=true]:text-primary"
                   >

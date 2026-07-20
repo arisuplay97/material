@@ -22,6 +22,7 @@ import MaterialRequests from '@/pages/material-requests';
 import Reports from '@/pages/reports';
 import Users from '@/pages/users';
 import Settings from '@/pages/settings';
+import GisMap from '@/pages/gis-map';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,9 +49,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      
+
       {/* Protected Routes */}
       <ProtectedRoute path="/dashboard" component={Dashboard} />
+      <ProtectedRoute path="/gis-map" component={GisMap} />
       <ProtectedRoute path="/trackings" component={Trackings} />
       <ProtectedRoute path="/trackings/new" component={TrackingNew} />
       <ProtectedRoute path="/trackings/:id" component={TrackingDetail} />
