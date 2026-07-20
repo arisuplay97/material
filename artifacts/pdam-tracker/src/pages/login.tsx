@@ -1,11 +1,16 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useLogin } from '@workspace/api-client-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  Package,
+  MapPin,
+} from 'lucide-react';
 
-/* ─── SVG Logo Component ─── */
+/* ─── SVG Logo ─── */
 function SiaraLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -40,12 +45,9 @@ function FloatingInput({
   const isActive = focused || value.length > 0;
 
   return (
-    <div className="siara-input-group">
-      <div className={`siara-input-wrapper ${isActive ? 'active' : ''} ${focused ? 'focused' : ''}`}>
-        <label
-          htmlFor={id}
-          className={`siara-floating-label ${isActive ? 'floating' : ''}`}
-        >
+    <div className="sl-input-group">
+      <div className={`sl-input-wrap ${isActive ? 'active' : ''} ${focused ? 'focused' : ''}`}>
+        <label htmlFor={id} className={`sl-float-label ${isActive ? 'floating' : ''}`}>
           {label}
         </label>
         <input
@@ -56,10 +58,10 @@ function FloatingInput({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           autoComplete={autoComplete}
-          className="siara-input"
+          className="sl-input"
           required
         />
-        {suffix && <div className="siara-input-suffix">{suffix}</div>}
+        {suffix && <div className="sl-input-suffix">{suffix}</div>}
       </div>
     </div>
   );
@@ -75,24 +77,11 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
-  const illustrationRef = useRef<HTMLDivElement>(null);
 
   const loginMutation = useLogin();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Subtle parallax on the illustration
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!illustrationRef.current) return;
-      const x = (e.clientX / window.innerWidth - 0.5) * 12;
-      const y = (e.clientY / window.innerHeight - 0.5) * 12;
-      illustrationRef.current.style.transform = `translate(${x}px, ${y}px)`;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -115,144 +104,149 @@ export default function Login() {
         },
         onError: (err) => {
           setError(err.data?.error || 'Gagal masuk. Periksa username dan kata sandi.');
-        }
+        },
       }
     );
   };
 
+  const fc = (cls: string, delay: string) =>
+    `${cls} ${mounted ? `sl-fade-in ${delay}` : 'sl-fade-init'}`;
+
   return (
     <>
       <style>{`
-        /* ─── SIARA Login Page Styles ─── */
-        .siara-login-root {
+        /* ═══════════════════════════════════════
+           SIARA Login — Enterprise Abstract Design
+           ═══════════════════════════════════════ */
+
+        .sl-root {
           min-height: 100vh;
           display: flex;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
           background: #ffffff;
           overflow: hidden;
         }
+        .sl-root * { box-sizing: border-box; }
 
-        .siara-login-root * {
-          box-sizing: border-box;
+        /* ── Fade Animations ── */
+        .sl-fade-init {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        .sl-fade-in {
+          opacity: 1;
+          transform: translateY(0);
+          transition: opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .sl-d1 { transition-delay: 0.05s !important; }
+        .sl-d2 { transition-delay: 0.12s !important; }
+        .sl-d3 { transition-delay: 0.19s !important; }
+        .sl-d4 { transition-delay: 0.26s !important; }
+        .sl-d5 { transition-delay: 0.33s !important; }
+        .sl-d6 { transition-delay: 0.40s !important; }
+        .sl-d7 { transition-delay: 0.47s !important; }
+
+        .sl-scale-init {
+          opacity: 0;
+          transform: scale(0.96) translate(10px, 10px);
+        }
+        .sl-scale-in {
+          opacity: 1;
+          transform: scale(1) translate(0, 0);
+          transition: opacity 0.8s ease 0.15s, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s;
         }
 
-        /* ── Left Panel ── */
-        .siara-left {
-          width: 42%;
-          min-width: 400px;
+        /* ═══ LEFT PANEL ═══ */
+        .sl-left {
+          width: 40%;
+          min-width: 420px;
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 48px 56px;
+          padding: 48px 64px;
           position: relative;
           z-index: 2;
           background: #ffffff;
         }
-
-        .siara-left-inner {
-          max-width: 420px;
+        .sl-left-inner {
+          max-width: 380px;
           width: 100%;
+          margin: 0 auto;
         }
 
-        /* Organic curved divider */
-        .siara-left::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          right: -60px;
-          width: 120px;
-          height: 100%;
-          background: #ffffff;
-          z-index: 1;
-          clip-path: ellipse(60px 55% at 0% 50%);
-        }
-
-        /* Branding */
-        .siara-brand {
+        /* Brand */
+        .sl-brand {
           display: flex;
           align-items: center;
-          gap: 14px;
-          margin-bottom: 12px;
+          gap: 12px;
+          margin-bottom: 24px;
         }
-
-        .siara-brand-logo {
-          width: 42px;
-          height: 42px;
+        .sl-brand-logo {
+          width: 38px;
+          height: 38px;
           flex-shrink: 0;
         }
-
-        .siara-brand-text h1 {
+        .sl-brand-text h1 {
           font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 22px;
+          font-size: 20px;
           font-weight: 800;
-          letter-spacing: -0.02em;
+          letter-spacing: -0.01em;
           color: #0F5FA8;
           margin: 0;
           line-height: 1;
         }
-
-        .siara-brand-text p {
+        .sl-brand-text p {
           font-size: 11px;
           font-weight: 500;
-          color: #64748b;
-          margin: 3px 0 0 0;
-          letter-spacing: 0.01em;
-          line-height: 1.3;
+          color: #475569;
+          margin: 4px 0 0;
+          line-height: 1.2;
         }
 
-        .siara-tagline {
+        .sl-tagline {
           font-size: 13.5px;
-          line-height: 1.65;
-          color: #94a3b8;
-          margin: 0 0 40px 0;
-          max-width: 380px;
+          line-height: 1.6;
+          color: #64748b;
+          margin: 0 0 48px;
           font-weight: 400;
         }
 
-        /* Form title */
-        .siara-form-title {
+        /* Form heading */
+        .sl-form-title {
           font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 28px;
+          font-size: 24px;
           font-weight: 700;
           color: #0f172a;
-          letter-spacing: -0.025em;
-          margin: 0 0 6px 0;
+          letter-spacing: -0.02em;
+          margin: 0 0 6px;
+        }
+        .sl-form-sub {
+          font-size: 13.5px;
+          color: #64748b;
+          margin: 0 0 32px;
         }
 
-        .siara-form-subtitle {
-          font-size: 14px;
-          color: #94a3b8;
-          margin: 0 0 32px 0;
-          font-weight: 400;
+        /* Input */
+        .sl-input-group {
+          margin-bottom: 18px;
         }
-
-        /* Floating label input */
-        .siara-input-group {
-          margin-bottom: 20px;
-        }
-
-        .siara-input-wrapper {
+        .sl-input-wrap {
           position: relative;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 12px;
-          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          background: #ffffff;
           transition: all 0.2s ease;
-          padding: 0;
         }
-
-        .siara-input-wrapper:hover {
+        .sl-input-wrap:hover {
           border-color: #cbd5e1;
         }
-
-        .siara-input-wrapper.focused {
-          border-color: #1976D2;
-          background: #ffffff;
-          box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.08);
+        .sl-input-wrap.focused {
+          border-color: #0F5FA8;
+          box-shadow: 0 0 0 3px rgba(15, 95, 168, 0.08);
         }
-
-        .siara-floating-label {
+        .sl-float-label {
           position: absolute;
-          left: 16px;
+          left: 14px;
           top: 50%;
           transform: translateY(-50%);
           font-size: 14px;
@@ -260,171 +254,144 @@ export default function Login() {
           pointer-events: none;
           transition: all 0.2s ease;
           font-weight: 500;
-          background: transparent;
-          padding: 0;
         }
-
-        .siara-floating-label.floating {
+        .sl-float-label.floating {
           top: 8px;
           transform: translateY(0);
-          font-size: 10.5px;
-          color: #1976D2;
+          font-size: 10px;
+          color: #64748b;
           font-weight: 600;
-          letter-spacing: 0.03em;
-          background: transparent;
+          letter-spacing: 0.02em;
         }
-
-        .siara-input {
+        .sl-input-wrap.focused .sl-float-label.floating {
+          color: #0F5FA8;
+        }
+        .sl-input {
           width: 100%;
           border: none;
           outline: none;
           background: transparent;
-          padding: 24px 48px 8px 16px;
-          font-size: 15px;
+          padding: 24px 44px 8px 14px;
+          font-size: 14px;
           font-family: 'Inter', sans-serif;
           color: #0f172a;
           font-weight: 500;
-          line-height: 1;
         }
+        .sl-input::placeholder { color: transparent; }
 
-        .siara-input::placeholder {
-          color: transparent;
-        }
-
-        .siara-input-suffix {
+        .sl-input-suffix {
           position: absolute;
-          right: 14px;
+          right: 12px;
           top: 50%;
           transform: translateY(-50%);
           display: flex;
-          align-items: center;
         }
-
-        .siara-toggle-pw {
+        .sl-toggle-pw {
           background: none;
           border: none;
           cursor: pointer;
-          padding: 4px;
+          padding: 6px;
           color: #94a3b8;
           display: flex;
           align-items: center;
           transition: color 0.15s;
           border-radius: 6px;
         }
-
-        .siara-toggle-pw:hover {
+        .sl-toggle-pw:hover {
           color: #475569;
-          background: #f1f5f9;
+          background: #f8fafc;
         }
 
-        /* Remember & Forgot */
-        .siara-options-row {
+        /* Options row */
+        .sl-options {
           display: flex;
           align-items: center;
           justify-content: space-between;
           margin-bottom: 28px;
         }
-
-        .siara-checkbox-label {
+        .sl-cb-label {
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 13px;
-          color: #64748b;
+          color: #475569;
           cursor: pointer;
           user-select: none;
           font-weight: 500;
         }
-
-        .siara-checkbox {
+        .sl-cb {
           width: 16px;
           height: 16px;
           border-radius: 4px;
-          border: 1.5px solid #cbd5e1;
+          border: 1px solid #cbd5e1;
           appearance: none;
           cursor: pointer;
           transition: all 0.15s;
-          background: #ffffff;
+          background: #fff;
           flex-shrink: 0;
         }
-
-        .siara-checkbox:checked {
-          background: #1976D2;
-          border-color: #1976D2;
+        .sl-cb:checked {
+          background: #0F5FA8;
+          border-color: #0F5FA8;
           background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
         }
-
-        .siara-forgot {
+        .sl-forgot {
           font-size: 13px;
-          color: #1976D2;
+          color: #0F5FA8;
           text-decoration: none;
           font-weight: 600;
           transition: color 0.15s;
         }
+        .sl-forgot:hover { color: #1e40af; }
 
-        .siara-forgot:hover {
-          color: #0F5FA8;
-        }
-
-        /* Login button */
-        .siara-btn {
+        /* Button */
+        .sl-btn {
           width: 100%;
-          height: 52px;
+          height: 46px;
           border: none;
-          border-radius: 12px;
+          border-radius: 8px;
           font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 15px;
-          font-weight: 700;
-          color: #ffffff;
+          font-size: 14.5px;
+          font-weight: 600;
+          color: #fff;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
           transition: all 0.2s ease;
-          background: linear-gradient(135deg, #1976D2 0%, #0F5FA8 100%);
-          box-shadow: 0 2px 8px rgba(15, 95, 168, 0.25), 0 1px 2px rgba(15, 95, 168, 0.15);
+          background: #0F5FA8;
           letter-spacing: 0.01em;
-          position: relative;
-          overflow: hidden;
         }
-
-        .siara-btn:hover:not(:disabled) {
-          box-shadow: 0 4px 16px rgba(15, 95, 168, 0.35), 0 2px 4px rgba(15, 95, 168, 0.2);
-          transform: translateY(-1px);
+        .sl-btn:hover:not(:disabled) {
+          background: #0d5496;
         }
-
-        .siara-btn:active:not(:disabled) {
-          transform: translateY(0px);
-          box-shadow: 0 1px 4px rgba(15, 95, 168, 0.2);
+        .sl-btn:active:not(:disabled) {
+          transform: translateY(1px);
         }
-
-        .siara-btn:disabled {
+        .sl-btn:disabled {
           opacity: 0.7;
           cursor: not-allowed;
         }
 
-        /* Error alert */
-        .siara-error {
+        /* Error */
+        .sl-error {
           background: #fef2f2;
           border: 1px solid #fecaca;
-          border-radius: 10px;
-          padding: 12px 16px;
+          border-radius: 8px;
+          padding: 10px 14px;
           margin-bottom: 20px;
           display: flex;
           align-items: center;
           gap: 10px;
         }
-
-        .siara-error-dot {
-          width: 6px;
-          height: 6px;
+        .sl-error-dot {
+          width: 6px; height: 6px;
           border-radius: 50%;
           background: #ef4444;
           flex-shrink: 0;
         }
-
-        .siara-error-text {
+        .sl-error-text {
           font-size: 13px;
           color: #dc2626;
           font-weight: 500;
@@ -432,190 +399,245 @@ export default function Login() {
         }
 
         /* Footer */
-        .siara-footer {
-          margin-top: 48px;
+        .sl-footer {
+          margin-top: 56px;
           font-size: 11px;
-          color: #cbd5e1;
-          line-height: 1.5;
-        }
-
-        .siara-footer span {
           color: #94a3b8;
-          font-weight: 500;
+          text-align: left;
         }
 
-        /* ── Right Panel ── */
-        .siara-right {
+        /* ═══ RIGHT PANEL (Visual Showcase) ═══ */
+        .sl-right {
           flex: 1;
           position: relative;
+          background: #f8fafc; /* Very light blue-gray */
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(145deg, #e8f0fe 0%, #dbeafe 30%, #eff6ff 70%, #f0f7ff 100%);
           overflow: hidden;
+          padding: 40px;
+          border-left: 1px solid #e2e8f0;
         }
 
-        /* Subtle geometric background patterns */
-        .siara-bg-pattern {
+        /* Subtle grid background common in SaaS */
+        .sl-grid {
           position: absolute;
           inset: 0;
-          overflow: hidden;
+          background-image:
+            linear-gradient(#f1f5f9 1px, transparent 1px),
+            linear-gradient(90deg, #f1f5f9 1px, transparent 1px);
+          background-size: 32px 32px;
+          background-position: -1px -1px;
+          opacity: 0.6;
           pointer-events: none;
         }
 
-        .siara-bg-circle {
-          position: absolute;
-          border-radius: 50%;
-          border: 1px solid rgba(25, 118, 210, 0.06);
-        }
-
-        .siara-bg-circle:nth-child(1) {
-          width: 300px; height: 300px;
-          top: -60px; right: -40px;
-          background: radial-gradient(circle, rgba(25, 118, 210, 0.04) 0%, transparent 70%);
-        }
-
-        .siara-bg-circle:nth-child(2) {
-          width: 200px; height: 200px;
-          bottom: 80px; left: 40px;
-          background: radial-gradient(circle, rgba(66, 165, 245, 0.05) 0%, transparent 70%);
-        }
-
-        .siara-bg-circle:nth-child(3) {
-          width: 500px; height: 500px;
-          top: 50%; left: 50%;
-          transform: translate(-50%, -50%);
-          border: 1.5px solid rgba(25, 118, 210, 0.04);
-        }
-
-        .siara-bg-dots {
-          position: absolute;
-          width: 120px;
-          height: 120px;
-          background-image: radial-gradient(circle, rgba(25, 118, 210, 0.12) 1.5px, transparent 1.5px);
-          background-size: 16px 16px;
-        }
-
-        .siara-bg-dots:nth-child(4) {
-          top: 40px;
-          right: 40px;
-        }
-
-        .siara-bg-dots:nth-child(5) {
-          bottom: 60px;
-          left: 60px;
-          opacity: 0.6;
-        }
-
-        /* Illustration */
-        .siara-illustration-wrap {
+        /* Abstract Mockup Composition */
+        .mockup-container {
           position: relative;
-          z-index: 1;
-          width: 85%;
-          max-width: 580px;
-          transition: transform 0.3s ease-out;
-          will-change: transform;
-        }
-
-        .siara-illustration-wrap img {
           width: 100%;
-          height: auto;
-          filter: drop-shadow(0 8px 24px rgba(15, 95, 168, 0.1));
+          max-width: 640px;
+          z-index: 10;
         }
 
-        /* ── Fade-in animation ── */
-        .siara-fade-enter {
-          opacity: 0;
-          transform: translateY(16px);
+        /* Main Window */
+        .mockup-window {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+          overflow: hidden;
+          width: 100%;
         }
 
-        .siara-fade-active {
-          opacity: 1;
-          transform: translateY(0);
-          transition: opacity 0.5s ease, transform 0.5s ease;
+        .mw-header {
+          height: 48px;
+          background: #ffffff;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          gap: 6px;
+        }
+        .mw-dot {
+          width: 10px; height: 10px;
+          border-radius: 50%;
+          background: #e2e8f0;
         }
 
-        .siara-fade-delay-1 { transition-delay: 0.05s !important; }
-        .siara-fade-delay-2 { transition-delay: 0.12s !important; }
-        .siara-fade-delay-3 { transition-delay: 0.2s !important; }
-        .siara-fade-delay-4 { transition-delay: 0.28s !important; }
-        .siara-fade-delay-5 { transition-delay: 0.36s !important; }
-        .siara-fade-delay-6 { transition-delay: 0.44s !important; }
-
-        .siara-right-fade-enter {
-          opacity: 0;
-          transform: scale(0.96);
+        .mw-body {
+          padding: 32px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
         }
 
-        .siara-right-fade-active {
-          opacity: 1;
-          transform: scale(1);
-          transition: opacity 0.7s ease 0.15s, transform 0.7s ease 0.15s;
+        /* Abstract Row */
+        .mw-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border: 1px solid #f1f5f9;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+        .mw-row-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .mw-icon {
+          width: 36px; height: 36px;
+          border-radius: 8px;
+          background: #f0f7ff;
+          color: #0F5FA8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .mw-lines {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .al-dark { height: 8px; background: #334155; border-radius: 4px; }
+        .al-light { height: 8px; background: #cbd5e1; border-radius: 4px; }
+        
+        .mw-badge {
+          display: inline-flex;
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+        }
+        .mw-badge.blue {
+          background: #eff6ff;
+          color: #0F5FA8;
+        }
+        .mw-badge.green {
+          background: #f0fdf4;
+          color: #16a34a;
         }
 
-        /* ── Responsive ── */
-        @media (max-width: 900px) {
-          .siara-login-root {
-            flex-direction: column;
+        /* Abstract Tracking Line inside window */
+        .mw-tracking {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+          padding: 0 12px;
+        }
+        .mt-dot {
+          width: 12px; height: 12px;
+          border-radius: 50%;
+          background: #cbd5e1;
+        }
+        .mt-dot.done {
+          background: #0F5FA8;
+          box-shadow: 0 0 0 3px #eff6ff;
+        }
+        .mt-line {
+          flex: 1;
+          height: 2px;
+          background: #e2e8f0;
+          border-radius: 1px;
+        }
+        .mt-line.done {
+          background: #0F5FA8;
+        }
+
+        /* Overlapping Card */
+        .mockup-float {
+          position: absolute;
+          bottom: -24px;
+          right: -32px;
+          width: 260px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 20px;
+          box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+        }
+        .mf-header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .mf-icon {
+          width: 28px; height: 28px;
+          border-radius: 6px;
+          background: #f8fafc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+        }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 1024px) {
+          .sl-right { padding: 32px; }
+          .mockup-float {
+            right: 0;
+            bottom: -20px;
           }
-          .siara-left {
+        }
+
+        @media (max-width: 900px) {
+          .sl-root { flex-direction: column; }
+          .sl-left {
             width: 100%;
             min-width: unset;
-            padding: 32px 24px;
+            padding: 40px 32px;
+            align-items: center;
           }
-          .siara-left::after {
-            display: none;
-          }
-          .siara-right {
-            display: none;
-          }
-          .siara-left-inner {
-            max-width: 100%;
-          }
+          .sl-left-inner { max-width: 400px; }
+          .sl-right { display: none; }
         }
 
         @media (max-width: 480px) {
-          .siara-left {
-            padding: 24px 20px;
-          }
-          .siara-form-title {
-            font-size: 24px;
-          }
+          .sl-left { padding: 32px 24px; }
+          .sl-form-title { font-size: 22px; }
+          .sl-brand-text h1 { font-size: 18px; }
         }
       `}</style>
 
-      <div className="siara-login-root">
-        {/* ─── LEFT PANEL ─── */}
-        <div className="siara-left">
-          <div className="siara-left-inner">
-            {/* Brand */}
-            <div className={`siara-brand ${mounted ? 'siara-fade-active siara-fade-delay-1' : 'siara-fade-enter'}`}>
-              <SiaraLogo className="siara-brand-logo" />
-              <div className="siara-brand-text">
+      <div className="sl-root">
+        {/* ═══ LEFT: Login Form ═══ */}
+        <div className="sl-left">
+          <div className="sl-left-inner">
+            {/* Brand Logo & Title */}
+            <div className={fc('sl-brand', 'sl-d1')}>
+              <SiaraLogo className="sl-brand-logo" />
+              <div className="sl-brand-text">
                 <h1>SIARA</h1>
-                <p>Sistem Informasi Akuntabilitas<br />dan Realisasi Material</p>
+                <p>Sistem Informasi Akuntabilitas dan Realisasi Material</p>
               </div>
             </div>
 
-            <p className={`siara-tagline ${mounted ? 'siara-fade-active siara-fade-delay-2' : 'siara-fade-enter'}`}>
+            {/* Supporting Description */}
+            <p className={fc('sl-tagline', 'sl-d2')}>
               Memastikan setiap material memiliki jejak digital mulai dari gudang hingga menjadi aset perusahaan.
             </p>
 
-            {/* Form */}
-            <div className={mounted ? 'siara-fade-active siara-fade-delay-3' : 'siara-fade-enter'}>
-              <h2 className="siara-form-title">Masuk ke Akun</h2>
-              <p className="siara-form-subtitle">Masukkan kredensial Anda untuk melanjutkan</p>
+            {/* Form heading */}
+            <div className={fc('', 'sl-d3')}>
+              <h2 className="sl-form-title">Masuk ke Akun</h2>
+              <p className="sl-form-sub">Masukkan kredensial Anda untuk melanjutkan</p>
             </div>
 
+            {/* Error Message */}
             {error && (
-              <div className="siara-error">
-                <div className="siara-error-dot" />
-                <span className="siara-error-text">{error}</span>
+              <div className="sl-error">
+                <div className="sl-error-dot" />
+                <span className="sl-error-text">{error}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit}>
-              <div className={mounted ? 'siara-fade-active siara-fade-delay-4' : 'siara-fade-enter'}>
+              <div className={fc('', 'sl-d4')}>
                 <FloatingInput
                   id="login-username"
                   label="Username / NIK"
@@ -625,7 +647,7 @@ export default function Login() {
                 />
               </div>
 
-              <div className={mounted ? 'siara-fade-active siara-fade-delay-5' : 'siara-fade-enter'}>
+              <div className={fc('', 'sl-d5')}>
                 <FloatingInput
                   id="login-password"
                   label="Password"
@@ -636,40 +658,40 @@ export default function Login() {
                   suffix={
                     <button
                       type="button"
-                      className="siara-toggle-pw"
+                      className="sl-toggle-pw"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   }
                 />
               </div>
 
-              <div className={`siara-options-row ${mounted ? 'siara-fade-active siara-fade-delay-5' : 'siara-fade-enter'}`}>
-                <label className="siara-checkbox-label">
+              <div className={fc('sl-options', 'sl-d6')}>
+                <label className="sl-cb-label">
                   <input
                     type="checkbox"
-                    className="siara-checkbox"
+                    className="sl-cb"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                   />
                   Ingat saya
                 </label>
-                <a href="#" className="siara-forgot" onClick={(e) => e.preventDefault()}>
+                <a href="#" className="sl-forgot" onClick={(e) => e.preventDefault()}>
                   Lupa Password?
                 </a>
               </div>
 
-              <div className={mounted ? 'siara-fade-active siara-fade-delay-6' : 'siara-fade-enter'}>
+              <div className={fc('', 'sl-d7')}>
                 <button
                   type="submit"
-                  className="siara-btn"
+                  className="sl-btn"
                   disabled={loginMutation.isPending}
                 >
                   {loginMutation.isPending ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin" />
                       Memverifikasi...
                     </>
                   ) : (
@@ -679,33 +701,87 @@ export default function Login() {
               </div>
             </form>
 
-            <div className={`siara-footer ${mounted ? 'siara-fade-active siara-fade-delay-6' : 'siara-fade-enter'}`}>
-              <span>PERUMDAM Tirta Ardhia Rinjani</span> — SIARA v2.0
+            <div className={fc('sl-footer', 'sl-d7')}>
+              PERUMDAM Tirta Ardhia Rinjani — SIARA v2.0
             </div>
           </div>
         </div>
 
-        {/* ─── RIGHT PANEL ─── */}
-        <div className="siara-right">
-          {/* Background patterns */}
-          <div className="siara-bg-pattern">
-            <div className="siara-bg-circle" />
-            <div className="siara-bg-circle" />
-            <div className="siara-bg-circle" />
-            <div className="siara-bg-dots" />
-            <div className="siara-bg-dots" />
-          </div>
+        {/* ═══ RIGHT: Abstract Product Composition ═══ */}
+        <div className="sl-right">
+          <div className="sl-grid" />
 
-          {/* Illustration with parallax */}
-          <div
-            ref={illustrationRef}
-            className={`siara-illustration-wrap ${mounted ? 'siara-right-fade-active' : 'siara-right-fade-enter'}`}
-          >
-            <img
-              src="/siara-illustration.png"
-              alt="SIARA Material Accountability System — Ilustrasi alur tracking material dari gudang ke pemasangan"
-              draggable={false}
-            />
+          <div className={`mockup-container ${mounted ? 'sl-scale-in' : 'sl-scale-init'}`}>
+            {/* Main Mockup Window */}
+            <div className="mockup-window">
+              <div className="mw-header">
+                <div className="mw-dot" />
+                <div className="mw-dot" />
+                <div className="mw-dot" />
+              </div>
+              <div className="mw-body">
+
+                {/* Abstract Material Item 1 */}
+                <div className="mw-row">
+                  <div className="mw-row-left">
+                    <div className="mw-icon">
+                      <Package size={18} strokeWidth={2.5} />
+                    </div>
+                    <div className="mw-lines">
+                      <div className="al-dark" style={{ width: '140px' }} />
+                      <div className="al-light" style={{ width: '80px' }} />
+                    </div>
+                  </div>
+                  <div className="mw-badge blue">
+                    Dalam Distribusi
+                  </div>
+                </div>
+
+                {/* Abstract Material Item 2 */}
+                <div className="mw-row">
+                  <div className="mw-row-left">
+                    <div className="mw-icon">
+                      <Package size={18} strokeWidth={2.5} />
+                    </div>
+                    <div className="mw-lines">
+                      <div className="al-dark" style={{ width: '100px' }} />
+                      <div className="al-light" style={{ width: '90px' }} />
+                    </div>
+                  </div>
+                  <div className="mw-badge green">
+                    Terpasang
+                  </div>
+                </div>
+
+                {/* Abstract Tracking Step Indicators */}
+                <div className="mw-tracking">
+                  <div className="mt-dot done" />
+                  <div className="mt-line done" />
+                  <div className="mt-dot done" />
+                  <div className="mt-line done" />
+                  <div className="mt-dot done" />
+                  <div className="mt-line" />
+                  <div className="mt-dot" />
+                </div>
+              </div>
+            </div>
+
+            {/* Overlapping small card for depth */}
+            <div className="mockup-float">
+              <div className="mf-header">
+                <div className="mf-icon">
+                  <MapPin size={14} strokeWidth={2.5} />
+                </div>
+                <div className="mw-lines">
+                  <div className="al-dark" style={{ width: '90px' }} />
+                  <div className="al-light" style={{ width: '130px' }} />
+                </div>
+              </div>
+              <div className="mw-lines" style={{ gap: '12px' }}>
+                <div className="al-light" style={{ width: '100%' }} />
+                <div className="al-light" style={{ width: '70%' }} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
