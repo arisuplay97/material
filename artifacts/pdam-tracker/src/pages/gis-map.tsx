@@ -196,8 +196,28 @@ export default function GisMap() {
                                 </Popup>
                             </Marker>
                         ))}
+
                     </MapContainer>
                 )}
+
+                {/* Legend Overlay */}
+                <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur shadow-lg rounded-lg border border-slate-200 p-4 min-w-[200px]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2">Legenda Status</h3>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-[#16a34a] ring-4 ring-[#16a34a]/20"></div>
+                            <span className="text-sm font-medium text-slate-700">Terpasang</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-[#3b82f6] ring-4 ring-[#3b82f6]/20"></div>
+                            <span className="text-sm font-medium text-slate-700">Dalam Pengiriman</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-[#64748b] ring-4 ring-[#64748b]/20"></div>
+                            <span className="text-sm font-medium text-slate-700">Di Gudang</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
