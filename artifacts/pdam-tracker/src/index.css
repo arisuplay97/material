@@ -331,14 +331,6 @@
 }
 
 /* ── MapLibre GL Container Styling ── */
-.maplibregl-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100% !important;
-  height: 100% !important;
-}
-
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-logo {
   display: none !important;

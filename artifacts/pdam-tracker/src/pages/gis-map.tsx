@@ -36,35 +36,50 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Default center of Praya Barat, Lombok Tengah
+// Strict boundary for Pulau Lombok, NTB (PRD: Lock all maps strictly to Lombok only)
+const LOMBOK_BOUNDS: L.LatLngBoundsExpression = [
+  [-9.12, 115.82], // Barat Daya (Sekotong / Samudera Hindia)
+  [-8.18, 116.75], // Timur Laut (Lombok Timur / Laut Jawa)
+];
+
+// Default centers and zoom levels locked to Lombok
+const CENTER_LOMBOK: [number, number] = [-8.7000, 116.2700];
 const CENTER_PRAYA_BARAT: [number, number] = [-8.7892, 116.2051];
 const DEFAULT_ZOOM = 12;
+const MIN_ZOOM = 10; // Locked to Lombok: cannot zoom out beyond the island
+const MAX_ZOOM = 18;
 
-// Basemap Providers — replaced Carto Positron with custom MapLibre Lombok Tengah Tropis
+// Basemap Providers — all locked strictly to Pulau Lombok (Bebas API Key)
 const BASEMAPS = {
-  lombok: {
-    name: 'Lombok Tropis',
-    type: 'maplibre' as const,
-    url: '', // uses MapLibre style object
-    attribution: '© OpenFreeMap © OpenMapTiles',
+  cerah: {
+    name: 'Peta Cerah (Humaniter)',
+    type: 'raster' as const,
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors, Humanitarian OpenStreetMap Team',
   },
   osm: {
-    name: 'OpenStreetMap',
+    name: 'OpenStreetMap (Standar)',
     type: 'raster' as const,
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
   },
   satellite: {
-    name: 'Satelit (Esri)',
+    name: 'Citra Satelit (Esri)',
     type: 'raster' as const,
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar',
   },
   topo: {
-    name: 'Topografi',
+    name: 'Topografi & Kontur',
     type: 'raster' as const,
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap, SRTM | &copy; OpenTopoMap',
+  },
+  vektor: {
+    name: 'Peta Vektor Mandiri (GL)',
+    type: 'maplibre' as const,
+    url: '',
+    attribution: '© OpenFreeMap © OpenMapTiles',
   },
 };
 
@@ -382,8 +397,8 @@ export default function GisMap() {
   const [pelangganList, setPelangganList] = useState<Pelanggan[]>([]);
   const [wilayahList, setWilayahList] = useState<WilayahAcuan[]>([]);
 
-  // Basemap selector state — default to custom Lombok Tropis
-  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('lombok');
+  // Basemap selector state — default to Peta Cerah (Humaniter)
+  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('cerah');
 
   // Filter States
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07'); // Default: 07 Praya Barat
@@ -706,10 +721,11 @@ export default function GisMap() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-border bg-card">
-              <SelectItem value="lombok">Lombok Tropis</SelectItem>
-              <SelectItem value="osm">OpenStreetMap</SelectItem>
-              <SelectItem value="satellite">Satelit (Esri)</SelectItem>
-              <SelectItem value="topo">Topografi</SelectItem>
+              <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
+              <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
+              <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
+              <SelectItem value="topo">Topografi & Kontur</SelectItem>
+              <SelectItem value="vektor">Peta Vektor Mandiri (GL)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1225,22 +1241,27 @@ export default function GisMap() {
       <MapContainer
         center={CENTER_PRAYA_BARAT}
         zoom={DEFAULT_ZOOM}
-        minZoom={8}
-        maxZoom={19}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
+        maxBounds={LOMBOK_BOUNDS}
+        maxBoundsViscosity={1.0}
         scrollWheelZoom={true}
         className="w-full h-full"
         zoomControl={false}
       >
-        {/* Raster tile layer — hidden when MapLibre basemap is active */}
-        {basemapKey !== 'lombok' && (
+        {/* Base raster tile layer — hidden when vector basemap is active */}
+        {basemapKey !== 'vektor' && (
           <TileLayer
-            attribution={(BASEMAPS[basemapKey] as any).attribution}
-            url={(BASEMAPS[basemapKey] as any).url}
+            key={basemapKey}
+            attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
+            url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
+            maxZoom={MAX_ZOOM}
+            bounds={LOMBOK_BOUNDS}
           />
         )}
 
-        {/* MapLibre GL vector basemap overlay */}
-        <MapLibreLayer active={basemapKey === 'lombok'} />
+        {/* MapLibre GL vector basemap overlay when 'vektor' is active */}
+        <MapLibreLayer active={basemapKey === 'vektor'} />
 
         {/* Controller for map navigation */}
         <MapController targetPoint={targetPoint} />

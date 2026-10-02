@@ -1,5 +1,5 @@
 /**
- * MapLibre GL Style Spec v8 — "Lombok Tengah Tropis"
+ * MapLibre GL Style Spec v8 — "Peta Vektor Mandiri"
  *
  * Source: OpenFreeMap (OpenMapTiles schema, no API key)
  * Palette: warm tropical theme inspired by Lombok's landscape
@@ -15,7 +15,7 @@ const NAME_EXPR: any = ['coalesce', ['get', 'name:id'], ['get', 'name']];
 
 export const lombokTengahStyle: Record<string, any> = {
   version: 8,
-  name: 'Lombok Tengah Tropis',
+  name: 'Peta Vektor Mandiri',
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
     openmaptiles: {
@@ -173,7 +173,7 @@ export const lombokTengahStyle: Record<string, any> = {
         ['<=', 'admin_level', 6],
       ],
       paint: {
-        'line-color': '#7a4fd1',
+        'line-color': '#8b5cf6',
         'line-width': [
           'interpolate', ['linear'], ['zoom'],
           4, 0.8,
@@ -181,7 +181,7 @@ export const lombokTengahStyle: Record<string, any> = {
           14, 2.5,
         ],
         'line-dasharray': [3, 2],
-        'line-opacity': 0.7,
+        'line-opacity': 0.8,
       },
     },
 
@@ -199,32 +199,24 @@ export const lombokTengahStyle: Record<string, any> = {
       },
       paint: {
         'line-color': [
-          'interpolate', ['linear'], ['zoom'],
-          5, [
-            'match', ['get', 'class'],
-            'motorway', '#d9533a',
-            'trunk', '#d9533a',
-            'primary', '#d9533a',
-            '#e6c4a0',
-          ],
-          14, [
-            'match', ['get', 'class'],
-            'motorway', '#d9533a',
-            'trunk', '#d9533a',
-            'primary', '#d9533a',
-            '#e6c4a0',
-          ],
+          'match', ['get', 'class'],
+          'motorway', '#d9533a',
+          'trunk', '#d9533a',
+          'primary', '#d9533a',
+          'secondary', '#d9533a',
+          'tertiary', '#d9533a',
+          '#e0c9a8', // local road casing
         ],
         'line-width': [
           'interpolate', ['exponential', 1.5], ['zoom'],
           5, [
             'match', ['get', 'class'],
-            'motorway', 1.5,
-            'trunk', 1.2,
-            'primary', 1,
-            'secondary', 0.8,
-            'tertiary', 0.6,
-            0.3,
+            'motorway', 1.8,
+            'trunk', 1.5,
+            'primary', 1.2,
+            'secondary', 1.0,
+            'tertiary', 0.8,
+            0.5,
           ],
           14, [
             'match', ['get', 'class'],
@@ -262,25 +254,13 @@ export const lombokTengahStyle: Record<string, any> = {
       },
       paint: {
         'line-color': [
-          'interpolate', ['linear'], ['zoom'],
-          5, [
-            'match', ['get', 'class'],
-            'motorway', '#ff7a59',
-            'trunk', '#ff7a59',
-            'primary', '#ff7a59',
-            'secondary', '#ffffff',
-            'tertiary', '#ffffff',
-            '#fffaf0',
-          ],
-          14, [
-            'match', ['get', 'class'],
-            'motorway', '#ff7a59',
-            'trunk', '#ff7a59',
-            'primary', '#ff7a59',
-            'secondary', '#ffffff',
-            'tertiary', '#ffffff',
-            '#fffaf0',
-          ],
+          'match', ['get', 'class'],
+          'motorway', '#ff7a59',
+          'trunk', '#ff7a59',
+          'primary', '#ff7a59',
+          'secondary', '#fca468',
+          'tertiary', '#fca468',
+          '#ffffff', // local road fill
         ],
         'line-width': [
           'interpolate', ['exponential', 1.5], ['zoom'],
