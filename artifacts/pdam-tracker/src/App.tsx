@@ -1,37 +1,16 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import React from 'react';
+import { Route, Switch, Redirect, Router as WouterRouter } from 'wouter';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppLayout } from '@/components/layout/AppLayout';
 
-// Pages
+// New PDAM Tirta Ardhia Rinjani GIS & Dashboard Pages
 import Login from '@/pages/login';
 import Dashboard from '@/pages/dashboard';
-import NotFound from '@/pages/not-found';
-import Trackings from '@/pages/trackings';
-import TrackingNew from '@/pages/trackings-new';
-import TrackingDetail from '@/pages/tracking-detail';
-import Receive from '@/pages/receive';
-import Lapangan from '@/pages/lapangan';
-import LapanganUpload from '@/pages/lapangan-upload';
-import FlaggedProofs from '@/pages/flagged-proofs';
-import Branches from '@/pages/branches';
-import Materials from '@/pages/materials';
-import MaterialRequests from '@/pages/material-requests';
-import Reports from '@/pages/reports';
-import Users from '@/pages/users';
-import Settings from '@/pages/settings';
 import GisMap from '@/pages/gis-map';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import Settings from '@/pages/settings';
+import NotFound from '@/pages/not-found';
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   return (
@@ -50,49 +29,32 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
 
-      {/* Protected Routes */}
+      {/* 3 Menu Utama Sesuai PRD Section 1 */}
       <ProtectedRoute path="/dashboard" component={Dashboard} />
+      <ProtectedRoute path="/gis" component={GisMap} />
       <ProtectedRoute path="/gis-map" component={GisMap} />
-      <ProtectedRoute path="/trackings" component={Trackings} />
-      <ProtectedRoute path="/trackings/new" component={TrackingNew} />
-      <ProtectedRoute path="/trackings/:id" component={TrackingDetail} />
-      <ProtectedRoute path="/receive" component={Receive} />
-      <ProtectedRoute path="/lapangan" component={Lapangan} />
-      <ProtectedRoute path="/lapangan/upload/:id" component={LapanganUpload} />
-      <ProtectedRoute path="/spi/flagged" component={FlaggedProofs} />
-      <ProtectedRoute path="/branches" component={Branches} />
-      <ProtectedRoute path="/materials" component={Materials} />
-      <ProtectedRoute path="/material-requests" component={MaterialRequests} />
-      <ProtectedRoute path="/reports" component={Reports} />
-      <ProtectedRoute path="/users" component={Users} />
       <ProtectedRoute path="/settings" component={Settings} />
 
-      {/* Defaults/Fallbacks */}
+      {/* Redirect root to dashboard */}
       <Route path="/">
-        {() => {
-          // Redirect to login, auth context handles redirection based on auth state
-          window.location.replace('/login');
-          return null;
-        }}
+        {() => <Redirect to="/dashboard" />}
       </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <AuthProvider>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, '') || ''}>
             <Router />
-          </AuthProvider>
-        </WouterRouter>
-        <Toaster />
+          </WouterRouter>
+        </AuthProvider>
       </TooltipProvider>
-    </QueryClientProvider>
+    </ThemeProvider>
   );
 }
-
-export default App;

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -23,142 +23,122 @@
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-primary-border: var(--primary-border);
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-secondary-border: var(--secondary-border);
 
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-muted-border: var(--muted-border);
 
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-accent-border: var(--accent-border);
 
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-destructive-border: var(--destructive-border);
 
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-primary: hsl(var(--sidebar-primary));
   --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
-  --color-sidebar-primary-border: var(--sidebar-primary-border);
   --color-sidebar-accent: hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
-  --color-sidebar-accent-border: var(--sidebar-accent-border);
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: var(--app-font-sans);
-  --font-serif: var(--app-font-serif);
-  --font-mono: var(--app-font-mono);
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
-  @keyframes accordion-down {
-    from { height: 0; }
-    to { height: var(--radix-accordion-content-height); }
-  }
-  @keyframes accordion-up {
-    from { height: var(--radix-accordion-content-height); }
-    to { height: 0; }
-  }
 }
 
-/* LIGHT MODE */
+/* ── LIGHT MODE (Modern Clean Crisp Enterprise) ── */
 :root {
-  --background: 43 23% 95%; /* Cream paper #F7F5F0 */
-  --foreground: 218 46% 10%; /* Deep navy #0E1726 */
-  
-  --border: 43 15% 85%;
-  --input: 43 15% 85%;
-  --ring: 218 46% 10%;
+  --background: 210 40% 98%; /* #f8fafc */
+  --foreground: 222 47% 11%; /* #0f172a */
 
-  --card: 43 25% 98%;
-  --card-foreground: 218 46% 10%;
-  --card-border: 43 15% 88%;
+  --border: 214 32% 91%; /* #e2e8f0 */
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
 
-  --popover: 43 25% 98%;
-  --popover-foreground: 218 46% 10%;
-  --popover-border: 43 15% 85%;
+  --card: 0 0% 100%; /* #ffffff */
+  --card-foreground: 222 47% 11%;
+  --card-border: 214 32% 91%;
 
-  --primary: 218 46% 10%; /* Deep navy */
-  --primary-foreground: 43 23% 95%; /* Cream paper */
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 214 32% 91%;
 
-  --secondary: 43 10% 90%;
-  --secondary-foreground: 218 46% 10%;
+  --primary: 217 91% 60%; /* #2563eb / #3b82f6 modern blue */
+  --primary-foreground: 0 0% 100%;
 
-  --muted: 43 10% 90%;
-  --muted-foreground: 218 10% 40%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222 47% 11%;
 
-  --accent: 43 15% 85%;
-  --accent-foreground: 218 46% 10%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215 16% 47%;
 
-  --destructive: 358 75% 42%; /* Crimson */
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --sidebar: 43 25% 98%;
-  --sidebar-foreground: 218 46% 10%;
-  --sidebar-border: 43 15% 85%;
-  --sidebar-primary: 218 46% 10%;
-  --sidebar-primary-foreground: 43 23% 95%;
-  --sidebar-accent: 43 15% 85%;
-  --sidebar-accent-foreground: 218 46% 10%;
-  --sidebar-ring: 218 46% 10%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 214 32% 91%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 40% 96.1%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-ring: 217 91% 60%;
 
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: 'Newsreader', serif;
-  --app-font-mono: 'IBM Plex Mono', monospace;
-  --radius: 0; /* Sharp corners for editorial precision */
+  --radius: 0.625rem; /* 10px rounded */
 }
 
+/* ── DARK MODE (Premium Sleek Deep Navy/Slate) ── */
 .dark {
-  --background: 218 46% 10%;
-  --foreground: 43 23% 95%;
+  --background: 222 47% 7%; /* #080c16 deep midnight slate */
+  --foreground: 210 40% 98%; /* #f8fafc */
 
-  --border: 218 30% 20%;
-  --input: 218 30% 20%;
-  --ring: 43 23% 95%;
+  --border: 217 33% 16%; /* #1e293b crisp subtle border */
+  --input: 217 33% 16%;
+  --ring: 217 91% 60%;
 
-  --card: 218 40% 12%;
-  --card-foreground: 43 23% 95%;
-  --card-border: 218 30% 20%;
+  --card: 222 40% 10%; /* #0f1626 card surface */
+  --card-foreground: 210 40% 98%;
+  --card-border: 217 33% 16%;
 
-  --popover: 218 40% 12%;
-  --popover-foreground: 43 23% 95%;
-  --popover-border: 218 30% 20%;
+  --popover: 222 40% 10%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 217 33% 16%;
 
-  --primary: 43 23% 95%;
-  --primary-foreground: 218 46% 10%;
+  --primary: 217 91% 60%; /* #3b82f6 vibrant accent */
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 218 30% 20%;
-  --secondary-foreground: 43 23% 95%;
+  --secondary: 217 33% 16%;
+  --secondary-foreground: 210 40% 98%;
 
-  --muted: 218 30% 20%;
-  --muted-foreground: 218 10% 60%;
+  --muted: 217 33% 15%;
+  --muted-foreground: 215 20% 65%;
 
-  --accent: 218 30% 25%;
-  --accent-foreground: 43 23% 95%;
+  --accent: 217 33% 16%;
+  --accent-foreground: 210 40% 98%;
 
-  --destructive: 358 75% 55%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --sidebar: 218 40% 12%;
-  --sidebar-foreground: 43 23% 95%;
-  --sidebar-border: 218 30% 20%;
-  --sidebar-primary: 43 23% 95%;
-  --sidebar-primary-foreground: 218 46% 10%;
-  --sidebar-accent: 218 30% 25%;
-  --sidebar-accent-foreground: 43 23% 95%;
-  --sidebar-ring: 43 23% 95%;
+  --sidebar: 222 47% 8%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 217 33% 16%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 33% 14%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-ring: 217 91% 60%;
 }
 
 @layer base {
@@ -167,42 +147,220 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased bg-background text-foreground transition-colors duration-200;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-serif tracking-tight text-primary;
+    font-family: var(--font-heading);
+    @apply tracking-tight font-semibold text-foreground;
   }
 }
 
-.table-row-hover {
-  transition: background-color 0.1s ease-in-out;
-}
-.table-row-hover:hover {
-  background-color: hsl(var(--muted) / 0.5);
-}
-
-/* Custom pulse animations for timeline */
-@keyframes pulse-amber {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
-  }
-}
-.pulse-amber {
-  animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* ── Leaflet Map Enhancements ── */
+.leaflet-container {
+  font-family: 'Inter', -apple-system, sans-serif !important;
+  width: 100%;
+  height: 100%;
+  background-color: #0b0f19;
+  z-index: 10;
 }
 
-@keyframes line-fill {
-  0% {
-    width: 0%;
-  }
-  100% {
-    width: 100%;
-  }
+.dark .leaflet-container {
+  background-color: #080c16;
 }
-.animate-line-fill {
-  animation: line-fill 0.8s ease-out forwards;
+
+/* Custom Popup */
+.leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* Custom Marker Styling */
+.gis-point-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.gis-point-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.gis-point-marker:hover .gis-point-dot {
+  transform: scale(1.35);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Spatial Anomaly Marker Pulsing Ring */
+@keyframes anomaly-beacon {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(2.2); opacity: 0.15; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+.gis-anomaly-ring {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.35);
+  border: 1.5px solid #ef4444;
+  animation: anomaly-beacon 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+/* Ensure no cards ever become transparent on hover */
+.card-solid {
+  background-color: var(--card) !important;
+}
+.card-solid:hover {
+  background-color: var(--card) !important;
+}
+
+/* Custom MarkerCluster Styling */
+.marker-cluster {
+  background-clip: padding-box;
+  border-radius: 20px;
+}
+
+.marker-cluster div {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+  margin-top: 4px;
+  text-align: center;
+  border-radius: 50%;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.marker-cluster-small {
+  background-color: rgba(59, 130, 246, 0.35);
+}
+.marker-cluster-small div {
+  background-color: rgba(37, 99, 235, 0.9);
+}
+
+.marker-cluster-medium {
+  background-color: rgba(16, 185, 129, 0.35);
+}
+.marker-cluster-medium div {
+  background-color: rgba(5, 150, 105, 0.9);
+}
+
+.marker-cluster-large {
+  background-color: rgba(239, 68, 68, 0.35);
+}
+.marker-cluster-large div {
+  background-color: rgba(220, 38, 38, 0.9);
+}
+
+/* ── Selected Marker Pulse (click/search only) ── */
+@keyframes selected-pulse-ring {
+  0% { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.gis-selected-pulse-wrapper {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none !important;
+}
+
+.gis-selected-pulse {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gis-selected-pulse-ring {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2.5px solid #2563EB;
+  background: rgba(37, 99, 235, 0.12);
+  animation: selected-pulse-ring 1.5s ease-out infinite;
+}
+
+.gis-selected-pulse-ring-2 {
+  animation-delay: 0.5s;
+}
+
+.gis-selected-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563EB;
+  border: 2px solid white;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);
+  z-index: 5;
+}
+
+/* ── MapLibre GL Container Styling ── */
+.maplibregl-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo {
+  display: none !important;
+}
+
+/* ── Fullscreen map adjustments ── */
+:fullscreen .leaflet-container {
+  z-index: 10;
+}
+
+/* Subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
 }

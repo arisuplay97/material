@@ -1,184 +1,84 @@
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useLocation } from 'wouter';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarFooter
-} from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import {
-  LayoutDashboard,
-  Box,
-  MapPin,
-  ClipboardCheck,
-  AlertTriangle,
-  FileText,
-  Users,
-  Building2,
-  LogOut,
-  Settings,
-  ShieldCheck,
-  ScanLine,
-  Map
-} from 'lucide-react';
-import { useLogout } from '@workspace/api-client-react';
-import React from 'react';
+import { LayoutDashboard, Map, Sliders, Lock, ChevronRight, Database } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-export function AppSidebar() {
-  const { user, logout } = useAuth();
+export function Sidebar() {
+  const { user } = useAuth();
   const [location] = useLocation();
-  const logoutMutation = useLogout();
+  const isAdmin = user?.role === 'admin';
 
-  const handleLogout = () => {
-    logoutMutation.mutate(undefined, {
-      onSettled: () => {
-        logout();
-      }
-    });
-  };
-
-  const role = user?.role;
-
-  const menuItems = [
-    {
-      title: "Dashboard",
-      path: "/dashboard",
-      icon: LayoutDashboard,
-      roles: ['spi', 'direksi', 'superadmin', 'admin_gudang']
-    },
-    {
-      title: "Peta GIS",
-      path: "/gis-map",
-      icon: Map,
-      roles: ['spi', 'direksi', 'superadmin', 'admin_gudang']
-    },
-    {
-      title: "Penerimaan Cabang",
-      path: "/receive",
-      icon: ScanLine,
-      roles: ['admin_gudang', 'petugas_lapangan', 'superadmin']
-    },
-    {
-      title: "Tugas Lapangan",
-      path: "/lapangan",
-      icon: MapPin,
-      roles: ['petugas_lapangan', 'superadmin']
-    },
-    {
-      title: "Tracking Material",
-      path: "/trackings",
-      icon: ClipboardCheck,
-      roles: ['admin_gudang', 'spi', 'direksi', 'superadmin']
-    },
-    {
-      title: "Permintaan Material",
-      path: "/material-requests",
-      icon: FileText,
-      roles: ['admin_gudang', 'spi', 'superadmin']
-    },
-    {
-      title: "Review Bukti",
-      path: "/spi/flagged",
-      icon: AlertTriangle,
-      roles: ['spi', 'superadmin']
-    },
-    {
-      title: "Laporan",
-      path: "/reports",
-      icon: FileText,
-      roles: ['spi', 'direksi', 'superadmin']
-    },
-    {
-      title: "Data Material",
-      path: "/materials",
-      icon: Box,
-      roles: ['admin_gudang', 'superadmin']
-    },
-    {
-      title: "Cabang",
-      path: "/branches",
-      icon: Building2,
-      roles: ['spi', 'superadmin']
-    },
-    {
-      title: "Pengguna",
-      path: "/users",
-      icon: Users,
-      roles: ['superadmin']
-    }
+  const navItems = [
+    { title: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'verifikator', 'pimpinan'] },
+    { title: 'Peta GIS', path: '/gis', icon: Map, roles: ['admin', 'verifikator', 'pimpinan'] },
+    { title: 'Settingan', path: '/settings', icon: Sliders, roles: ['admin'], adminOnly: true },
   ];
 
-  const visibleItems = menuItems.filter(item => !role || item.roles.includes(role));
-
   return (
-    <Sidebar variant="inset">
-      <SidebarHeader className="border-b border-border py-4 px-4 bg-primary text-primary-foreground">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-background" />
-          <div className="flex flex-col">
-            <span className="font-serif font-bold text-lg leading-tight tracking-tight">PDAM Tiara</span>
-            <span className="text-[10px] uppercase tracking-wider text-background/80 font-mono">Tracking & Verifikasi</span>
+    <aside className="w-56 border-r border-border/60 bg-card flex flex-col shrink-0 h-screen sticky top-0 z-20">
+      {/* Header */}
+      <div className="px-4 py-4 border-b border-border/60">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center">
+            <Database className="w-4 h-4 text-foreground/70" />
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="text-[12px] font-semibold text-foreground tracking-tight">Data Pelanggan</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5">Lombok Tengah</span>
           </div>
         </div>
-      </SidebarHeader>
+      </div>
 
-      <SidebarContent className="bg-card">
-        <SidebarGroup>
-          <SidebarGroupLabel className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-4">Menu Utama</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.path || location.startsWith(item.path + '/')}
-                    className="font-medium data-[active=true]:bg-primary/5 data-[active=true]:text-primary"
-                  >
-                    <Link href={item.path} className="flex items-center gap-3">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="border-t border-border p-4 bg-card">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif font-bold">
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold truncate max-w-[140px] text-foreground">{user?.name}</span>
-              <span className="text-xs text-muted-foreground font-mono truncate max-w-[140px]">{user?.role.replace('_', ' ')}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" size="sm" asChild className="font-mono text-xs">
-              <Link href="/settings">
-                <Settings className="w-3 h-3 mr-2" />
-                Setting
-              </Link>
-            </Button>
-            <Button variant="destructive" size="sm" onClick={handleLogout} className="font-mono text-xs" disabled={logoutMutation.isPending}>
-              <LogOut className="w-3 h-3 mr-2" />
-              Keluar
-            </Button>
-          </div>
+      {/* Nav */}
+      <nav className="flex-1 py-3 px-2.5 space-y-0.5">
+        <div className="px-2 pb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
+          Menu
         </div>
-      </SidebarFooter>
-    </Sidebar>
+        {navItems.map(item => {
+          const isActive = location === item.path || (item.path !== '/' && location.startsWith(item.path));
+          const isRestricted = item.adminOnly && !isAdmin;
+          const Icon = item.icon;
+
+          if (isRestricted) {
+            return (
+              <Tooltip key={item.path}>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-muted-foreground/40 cursor-not-allowed">
+                    <Icon className="w-4 h-4" />
+                    <span>{item.title}</span>
+                    <Lock className="w-3 h-3 ml-auto" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">Hanya Admin</TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          return (
+            <Link key={item.path} href={item.path}>
+              <div className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                isActive
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]'
+              }`}>
+                <Icon className={`w-4 h-4 ${isActive ? 'text-background' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                <span>{item.title}</span>
+                {isActive && <ChevronRight className="w-3 h-3 ml-auto text-background/60" />}
+              </div>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-border/60">
+        <div className="px-2 text-[10px] text-muted-foreground/60 leading-relaxed">
+          <span className="font-mono">KKWWxxxxx</span> (9 digit)
+          <br />13 Kecamatan &middot; 20 Wilayah (07)
+          <br />PRD v1.2
+        </div>
+      </div>
+    </aside>
   );
 }

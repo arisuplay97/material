@@ -1,530 +1,276 @@
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLogin } from '@workspace/api-client-react';
-import { useState, useEffect } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useLocation } from 'wouter';
-import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
+import { UserRole } from '@/types/pdam';
+import {
+  Shield,
+  UserCheck,
+  Building,
+  Lock,
+  Mail,
+  ArrowRight,
+  Sun,
+  Moon,
+  Layers,
+  CheckCircle2,
+  MapPin,
+  BarChart3,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
-/* ─── Floating Label Input ─── */
-function FloatingInput({
-  id,
-  label,
-  type = 'text',
-  value,
-  onChange,
-  autoComplete,
-  suffix,
-}: {
-  id: string;
-  label: string;
-  type?: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoComplete?: string;
-  suffix?: React.ReactNode;
-}) {
-  const [focused, setFocused] = useState(false);
-  const isActive = focused || value.length > 0;
-
-  return (
-    <div className="sl-input-group">
-      <div className={`sl-input-wrap ${isActive ? 'active' : ''} ${focused ? 'focused' : ''}`}>
-        <label htmlFor={id} className={`sl-float-label ${isActive ? 'floating' : ''}`}>
-          {label}
-        </label>
-        <input
-          id={id}
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoComplete={autoComplete}
-          className="sl-input"
-          required
-        />
-        {suffix && <div className="sl-input-suffix">{suffix}</div>}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Main Login Page ─── */
 export default function Login() {
+  const { login, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [, setLocation] = useLocation();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const { login } = useAuth();
-  const [, setLocation] = useLocation();
-  const [error, setError] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const loginMutation = useLogin();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // If already logged in, redirect to dashboard
+  if (user) {
+    setLocation('/dashboard');
+    return null;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    loginMutation.mutate(
-      { data: { email, password } },
-      {
-        onSuccess: (data) => {
-          login(data.accessToken, data.refreshToken, data.user);
-          const role = data.user.role;
-          if (role === 'petugas_lapangan') {
-            setLocation('/lapangan');
-          } else if (role === 'admin_gudang') {
-            setLocation('/trackings');
-          } else {
-            setLocation('/dashboard');
-          }
-        },
-        onError: (err) => {
-          setError(err.data?.error || 'Gagal masuk. Periksa username dan kata sandi.');
-        },
-      }
-    );
+    setIsLoading(true);
+    setTimeout(() => {
+      login(selectedRole);
+      setLocation('/dashboard');
+    }, 300);
   };
 
-  const fc = (cls: string, delay: string) =>
-    `${cls} ${mounted ? `fade-in ${delay}` : 'fade-init'}`;
+  const handleQuickRoleLogin = (role: UserRole) => {
+    setIsLoading(true);
+    setTimeout(() => {
+      login(role);
+      setLocation('/dashboard');
+    }, 200);
+  };
 
   return (
-    <>
-      <style>{`
-        /* ═══════════════════════════════════════
-           SIARA Login — Minimal 50/50 Enterprise
-           ═══════════════════════════════════════ */
+    <div className="min-h-screen w-full flex bg-background text-foreground transition-colors duration-200">
+      {/* ── Left Showcase Panel (Enterprise Utility GIS) ── */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 p-12 flex-col justify-between relative overflow-hidden border-r border-border/40">
+        {/* Subtle grid pattern background */}
+        <div
+          className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.2) 1px, transparent 0)`,
+            backgroundSize: '24px 24px',
+          }}
+        />
 
-        .sl-root {
-          min-height: 100vh;
-          display: flex;
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          background: #ffffff;
-        }
-        .sl-root * { box-sizing: border-box; }
+        {/* Top Logo */}
+        <div className="flex items-center gap-3 z-10">
+          <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold shadow-lg ring-1 ring-white/20">
+            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+            </svg>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-heading font-bold text-base tracking-tight text-white">
+              PDAM Tirta Ardhia Rinjani
+            </span>
+            <span className="text-[11px] text-blue-300 font-mono">
+              Kabupaten Lombok Tengah
+            </span>
+          </div>
+        </div>
 
-        /* ── Fade Animations ── */
-        .fade-init {
-          opacity: 0;
-          transform: translateY(12px);
-        }
-        .fade-in {
-          opacity: 1;
-          transform: translateY(0);
-          transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-        .d1 { transition-delay: 0.1s !important; }
-        .d2 { transition-delay: 0.2s !important; }
-        .d3 { transition-delay: 0.3s !important; }
-        .d4 { transition-delay: 0.4s !important; }
+        {/* Main Value Proposition */}
+        <div className="max-w-md z-10 space-y-6">
+          <Badge variant="outline" className="font-mono text-xs text-blue-300 border-blue-400/30 bg-blue-500/10">
+            Modul Perapian Data Pelanggan v1.2
+          </Badge>
 
-        /* ═══ LEFT PANEL (Value Proposition) ═══ */
-        .sl-left {
-          width: 50%;
-          background: linear-gradient(145deg, #0f172a 0%, #172554 100%);
-          color: #ffffff;
-          padding: 80px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          position: relative;
-        }
+          <h1 className="text-3xl lg:text-4xl font-heading font-bold text-white leading-tight">
+            Dashboard Analitik & Pemetaan GIS Pelanggan
+          </h1>
 
-        .sl-left-inner {
-          max-width: 480px;
-          margin: 0 auto;
-          width: 100%;
-        }
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Platform internal untuk memantau kualitas data pelanggan, sebaran spasial titik koordinat di 20 wilayah Kecamatan Praya Barat, dan validasi kode pelanggan 9 digit (<code className="font-mono text-blue-300 font-bold">KKWWxxxxx</code>).
+          </p>
 
-        .sl-headline {
-          font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 40px;
-          font-weight: 700;
-          line-height: 1.15;
-          letter-spacing: -0.02em;
-          margin-bottom: 24px;
-          color: #ffffff;
-        }
-
-        .sl-description {
-          font-size: 16px;
-          line-height: 1.6;
-          color: #94a3b8;
-          margin-bottom: 48px;
-        }
-
-        .sl-benefits {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .sl-benefit-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 16px;
-        }
-
-        .sl-check {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: rgba(25, 118, 210, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #3b82f6;
-          flex-shrink: 0;
-          margin-top: 2px;
-        }
-
-        .sl-benefit-text {
-          font-size: 15px;
-          font-weight: 500;
-          color: #e2e8f0;
-          line-height: 1.5;
-        }
-
-        /* ═══ RIGHT PANEL (Login Form) ═══ */
-        .sl-right {
-          width: 50%;
-          background: #ffffff;
-          padding: 80px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-
-        .sl-right-inner {
-          max-width: 400px;
-          margin: 0 auto;
-          width: 100%;
-        }
-
-        .sl-form-title {
-          font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 32px;
-          font-weight: 700;
-          color: #0f172a;
-          letter-spacing: -0.02em;
-          margin-bottom: 8px;
-        }
-
-        .sl-form-sub {
-          font-size: 14.5px;
-          color: #64748b;
-          margin-bottom: 40px;
-        }
-
-        /* Input */
-        .sl-input-group {
-          margin-bottom: 20px;
-        }
-        .sl-input-wrap {
-          position: relative;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          background: #ffffff;
-          transition: all 0.2s ease;
-        }
-        .sl-input-wrap:hover {
-          border-color: #cbd5e1;
-        }
-        .sl-input-wrap.focused {
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        .sl-float-label {
-          position: absolute;
-          left: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          font-size: 14.5px;
-          color: #94a3b8;
-          pointer-events: none;
-          transition: all 0.2s ease;
-          font-weight: 400;
-        }
-        .sl-float-label.floating {
-          top: 10px;
-          transform: translateY(0);
-          font-size: 11px;
-          color: #64748b;
-          font-weight: 500;
-        }
-        .sl-input-wrap.focused .sl-float-label.floating {
-          color: #3b82f6;
-        }
-        .sl-input {
-          width: 100%;
-          border: none;
-          outline: none;
-          background: transparent;
-          padding: 26px 48px 10px 16px;
-          font-size: 15px;
-          font-family: 'Inter', sans-serif;
-          color: #0f172a;
-          font-weight: 500;
-        }
-        .sl-input::placeholder { color: transparent; }
-
-        .sl-input-suffix {
-          position: absolute;
-          right: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          display: flex;
-        }
-        .sl-toggle-pw {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 6px;
-          color: #94a3b8;
-          display: flex;
-          align-items: center;
-          transition: color 0.15s;
-          border-radius: 6px;
-        }
-        .sl-toggle-pw:hover {
-          color: #475569;
-          background: #f8fafc;
-        }
-
-        /* Options */
-        .sl-options {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 32px;
-        }
-        .sl-cb-label {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          color: #475569;
-          cursor: pointer;
-          user-select: none;
-        }
-        .sl-cb {
-          width: 18px;
-          height: 18px;
-          border-radius: 4px;
-          border: 1px solid #cbd5e1;
-          appearance: none;
-          cursor: pointer;
-          transition: all 0.15s;
-          background: #fff;
-          flex-shrink: 0;
-        }
-        .sl-cb:checked {
-          background: #3b82f6;
-          border-color: #3b82f6;
-          background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M4 8l3 3 5-5'/%3e%3c/svg%3e");
-          background-position: center;
-          background-size: 12px;
-          background-repeat: no-repeat;
-        }
-        .sl-forgot {
-          font-size: 14px;
-          color: #3b82f6;
-          text-decoration: none;
-          font-weight: 500;
-          transition: color 0.15s;
-        }
-        .sl-forgot:hover { color: #2563eb; }
-
-        /* Button */
-        .sl-btn {
-          width: 100%;
-          height: 52px;
-          border: none;
-          border-radius: 8px;
-          font-family: 'Inter', sans-serif;
-          font-size: 16px;
-          font-weight: 600;
-          color: #fff;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: all 0.2s ease;
-          background: #3b82f6;
-        }
-        .sl-btn:hover:not(:disabled) {
-          background: #2563eb;
-        }
-        .sl-btn:active:not(:disabled) {
-          transform: translateY(1px);
-        }
-        .sl-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        /* Error */
-        .sl-error {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          border-radius: 8px;
-          padding: 12px 16px;
-          margin-bottom: 24px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .sl-error-dot {
-          width: 6px; height: 6px;
-          border-radius: 50%;
-          background: #ef4444;
-          flex-shrink: 0;
-        }
-        .sl-error-text {
-          font-size: 14px;
-          color: #b91c1c;
-          font-weight: 500;
-          line-height: 1.4;
-        }
-
-        /* ═══ RESPONSIVE ═══ */
-        @media (max-width: 960px) {
-          .sl-root { flex-direction: column; }
-          .sl-left, .sl-right { width: 100%; padding: 48px 32px; min-height: unset; }
-          .sl-headline { font-size: 32px; }
-        }
-
-        @media (max-width: 480px) {
-          .sl-left, .sl-right { padding: 40px 24px; }
-          .sl-headline { font-size: 28px; }
-          .sl-form-title { font-size: 28px; }
-        }
-      `}</style>
-
-      <div className="sl-root">
-
-        {/* ═══ LEFT PANEL ═══ */}
-        <div className="sl-left">
-          <div className="sl-left-inner">
-            <h1 className={fc('sl-headline', 'd1')}>
-              Setiap Material, Terpantau dengan Lebih Baik.
-            </h1>
-            <p className={fc('sl-description', 'd2')}>
-              Membantu memastikan setiap material memiliki jejak digital yang jelas, mulai dari penerimaan di gudang hingga menjadi aset perusahaan.
-            </p>
-
-            <div className={fc('sl-benefits', 'd3')}>
-              <div className="sl-benefit-item">
-                <div className="sl-check">
-                  <Check size={14} strokeWidth={3} />
-                </div>
-                <div className="sl-benefit-text">Pelacakan material yang terstruktur</div>
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-3 text-xs text-slate-200">
+              <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <MapPin className="w-3.5 h-3.5" />
               </div>
-              <div className="sl-benefit-item">
-                <div className="sl-check">
-                  <Check size={14} strokeWidth={3} />
-                </div>
-                <div className="sl-benefit-text">Riwayat pergerakan material terdokumentasi</div>
+              <span>Peta GIS interaktif dengan kode warna acuan per wilayah</span>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-slate-200">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <BarChart3 className="w-3.5 h-3.5" />
               </div>
-              <div className="sl-benefit-item">
-                <div className="sl-check">
-                  <Check size={14} strokeWidth={3} />
-                </div>
-                <div className="sl-benefit-text">Informasi status material lebih mudah dipantau</div>
+              <span>Dashboard statistik sebaran tarif & status sambungan</span>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-slate-200">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Shield className="w-3.5 h-3.5" />
               </div>
+              <span>Validasi otomatis integritas data & pelacakan snapshot upload</span>
             </div>
           </div>
         </div>
 
-        {/* ═══ RIGHT PANEL ═══ */}
-        <div className="sl-right">
-          <div className="sl-right-inner">
-            <div className={fc('', 'd1')}>
-              <h2 className="sl-form-title">Masuk ke Akun</h2>
-              <p className="sl-form-sub">Masukkan kredensial Anda untuk melanjutkan</p>
-            </div>
-
-            {error && (
-              <div className="sl-error">
-                <div className="sl-error-dot" />
-                <span className="sl-error-text">{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit}>
-              <div className={fc('', 'd2')}>
-                <FloatingInput
-                  id="login-username"
-                  label="Username / NIK"
-                  value={email}
-                  onChange={setEmail}
-                  autoComplete="username"
-                />
-              </div>
-
-              <div className={fc('', 'd3')}>
-                <FloatingInput
-                  id="login-password"
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={setPassword}
-                  autoComplete="current-password"
-                  suffix={
-                    <button
-                      type="button"
-                      className="sl-toggle-pw"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  }
-                />
-              </div>
-
-              <div className={fc('sl-options', 'd4')}>
-                <label className="sl-cb-label">
-                  <input
-                    type="checkbox"
-                    className="sl-cb"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  Ingat saya
-                </label>
-                <a href="#" className="sl-forgot" onClick={(e) => e.preventDefault()}>
-                  Lupa Password?
-                </a>
-              </div>
-
-              <div className={fc('', 'd4')}>
-                <button
-                  type="submit"
-                  className="sl-btn"
-                  disabled={loginMutation.isPending}
-                >
-                  {loginMutation.isPending ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Memverifikasi...
-                    </>
-                  ) : (
-                    'Masuk'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+        {/* Bottom Credits */}
+        <div className="text-[11px] text-slate-400 font-mono z-10 flex items-center justify-between border-t border-slate-800/80 pt-4">
+          <span>Bidang IT & Sistem Informasi</span>
+          <span>Tahap Pilot: Kec. 07 Praya Barat</span>
         </div>
-
       </div>
-    </>
+
+      {/* ── Right Login Panel ── */}
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-10 md:p-16 max-w-xl mx-auto w-full">
+        {/* Top Bar with Theme Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex lg:hidden items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">
+              <Layers className="w-4 h-4" />
+            </div>
+            <span className="font-heading font-bold text-xs">PDAM Tiara</span>
+          </div>
+
+          <div className="ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-8 w-8 p-0 rounded-lg border-border hover:bg-muted text-muted-foreground"
+              title="Ganti Tema"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Center Form Container */}
+        <div className="my-auto space-y-6">
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-heading font-bold text-foreground">
+              Masuk ke Sistem
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Gunakan kredensial internal PDAM atau pilih peran simulasi di bawah.
+            </p>
+          </div>
+
+          {/* Quick Role Selection Buttons for evaluation */}
+          <div className="space-y-2">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Pilih Akses Cepat Berdasarkan Peran (PRD Section 5):
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickRoleLogin('admin')}
+                className="p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-left transition-colors flex flex-col gap-1"
+              >
+                <div className="flex items-center gap-1.5 text-blue-500">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span className="font-semibold text-xs">Admin (IT)</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">Semua menu & upload</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickRoleLogin('verifikator')}
+                className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-left transition-colors flex flex-col gap-1"
+              >
+                <div className="flex items-center gap-1.5 text-emerald-500">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span className="font-semibold text-xs">Verifikator</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">Dashboard & titik GIS</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickRoleLogin('pimpinan')}
+                className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-left transition-colors flex flex-col gap-1"
+              >
+                <div className="flex items-center gap-1.5 text-purple-500">
+                  <Building className="w-3.5 h-3.5" />
+                  <span className="font-semibold text-xs">Pimpinan</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">Data agregat</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-border" />
+            <span className="flex-shrink mx-3 text-[10px] font-mono uppercase text-muted-foreground">
+              atau masuk manual
+            </span>
+            <div className="flex-grow border-t border-border" />
+          </div>
+
+          {/* Standard Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">
+                Email / NIK Petugas
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="sofiyan.hawari@pdamtiara.id"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-9 h-10 text-xs rounded-xl border-border bg-card"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-foreground">
+                  Kata Sandi
+                </label>
+                <span className="text-[11px] text-primary hover:underline cursor-pointer">
+                  Lupa sandi?
+                </span>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 h-10 text-xs rounded-xl border-border bg-card"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-10 rounded-xl text-xs font-semibold gap-2 mt-2"
+            >
+              <span>{isLoading ? 'Memverifikasi...' : 'Masuk ke Aplikasi'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </form>
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center text-[11px] text-muted-foreground font-mono">
+          PDAM Tirta Ardhia Rinjani &copy; 2026. Hak Cipta Dilindungi.
+        </div>
+      </div>
+    </div>
   );
 }

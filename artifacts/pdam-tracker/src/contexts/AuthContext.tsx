@@ -1,65 +1,93 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useGetCurrentUser, User, setAuthTokenGetter } from '@workspace/api-client-react';
-import { useLocation } from 'wouter';
+import { UserRole, UserProfile } from '@/types/pdam';
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   isLoading: boolean;
-  login: (token: string, refreshToken: string, userData: User) => void;
+  login: (role?: UserRole, name?: string) => void;
   logout: () => void;
+  switchRole: (role: UserRole) => void;
 }
+
+const DEFAULT_USERS: Record<UserRole, UserProfile> = {
+  admin: {
+    id: 'usr-admin-01',
+    name: 'Muh Sofiyan Hawari',
+    email: 'sofiyan.hawari@pdamtiara.id',
+    role: 'admin',
+    department: 'Bidang IT & Sistem Informasi',
+  },
+  verifikator: {
+    id: 'usr-verif-02',
+    name: 'Lalu Danial Pratama',
+    email: 'danial.verif@pdamtiara.id',
+    role: 'verifikator',
+    department: 'Tim Perapian Data & Verifikasi Lapangan',
+  },
+  pimpinan: {
+    id: 'usr-pimp-03',
+    name: 'Direksi Operasional',
+    email: 'direksi@pdamtiara.id',
+    role: 'pimpinan',
+    department: 'Direksi & Manajemen Eksekutif',
+  },
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Always read token from localStorage so API calls work immediately after login
-setAuthTokenGetter(() => localStorage.getItem('access_token'));
+const STORAGE_KEYS = {
+  USER: 'pdam_tiara_auth_user',
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
-  const [user, setUser] = useState<User | null>(null);
-  const [, setLocation] = useLocation();
-
-  // Only fetch /auth/me on initial page load (when token exists but user not yet set)
-  const { data: currentUser, isLoading: isUserLoading, isError } = useGetCurrentUser({
-    query: {
-      enabled: !!token && user === null,
-      retry: false,
-      queryKey: ['currentUser']
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.USER);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Error reading auth state', e);
     }
+    // Default to admin for seamless evaluation
+    return DEFAULT_USERS.admin;
   });
 
-  useEffect(() => {
-    if (currentUser) {
-      setUser(currentUser);
-    }
-  }, [currentUser]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (isError) {
-      handleLogout();
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
     }
-  }, [isError]);
+  }, [user]);
 
-  // Accept user data directly so state is set synchronously before navigation
-  const handleLogin = (newToken: string, newRefreshToken: string, userData: User) => {
-    localStorage.setItem('access_token', newToken);
-    localStorage.setItem('refresh_token', newRefreshToken);
-    setToken(newToken);
-    setUser(userData); // set immediately — no race condition
+  const login = (role: UserRole = 'admin', customName?: string) => {
+    setIsLoading(true);
+    setTimeout(() => {
+      const baseUser = DEFAULT_USERS[role] || DEFAULT_USERS.admin;
+      const newUser: UserProfile = {
+        ...baseUser,
+        name: customName || baseUser.name,
+      };
+      setUser(newUser);
+      setIsLoading(false);
+    }, 200);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setToken(null);
+  const logout = () => {
     setUser(null);
-    setLocation('/login');
+    localStorage.removeItem(STORAGE_KEYS.USER);
   };
 
-  const isLoading = !!token && user === null && isUserLoading;
+  const switchRole = (role: UserRole) => {
+    const newUser = DEFAULT_USERS[role] || DEFAULT_USERS.admin;
+    setUser(newUser);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login: handleLogin, logout: handleLogout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, switchRole }}>
       {children}
     </AuthContext.Provider>
   );
