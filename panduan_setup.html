@@ -2,11 +2,11 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Panduan Setup PostGIS & WebGIS Realtime PDAM</title>
+  <title>Panduan Lengkap WebGIS & QGIS Realtime PDAM</title>
   <style>
     @page {
       size: A4;
-      margin: 16mm 14mm 16mm 14mm;
+      margin: 14mm 14mm 14mm 14mm;
     }
     * {
       box-sizing: border-box;
@@ -14,30 +14,30 @@
       print-color-adjust: exact;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 11.5pt;
-      line-height: 1.55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #1e293b;
       background: #ffffff;
       margin: 0;
       padding: 0;
     }
     .header {
-      border-bottom: 2px solid #0284c7;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
+      border-bottom: 2.5px solid #0284c7;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
     .header h1 {
-      font-size: 18pt;
+      font-size: 17pt;
       font-weight: 800;
       color: #0f172a;
-      margin: 0 0 4px 0;
+      margin: 0 0 3px 0;
     }
     .header p {
-      font-size: 10pt;
+      font-size: 9.5pt;
       color: #64748b;
       margin: 0;
     }
@@ -45,46 +45,51 @@
       display: inline-block;
       padding: 3px 8px;
       border-radius: 6px;
-      font-size: 8.5pt;
-      font-weight: 700;
+      font-size: 8pt;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       background-color: #e0f2fe;
       color: #0369a1;
       border: 1px solid #bae6fd;
     }
-    h2 {
-      font-size: 13pt;
-      font-weight: 700;
-      color: #0f172a;
-      margin: 22px 0 10px 0;
-      border-left: 4px solid #0284c7;
-      padding-left: 10px;
+    .diagram-box {
+      background: #f8fafc;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      text-align: center;
     }
-    h3 {
-      font-size: 11.5pt;
-      font-weight: 700;
-      color: #1e293b;
-      margin: 14px 0 6px 0;
+    .diagram-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
-    p, li {
-      font-size: 10.5pt;
-      color: #334155;
-      margin: 6px 0;
+    .diagram-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 10pt;
+      color: #0284c7;
+      font-weight: 800;
     }
-    ul, ol {
-      margin: 6px 0;
-      padding-left: 22px;
-    }
-    li {
-      margin-bottom: 5px;
+    .diagram-card p {
+      margin: 0;
+      font-size: 8.5pt;
+      color: #64748b;
+      line-height: 1.35;
     }
     .step-card {
       border: 1px solid #e2e8f0;
       border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-      background-color: #f8fafc;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      background-color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
       page-break-inside: avoid;
     }
     .step-header {
@@ -92,6 +97,8 @@
       align-items: center;
       gap: 10px;
       margin-bottom: 8px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 6px;
     }
     .step-num {
       width: 26px;
@@ -102,74 +109,103 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10.5pt;
+      font-size: 11pt;
       font-weight: 800;
       flex-shrink: 0;
     }
     .step-title {
       font-size: 12pt;
-      font-weight: 700;
+      font-weight: 800;
       color: #0f172a;
+    }
+    .step-target {
+      margin-left: auto;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    h3 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 10px 0 4px 0;
+    }
+    p, li {
+      font-size: 10pt;
+      color: #334155;
+      margin: 4px 0;
+    }
+    ul, ol {
+      margin: 4px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 4px;
     }
     code, pre {
       font-family: "Consolas", "Courier New", monospace;
     }
     code {
-      font-size: 9.5pt;
-      background-color: #e2e8f0;
+      font-size: 9pt;
+      background-color: #f1f5f9;
       color: #0f172a;
-      padding: 2px 6px;
+      padding: 1.5px 5px;
       border-radius: 4px;
+      border: 1px solid #e2e8f0;
     }
     pre {
       background-color: #0f172a;
       color: #f8fafc;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 9.5pt;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 9pt;
       overflow-x: auto;
-      margin: 8px 0;
-      line-height: 1.45;
+      margin: 6px 0;
+      line-height: 1.4;
     }
-    .highlight-box {
-      background-color: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-left: 4px solid #2563eb;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin: 10px 0;
-      font-size: 10pt;
+    .tip-box {
+      background-color: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 4px solid #16a34a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 9.5pt;
     }
     .warning-box {
       background-color: #fffbeb;
       border: 1px solid #fde68a;
       border-left: 4px solid #d97706;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin: 10px 0;
-      font-size: 10pt;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 9.5pt;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 10px 0;
-      font-size: 9.5pt;
+      margin: 8px 0;
+      font-size: 9pt;
     }
     th, td {
       border: 1px solid #cbd5e1;
-      padding: 6px 10px;
+      padding: 5px 8px;
       text-align: left;
     }
     th {
-      background-color: #f1f5f9;
+      background-color: #f8fafc;
       font-weight: 700;
       color: #0f172a;
     }
     .footer {
-      margin-top: 25px;
+      margin-top: 20px;
       border-top: 1px solid #e2e8f0;
-      padding-top: 8px;
-      font-size: 8.5pt;
+      padding-top: 6px;
+      font-size: 8pt;
       color: #94a3b8;
       display: flex;
       justify-content: space-between;
@@ -184,73 +220,95 @@
   <!-- HEADER -->
   <div class="header">
     <div>
-      <span class="badge">Panduan Teknis Resmi</span>
-      <h1>SOP Integrasi QGIS ke WebGIS Realtime (PostGIS)</h1>
-      <p>Sistem Informasi Spasial Pelanggan & Jaringan Pipa PDAM Tirta Ardhia Rinjani</p>
+      <span class="badge">Standar Operasional Prosedur (SOP)</span>
+      <h1>Panduan Lengkap WebGIS & QGIS Realtime</h1>
+      <p>Sistem Pemetaan Jaringan Pipa & Data Pelanggan &bull; PDAM Tirta Ardhia Rinjani</p>
     </div>
     <div style="text-align: right;">
-      <span style="font-size: 9pt; color: #64748b;">Versi 1.0 (Produksi)</span><br/>
+      <span style="font-size: 9pt; color: #0284c7; font-weight: 700;">Edisi Multi-User</span><br/>
       <span style="font-size: 8.5pt; color: #94a3b8;">Oktober 2026</span>
     </div>
   </div>
 
-  <!-- PENDAHULUAN -->
-  <div class="highlight-box">
-    <strong>Tujuan Panduan:</strong> Menghubungkan software <strong>QGIS</strong> di komputer teknisi kantor dengan <strong>WebGIS</strong> secara langsung (realtime) menggunakan database <strong>PostgreSQL + PostGIS</strong>. Apapun yang digambar teman Anda di QGIS (garis pipa, katup valve, batas zona) otomatis tampil di browser detik itu juga tanpa perlu ekspor-impor file manual!
+  <!-- BAGAN PEMBAGIAN 3 PERAN -->
+  <div class="diagram-box">
+    <div class="diagram-card">
+      <h4>💻 1. Laptop Anda</h4>
+      <p><strong>Khusus Koding:</strong> Membuat fitur baru, perbaikan tombol, dan update kode via <code>git push</code>. Bebas dibawa pulang.</p>
+    </div>
+    <div class="diagram-card" style="border-color: #0284c7; background: #f0f9ff;">
+      <h4>🏢 2. Server Kantor</h4>
+      <p><strong>Pusat Database & Web:</strong> Menyimpan PostgreSQL (PostGIS) dan menyalakan WebGIS 24 jam untuk seluruh kantor.</p>
+    </div>
+    <div class="diagram-card">
+      <h4>👥 3. Teman Kantor & User</h4>
+      <p><strong>Pengguna Realtime:</strong> Teman mengedit di QGIS (Ctrl+S). Staf/Pimpinan membuka WebGIS di Google Chrome.</p>
+    </div>
   </div>
 
   <!-- TAHAP 1 -->
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">1</div>
-      <div class="step-title">Ambil File Skema Database dari Laptop Anda</div>
+      <div class="step-title">Siapkan Database di Komputer Server Kantor</div>
+      <div class="step-target">Lokasi: Server Kantor</div>
     </div>
-    <p>File skrip database sudah disiapkan lengkap di laptop Anda.</p>
+    <p>Tujuan: Mengaktifkan database PostgreSQL dan fitur PostGIS agar siap menampung puluhan ribu garis pipa.</p>
     <ol>
-      <li>Buka <strong>File Explorer</strong> di laptop Anda, masuk ke direktori:
-        <pre>D:\ari\Material-Tracker\Material-Tracker\</pre>
-      </li>
-      <li>Cari satu file bernama: <code>postgis_pdam_schema.sql</code></li>
-      <li>Copy file tersebut ke <strong>Flashdisk</strong> atau kirimkan ke diri Anda sendiri lewat <strong>WhatsApp Web / Email</strong> agar bisa dibuka di komputer server kantor.</li>
-    </ol>
-  </div>
-
-  <!-- TAHAP 2 -->
-  <div class="step-card">
-    <div class="step-header">
-      <div class="step-num">2</div>
-      <div class="step-title">Eksekusi Skrip di Komputer Server Kantor (pgAdmin)</div>
-    </div>
-    <p>Lakukan langkah ini di komputer kantor tempat PostgreSQL terpasang:</p>
-    <ol>
-      <li>Buka aplikasi <strong>pgAdmin 4</strong> (aplikasi standar PostgreSQL).</li>
-      <li>Masukkan master password admin saat diminta.</li>
+      <li><strong>Bawa File Skrip:</strong> Dari laptop Anda, copy file <code>postgis_pdam_schema.sql</code> (lewat Flashdisk / WA) ke komputer server kantor.</li>
+      <li><strong>Buka pgAdmin 4 di Komputer Server Kantor:</strong> Masukkan password admin PostgreSQL saat diminta.</li>
       <li><strong>Buat Database Baru:</strong>
         <ul>
-          <li>Di menu kiri: klik kanan pada <strong>Databases</strong> ➔ pilih <strong>Create</strong> ➔ klik <strong>Database...</strong></li>
-          <li>Ketik nama database: <code>pdam_gis</code> lalu klik <strong>Save</strong>.</li>
+          <li>Di menu kiri: klik kanan <strong>Databases</strong> ➔ pilih <strong>Create</strong> ➔ klik <strong>Database...</strong></li>
+          <li>Ketik nama: <code>pdam_gis</code> lalu klik <strong>Save</strong>.</li>
         </ul>
       </li>
-      <li><strong>Jalankan File SQL:</strong>
+      <li><strong>Jalankan Skrip:</strong>
         <ul>
-          <li>Klik database <code>pdam_gis</code> yang baru dibuat.</li>
-          <li>Di menu atas, klik <strong>Tools</strong> ➔ pilih <strong>Query Tool</strong>.</li>
-          <li>Buka file <code>postgis_pdam_schema.sql</code> (bisa buka lewat Notepad, lalu <em>Copy All</em> ➔ <em>Paste</em> ke layar Query Tool pgAdmin).</li>
-          <li>Tekan tombol keyboard <strong>F5</strong> (atau klik tombol ikon <strong>▶ Run / Execute</strong>).</li>
-          <li>Tunggu hingga muncul pesan notifikasi hijau: <em>"Query returned successfully"</em>.</li>
+          <li>Klik database <code>pdam_gis</code> yang baru dibuat ➔ klik menu atas <strong>Tools</strong> ➔ pilih <strong>Query Tool</strong>.</li>
+          <li>Buka file <code>postgis_pdam_schema.sql</code> (bisa dibuka dengan Notepad ➔ Copy All ➔ Paste ke layar Query Tool pgAdmin).</li>
+          <li>Tekan tombol keyboard <strong>F5</strong> (atau klik tombol ikon ▶ Run).</li>
+          <li>Tunggu 2 detik sampai muncul pesan sukses hijau: <em>"Query returned successfully"</em>.</li>
         </ul>
       </li>
-      <li><strong>Cek Alamat IP Komputer Kantor:</strong>
+      <li><strong>Cek Alamat IP Komputer Server:</strong>
         <ul>
-          <li>Buka Command Prompt di komputer kantor (tekan tombol <code>Win + R</code> ➔ ketik <code>cmd</code> ➔ Enter).</li>
+          <li>Tekan tombol <code>Win + R</code> di keyboard server kantor ➔ ketik <code>cmd</code> ➔ Enter.</li>
           <li>Ketik perintah: <code>ipconfig</code> lalu tekan Enter.</li>
           <li>Catat nomor <strong>IPv4 Address</strong> (Contoh: <code>192.168.1.50</code>).</li>
         </ul>
       </li>
     </ol>
     <div class="warning-box">
-      <strong>Penting (Membedakan IP):</strong> Ambil angka pada baris <code>IPv4 Address</code> (misal <code>192.168.1.50</code>). <strong>JANGAN</strong> ambil <code>Default Gateway (192.168.1.1)</code> karena itu adalah IP modem router internet kantor!
+      <strong>Ingat Perbedaan IP:</strong> Ambil angka pada baris <code>IPv4 Address</code> (misal <code>192.168.1.50</code>). <strong>JANGAN</strong> ambil <code>Default Gateway (192.168.1.1)</code> karena itu IP modem router Indihome/internet kantor!
     </div>
+  </div>
+
+  <!-- TAHAP 2 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Pasang WebGIS di Komputer Server Kantor</div>
+      <div class="step-target">Lokasi: Server Kantor</div>
+    </div>
+    <p>Tujuan: Menjadikan komputer kantor sebagai server mandiri agar WebGIS bisa diakses siapa saja di kantor tanpa tergantung laptop Anda.</p>
+    <ol>
+      <li>Di komputer server kantor, buka <strong>Command Prompt (CMD)</strong> lalu download kodingan terbaru dari GitHub:
+        <pre>git clone https://github.com/arisuplay97/material/
+cd material</pre>
+      </li>
+      <li>Pasang dependensi sistem:
+        <pre>pnpm install</pre>
+      </li>
+      <li>Buat satu file bernama <strong><code>.env</code></strong> di dalam folder <code>material</code> tersebut. Isikan baris berikut:
+        <pre>DATABASE_URL="postgresql://postgres:password_kantor@localhost:5432/pdam_gis"</pre>
+        <span style="font-size: 8.5pt; color: #64748b;">*(Ganti <code>password_kantor</code> dengan password pgAdmin kantor Anda. Pakai kata <code>localhost</code> karena databasenya ada di komputer server itu sendiri).*</span>
+      </li>
+      <li>Nyalakan WebGIS agar bisa diakses seluruh kantor:
+        <pre>pnpm run dev --host</pre>
+        <span style="font-size: 8.5pt; color: #64748b;">*(Opsi <code>--host</code> memastikan WebGIS bisa dibuka oleh perangkat lain lewat Wi-Fi kantor).*</span>
+      </li>
+    </ol>
   </div>
 
   <div class="page-break"></div>
@@ -259,38 +317,40 @@
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">3</div>
-      <div class="step-title">Hubungkan QGIS Teman Kantor & Pindahkan Pipa (5 Detik)</div>
+      <div class="step-title">Setting QGIS Teman Kantor (Alur Kerja Realtime Otomatis)</div>
+      <div class="step-target">Lokasi: Komputer Teman (GIS)</div>
     </div>
-    <p>Duduk bersama teman Anda yang memegang software QGIS, lalu lakukan:</p>
+    <p>Tujuan: Menghubungkan QGIS teman Anda langsung ke server kantor. Apapun yang digambar langsung tersimpan otomatis!</p>
     
-    <h3>A. Sambungkan QGIS ke Database Kantor:</h3>
+    <h3>A. Sambungkan QGIS ke Server Kantor (Cukup 1 Kali Saja):</h3>
     <ol>
-      <li>Buka software <strong>QGIS</strong> di komputernya.</li>
-      <li>Di panel kiri (panel <strong>Browser</strong>), cari logo gajah bertuliskan <strong>PostGIS</strong>.</li>
-      <li>Klik kanan pada tulisan <strong>PostGIS</strong> ➔ pilih <strong>New Connection...</strong> (Koneksi Baru).</li>
-      <li>Isi form sebagai berikut:
+      <li>Di komputer teman Anda, buka software <strong>QGIS</strong>.</li>
+      <li>Di panel kiri (panel <strong>Browser</strong>), cari tulisan gajah <strong>PostGIS</strong>.</li>
+      <li>Klik kanan <strong>PostGIS</strong> ➔ pilih <strong>New Connection...</strong> (Koneksi Baru).</li>
+      <li>Isikan form:
         <table>
-          <tr><th style="width: 35%;">Kolom Form</th><th>Nilai Isian</th></tr>
+          <tr><th style="width: 30%;">Kolom</th><th>Nilai Isian</th></tr>
           <tr><td><strong>Name</strong></td><td><code>Database PDAM Kantor</code> (bebas)</td></tr>
-          <tr><td><strong>Host</strong></td><td><code>192.168.1.50</code> (masukkan IP komputer kantor tadi)</td></tr>
-          <tr><td><strong>Port</strong></td><td><code>5432</code> (default PostgreSQL)</td></tr>
+          <tr><td><strong>Host</strong></td><td><code>192.168.1.50</code> (masukkan IP komputer server kantor dari Tahap 1)</td></tr>
+          <tr><td><strong>Port</strong></td><td><code>5432</code></td></tr>
           <tr><td><strong>Database</strong></td><td><code>pdam_gis</code></td></tr>
-          <tr><td><strong>User / Password</strong></td><td>User (biasanya <code>postgres</code>) dan password database kantor</td></tr>
+          <tr><td><strong>User / Password</strong></td><td>User <code>postgres</code> dan password database kantor Anda</td></tr>
         </table>
       </li>
       <li>Klik tombol <strong>Test Connection</strong>. Begitu muncul pesan hijau sukses, klik <strong>OK</strong>.</li>
+      <li><strong>Pindahkan Data Pipa Awal:</strong> Cukup klik & tahan (Drag) layer pipa teman Anda, lalu lepaskan (Drop) ke dalam: <code>PostGIS ➔ Database PDAM Kantor ➔ public</code>. Selesai!</li>
     </ol>
 
-    <h3>B. Pindahkan Garis Pipa (Trik Cepat Drag & Drop):</h3>
-    <ol>
-      <li>Buka layer jaringan pipa yang biasa dikerjakan teman Anda di layar QGIS.</li>
-      <li>Cukup <strong>Klik & Tahan (Drag)</strong> layer pipa tersebut dari panel <em>Layers</em>.</li>
-      <li><strong>Lepaskan (Drop)</strong> ke dalam folder: <code>PostGIS ➔ Database PDAM Kantor ➔ public</code>.</li>
-      <li><strong>Selesai!</strong> Puluhan ribu garis pipa langsung otomatis ter-upload ke database kantor.</li>
-    </ol>
-
-    <div class="highlight-box">
-      <strong>Catatan Nama Kolom / Atribut:</strong> Teman Anda <em>bebas</em> memakai nama kolom apapun di QGIS (misal diameter dinamai <code>DIA</code>, <code>DN</code>, <code>UKURAN</code>, atau bahan dinamai <code>BAHAN</code>, <code>MATERIAL</code>). Sistem WebGIS sudah dilengkapi <strong>Pendeteksi Alias Cerdas</strong> sehingga seluruh data pasti otomatis terbaca!
+    <h3>B. Alur Kerja Harian Teman Anda (100% Realtime Otomatis):</h3>
+    <div class="tip-box">
+      <strong>Mulai sekarang teman Anda bekerja dengan cara praktis ini:</strong>
+      <ol style="margin: 4px 0; padding-left: 18px;">
+        <li>Di QGIS, buka layer pipa langsung dari pohon <code>PostGIS ➔ Database PDAM Kantor ➔ gis_pipa</code> (klik dua kali).</li>
+        <li>Klik ikon <strong>Pensil Kuning (Toggle Editing)</strong> di toolbar atas QGIS.</li>
+        <li>Gambar jalur pipa baru, geser letak katup valve, atau ubah angka diameter pipa.</li>
+        <li>Begitu selesai, tekan <strong>Ctrl + S (Save Edits)</strong> di QGIS.</li>
+        <li><strong>Detik itu juga:</strong> Data pipa langsung tersimpan ke server kantor dan langsung otomatis muncul di layar WebGIS seluruh kantor! Tidak perlu kirim file atau ekspor apapun lagi.</li>
+      </ol>
     </div>
   </div>
 
@@ -298,33 +358,23 @@
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">4</div>
-      <div class="step-title">Konfigurasi Pengaturan .env di Laptop Anda</div>
+      <div class="step-title">Cara Membuka WebGIS untuk Seluruh Kantor & Smartphone</div>
+      <div class="step-target">Lokasi: Semua Laptop / HP Kantor</div>
     </div>
-    <p>Kembali ke laptop Anda (pastikan laptop Anda tersambung ke <strong>Wi-Fi kantor yang sama</strong>):</p>
+    <p>Semua staf, pimpinan, dan teknisi lapangan yang tersambung ke Wi-Fi kantor bisa langsung mengakses WebGIS:</p>
     <ol>
-      <li>Buka file <code>.env</code> di root folder proyek aplikasi Anda:
-        <pre>D:\ari\Material-Tracker\Material-Tracker\.env</pre>
+      <li>Buka browser Google Chrome di laptop atau smartphone masing-masing.</li>
+      <li>Ketik alamat IP server kantor:
+        <pre>http://192.168.1.50:5173/gis</pre>
       </li>
-      <li>Ganti baris pertama <code>DATABASE_URL</code> dengan alamat IP dan password database kantor:
-        <pre>DATABASE_URL="postgresql://postgres:password_kantor@192.168.1.50:5432/pdam_gis"</pre>
-      </li>
-      <li><strong>Penjelasan Komponen URL:</strong>
+      <li><strong>Tips Cepat untuk Teman & Pimpinan:</strong> Buatkan <em>Shortcut Desktop</em> atau <em>Bookmark</em> bernama <strong>"WebGIS PDAM"</strong> di komputernya. Setiap pagi mereka tinggal klik satu kali, WebGIS langsung terbuka!</li>
+      <li><strong>Tampilan Lengkap Otomatis di WebGIS:</strong>
         <ul>
-          <li><code>postgres</code> = Username database server kantor.</li>
-          <li><code>password_kantor</code> = Ganti dengan password asli database kantor.</li>
-          <li><code>192.168.1.50</code> = Ganti dengan IP IPv4 komputer server kantor tadi.</li>
-          <li><code>5432</code> = Nomor port default PostgreSQL.</li>
-          <li><code>pdam_gis</code> = Nama database yang dibuat di pgAdmin.</li>
+          <li><strong>Garis Pipa Otomatis Berwarna:</strong> Pipa transmisi besar merah tebal, pipa distribusi biru sedang, pipa retikulasi biru muda.</li>
+          <li><strong>Ikon Katup Valve:</strong> Gate Valve oranye <code>⚙</code>, PRV pengatur tekanan ungu <code>⎈</code>.</li>
+          <li><strong>Klik Pipa / Valve:</strong> Muncul popup spesifikasi teknis lengkap (Diameter mm, Bahan, Tekanan Bar, Panjang, Zona DMA).</li>
         </ul>
       </li>
-      <li><strong>Tips Cadangan:</strong> Simpan database lama Anda dengan menambahkan tanda pagar (<code>#</code>) di depannya agar tidak hilang.
-<pre># Database Kantor (Aktif):
-DATABASE_URL="postgresql://postgres:password_kantor@192.168.1.50:5432/pdam_gis"
-
-# Database Cloud Neon (Cadangan):
-# DATABASE_URL=postgresql://neondb_owner:npg_9EDmOqw2ZYiQ@...</pre>
-      </li>
-      <li>Tekan tombol keyboard <strong>Ctrl + S</strong> untuk menyimpan file <code>.env</code>.</li>
     </ol>
   </div>
 
@@ -332,52 +382,44 @@ DATABASE_URL="postgresql://postgres:password_kantor@192.168.1.50:5432/pdam_gis"
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">5</div>
-      <div class="step-title">Selesai! Buka dan Periksa WebGIS Anda</div>
+      <div class="step-title">Alur Anda Sebagai Developer (Koding di Laptop)</div>
+      <div class="step-target">Lokasi: Laptop Pribadi Anda</div>
     </div>
     <ol>
-      <li>Buka browser di laptop Anda, akses alamat:
-        <pre>http://localhost:5173/gis</pre>
+      <li>Laptop Anda murni hanya untuk tempat membuat fitur baru, memoles desain, atau merombak kodingan.</li>
+      <li>Di laptop Anda, file <code>.env</code> cukup diarahkan ke IP server kantor untuk testing:
+        <pre>DATABASE_URL="postgresql://postgres:password_kantor@192.168.1.50:5432/pdam_gis"</pre>
       </li>
-      <li>Perhatikan tombol pill di bagian atas peta: <strong><code>[🔵 QGIS Pipa  ✓]</code></strong>.</li>
-      <li><strong>Fitur yang Otomatis Aktif:</strong>
+      <li><strong>Saat Selesai Bikin Fitur Baru:</strong>
         <ul>
-          <li><strong>Pewarnaan & Ketebalan Pipa:</strong> Pipa transmisi besar (merah tebal), pipa distribusi utama (biru sedang), dan pipa retikulasi pemukiman (biru muda).</li>
-          <li><strong>Hover Tooltip:</strong> Lewatkan kursor di atas pipa untuk melihat nama jalur secara instan.</li>
-          <li><strong>Klik Pipa (Popup Spesifikasi):</strong> Muncul kartu rincian teknis lengkap (Diameter mm, Material, Tekanan Bar, Panjang, Zona DMA, Status Aliran).</li>
+          <li>Di laptop Anda: ketik <code>git push</code> (file <code>.env</code> Anda otomatis aman dan tidak ikut ter-push).</li>
+          <li>Di server kantor: cukup ketik <code>git pull</code>.</li>
+          <li><strong>Selesai!</strong> Fitur baru buatan Anda langsung dinikmati oleh seluruh kantor secara instan.</li>
         </ul>
       </li>
     </ol>
   </div>
 
-  <!-- TROUBLESHOOTING -->
-  <h2>Tips Mengatasi Kendala (Troubleshooting)</h2>
+  <!-- TROUBLESHOOTING RINGKAS -->
+  <h3>Solusi Cepat Kendala (Troubleshooting):</h3>
   <table>
+    <tr><th style="width: 30%;">Kendala</th><th style="width: 35%;">Penyebab</th><th>Solusi</th></tr>
     <tr>
-      <th style="width: 30%;">Gejala / Pesan Error</th>
-      <th style="width: 35%;">Penyebab</th>
-      <th>Solusi Cepat</th>
+      <td><strong>Connection Refused (5432)</strong></td>
+      <td>Firewall server kantor memblokir port database.</td>
+      <td>Di server kantor: Buka Windows Firewall ➔ Inbound Rules ➔ New Rule ➔ Izinkan Port <code>5432</code>.</td>
     </tr>
     <tr>
-      <td><em>Connection timed out / Connection refused (port 5432)</em></td>
-      <td>Firewall di komputer server kantor memblokir akses port PostgreSQL dari laptop lain.</td>
-      <td>Di komputer server kantor: Buka <strong>Windows Defender Firewall with Advanced Security</strong> ➔ Inbound Rules ➔ Buat <strong>New Rule</strong> ➔ Port <code>5432</code> ➔ Allow Connection.</td>
-    </tr>
-    <tr>
-      <td><em>no pg_hba.conf entry for host</em></td>
-      <td>PostgreSQL belum mengizinkan koneksi dari IP Wi-Fi lokal.</td>
-      <td>Buka file <code>pg_hba.conf</code> di server kantor, tambahkan baris di paling bawah: <code>host all all 0.0.0.0/0 md5</code> lalu restart PostgreSQL service.</td>
-    </tr>
-    <tr>
-      <td>Peta di laptop belum berubah setelah diedit teman</td>
-      <td>File QGIS belum ditekan tombol Save.</td>
-      <td>Minta teman kantor menekan <strong>Ctrl + S (Save Layer Edits)</strong> di QGIS. Di WebGIS klik tombol <strong>🔄 Sync</strong>.</td>
+      <td><strong>no pg_hba.conf entry</strong></td>
+      <td>PostgreSQL belum mengizinkan koneksi dari IP Wi-Fi.</td>
+      <td>Buka file <code>pg_hba.conf</code> di folder PostgreSQL server kantor, tambahkan di baris paling bawah: <code>host all all 0.0.0.0/0 md5</code> lalu restart service PostgreSQL.</td>
     </tr>
   </table>
 
   <!-- FOOTER -->
   <div class="footer">
-    <span>PDAM Tirta Ardhia Rinjani &mdash; Tim IT & Sistem Informasi Geografis (WebGIS)</span>
-    <span>Dokumen Teknis &bull; Halaman 2 dari 2</span>
+    <span>PDAM Tirta Ardhia Rinjani &mdash; Tim IT & Sistem Informasi Geografis</span>
+    <span>Dokumen Resmi &bull; Alur Kerja Realtime Multi-User</span>
   </div>
 
 </body>
