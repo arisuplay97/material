@@ -2,11 +2,11 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Panduan Lengkap WebGIS & QGIS Realtime PDAM</title>
+  <title>Panduan Resmi WebGIS Vercel & QGIS Realtime PDAM</title>
   <style>
     @page {
-      size: A4;
-      margin: 14mm 14mm 14mm 14mm;
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
     }
     * {
       box-sizing: border-box;
@@ -15,50 +15,71 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 11pt;
-      line-height: 1.5;
+      font-size: 9.5pt;
+      line-height: 1.42;
       color: #1e293b;
       background: #ffffff;
       margin: 0;
       padding: 0;
     }
     .header {
-      border-bottom: 2.5px solid #0284c7;
-      padding-bottom: 10px;
-      margin-bottom: 16px;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
     .header h1 {
-      font-size: 17pt;
+      font-size: 15pt;
       font-weight: 800;
       color: #0f172a;
-      margin: 0 0 3px 0;
+      margin: 0 0 2px 0;
     }
     .header p {
-      font-size: 9.5pt;
+      font-size: 9pt;
       color: #64748b;
       margin: 0;
     }
     .badge {
       display: inline-block;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 8pt;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 7.5pt;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       background-color: #e0f2fe;
       color: #0369a1;
       border: 1px solid #bae6fd;
+      margin-bottom: 4px;
+    }
+    .cloud-hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    .cloud-hero h3 {
+      color: #38bdf8;
+      font-size: 11pt;
+      margin: 0 0 4px 0;
+      font-weight: 800;
+    }
+    .cloud-hero p {
+      color: #cbd5e1;
+      font-size: 9pt;
+      margin: 0;
+      line-height: 1.4;
     }
     .diagram-box {
       background: #f8fafc;
       border: 1.5px dashed #cbd5e1;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 16px;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
@@ -67,133 +88,118 @@
     .diagram-card {
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 8px 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      border-radius: 6px;
+      padding: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
     .diagram-card h4 {
-      margin: 0 0 4px 0;
-      font-size: 10pt;
+      margin: 0 0 3px 0;
+      font-size: 9.5pt;
       color: #0284c7;
       font-weight: 800;
     }
     .diagram-card p {
       margin: 0;
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #64748b;
       line-height: 1.35;
     }
     .step-card {
       border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 14px;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
       background-color: #ffffff;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
       page-break-inside: avoid;
     }
     .step-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
+      gap: 8px;
+      margin-bottom: 6px;
       border-bottom: 1px solid #f1f5f9;
-      padding-bottom: 6px;
+      padding-bottom: 5px;
     }
     .step-num {
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       background-color: #0284c7;
       color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11pt;
+      font-size: 10pt;
       font-weight: 800;
       flex-shrink: 0;
     }
     .step-title {
-      font-size: 12pt;
+      font-size: 10.5pt;
       font-weight: 800;
       color: #0f172a;
     }
     .step-target {
       margin-left: auto;
-      font-size: 8.5pt;
+      font-size: 7.5pt;
       font-weight: 700;
-      color: #64748b;
-      background: #f1f5f9;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
-    }
-    h3 {
-      font-size: 10.5pt;
-      font-weight: 700;
-      color: #1e293b;
-      margin: 10px 0 4px 0;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 2px 7px;
+      border-radius: 5px;
     }
     p, li {
-      font-size: 10pt;
+      font-size: 9pt;
       color: #334155;
-      margin: 4px 0;
+      margin: 3px 0;
     }
     ul, ol {
-      margin: 4px 0;
-      padding-left: 20px;
+      margin: 3px 0;
+      padding-left: 18px;
     }
     li {
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     code, pre {
       font-family: "Consolas", "Courier New", monospace;
     }
     code {
-      font-size: 9pt;
+      font-size: 8.5pt;
       background-color: #f1f5f9;
       color: #0f172a;
-      padding: 1.5px 5px;
+      padding: 1px 4px;
       border-radius: 4px;
       border: 1px solid #e2e8f0;
     }
     pre {
       background-color: #0f172a;
       color: #f8fafc;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 9pt;
-      overflow-x: auto;
-      margin: 6px 0;
-      line-height: 1.4;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 8pt;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 4px 0;
+      line-height: 1.35;
     }
     .tip-box {
       background-color: #f0fdf4;
       border: 1px solid #bbf7d0;
       border-left: 4px solid #16a34a;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin: 8px 0;
-      font-size: 9.5pt;
-    }
-    .warning-box {
-      background-color: #fffbeb;
-      border: 1px solid #fde68a;
-      border-left: 4px solid #d97706;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin: 8px 0;
-      font-size: 9.5pt;
+      border-radius: 5px;
+      padding: 6px 10px;
+      margin: 6px 0;
+      font-size: 9pt;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 8px 0;
-      font-size: 9pt;
+      margin: 6px 0;
+      font-size: 8.5pt;
     }
     th, td {
       border: 1px solid #cbd5e1;
-      padding: 5px 8px;
+      padding: 4px 7px;
       text-align: left;
     }
     th {
@@ -202,7 +208,7 @@
       color: #0f172a;
     }
     .footer {
-      margin-top: 20px;
+      margin-top: 14px;
       border-top: 1px solid #e2e8f0;
       padding-top: 6px;
       font-size: 8pt;
@@ -217,209 +223,163 @@
 </head>
 <body>
 
+  <!-- ==================== HALAMAN 1 ==================== -->
+
   <!-- HEADER -->
   <div class="header">
     <div>
-      <span class="badge">Standar Operasional Prosedur (SOP)</span>
-      <h1>Panduan Lengkap WebGIS & QGIS Realtime</h1>
+      <span class="badge">SOP Cloud Realtime 24 Jam</span>
+      <h1>Panduan Integrasi QGIS & WebGIS PDAM di Vercel</h1>
       <p>Sistem Pemetaan Jaringan Pipa & Data Pelanggan &bull; PDAM Tirta Ardhia Rinjani</p>
     </div>
     <div style="text-align: right;">
-      <span style="font-size: 9pt; color: #0284c7; font-weight: 700;">Edisi Multi-User</span><br/>
-      <span style="font-size: 8.5pt; color: #94a3b8;">Oktober 2026</span>
+      <span style="font-size: 8.5pt; color: #0284c7; font-weight: 700;">Arsitektur Cloud 24 Jam</span><br/>
+      <span style="font-size: 8pt; color: #94a3b8;">Oktober 2026</span>
     </div>
   </div>
 
-  <!-- BAGAN PEMBAGIAN 3 PERAN -->
+  <!-- CLOUD HERO -->
+  <div class="cloud-hero">
+    <h3>🌐 Tidak Perlu Server Kantor 24 Jam & Bebas Masalah IP Wi-Fi!</h3>
+    <p>WebGIS resmi Anda berjalan di <strong>Vercel (https://gudangtiara.vercel.app/gis)</strong> dan database spasial tersimpan di <strong>Neon PostgreSQL Cloud 24 Jam</strong>. Teman Anda mengedit di QGIS dari kantor atau rumah, dan detik itu juga peta di HP/laptop seluruh staf langsung terupdate otomatis!</p>
+  </div>
+
+  <!-- BAGAN ALUR KERJA CLOUD -->
   <div class="diagram-box">
     <div class="diagram-card">
       <h4>💻 1. Laptop Anda</h4>
-      <p><strong>Khusus Koding:</strong> Membuat fitur baru, perbaikan tombol, dan update kode via <code>git push</code>. Bebas dibawa pulang.</p>
+      <p><strong>Khusus Koding:</strong> Bikin fitur baru di laptop. Selesai koding cukup ketik <code>git push</code>. Vercel otomatis update!</p>
     </div>
     <div class="diagram-card" style="border-color: #0284c7; background: #f0f9ff;">
-      <h4>🏢 2. Server Kantor</h4>
-      <p><strong>Pusat Database & Web:</strong> Menyimpan PostgreSQL (PostGIS) dan menyalakan WebGIS 24 jam untuk seluruh kantor.</p>
+      <h4>☁️ 2. Neon Cloud</h4>
+      <p><strong>PostGIS 24 Jam Online:</strong> Menyimpan puluhan ribu pipa, katup valve, dan data 720 pelanggan aman di cloud.</p>
     </div>
     <div class="diagram-card">
-      <h4>👥 3. Teman Kantor & User</h4>
-      <p><strong>Pengguna Realtime:</strong> Teman mengedit di QGIS (Ctrl+S). Staf/Pimpinan membuka WebGIS di Google Chrome.</p>
+      <h4>📱 3. Seluruh Pengguna</h4>
+      <p><strong>Akses Instan:</strong> Buka langsung di Google Chrome / HP tanpa repot: <code>https://gudangtiara.vercel.app/gis</code></p>
     </div>
   </div>
 
-  <!-- TAHAP 1 -->
+  <!-- LANGKAH 1 -->
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">1</div>
-      <div class="step-title">Siapkan Database di Komputer Server Kantor</div>
-      <div class="step-target">Lokasi: Server Kantor</div>
+      <div class="step-title">Database PostGIS Cloud Sudah Aktif 100% (Neon)</div>
+      <div class="step-target">Status: SIAP PAKAI</div>
     </div>
-    <p>Tujuan: Mengaktifkan database PostgreSQL dan fitur PostGIS agar siap menampung puluhan ribu garis pipa.</p>
-    <ol>
-      <li><strong>Bawa File Skrip:</strong> Dari laptop Anda, copy file <code>postgis_pdam_schema.sql</code> (lewat Flashdisk / WA) ke komputer server kantor.</li>
-      <li><strong>Buka pgAdmin 4 di Komputer Server Kantor:</strong> Masukkan password admin PostgreSQL saat diminta.</li>
-      <li><strong>Buat Database Baru:</strong>
-        <ul>
-          <li>Di menu kiri: klik kanan <strong>Databases</strong> ➔ pilih <strong>Create</strong> ➔ klik <strong>Database...</strong></li>
-          <li>Ketik nama: <code>pdam_gis</code> lalu klik <strong>Save</strong>.</li>
-        </ul>
-      </li>
-      <li><strong>Jalankan Skrip:</strong>
-        <ul>
-          <li>Klik database <code>pdam_gis</code> yang baru dibuat ➔ klik menu atas <strong>Tools</strong> ➔ pilih <strong>Query Tool</strong>.</li>
-          <li>Buka file <code>postgis_pdam_schema.sql</code> (bisa dibuka dengan Notepad ➔ Copy All ➔ Paste ke layar Query Tool pgAdmin).</li>
-          <li>Tekan tombol keyboard <strong>F5</strong> (atau klik tombol ikon ▶ Run).</li>
-          <li>Tunggu 2 detik sampai muncul pesan sukses hijau: <em>"Query returned successfully"</em>.</li>
-        </ul>
-      </li>
-      <li><strong>Cek Alamat IP Komputer Server:</strong>
-        <ul>
-          <li>Tekan tombol <code>Win + R</code> di keyboard server kantor ➔ ketik <code>cmd</code> ➔ Enter.</li>
-          <li>Ketik perintah: <code>ipconfig</code> lalu tekan Enter.</li>
-          <li>Catat nomor <strong>IPv4 Address</strong> (Contoh: <code>192.168.1.50</code>).</li>
-        </ul>
-      </li>
-    </ol>
-    <div class="warning-box">
-      <strong>Ingat Perbedaan IP:</strong> Ambil angka pada baris <code>IPv4 Address</code> (misal <code>192.168.1.50</code>). <strong>JANGAN</strong> ambil <code>Default Gateway (192.168.1.1)</code> karena itu IP modem router Indihome/internet kantor!
-    </div>
+    <p>Database PostGIS Anda sudah berhasil diaktifkan secara online di Neon Cloud. Anda <strong>tidak perlu menyalakan komputer server di kantor</strong>.</p>
+    <p>Tabel yang sudah aktif di database online:</p>
+    <ul>
+      <li><strong><code>gis_pipa</code>:</strong> Menyimpan puluhan ribu jalur pipa (LineString WGS84) lengkap dengan diameter, bahan, panjang, dan tekanan.</li>
+      <li><strong><code>gis_aksesoris</code>:</strong> Menyimpan katup Gate Valve, PRV, Hydrant, dan Pompa (Point WGS84).</li>
+      <li><strong><code>gis_pelanggan</code>:</strong> Menyimpan 720 titik pelanggan lengkap dengan status sambungan dan deteksi anomali.</li>
+    </ul>
   </div>
 
-  <!-- TAHAP 2 -->
+  <!-- LANGKAH 2 -->
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">2</div>
-      <div class="step-title">Pasang WebGIS di Komputer Server Kantor</div>
-      <div class="step-target">Lokasi: Server Kantor</div>
+      <div class="step-title">Cara Teman Anda Menghubungkan QGIS ke Database Cloud (Cukup 1 Menit)</div>
+      <div class="step-target">Lokasi: Laptop Teman (Bagian GIS)</div>
     </div>
-    <p>Tujuan: Menjadikan komputer kantor sebagai server mandiri agar WebGIS bisa diakses siapa saja di kantor tanpa tergantung laptop Anda.</p>
+    <p>Beri tahu teman kantor bagian GIS untuk menghubungkan software QGIS-nya ke database cloud kita:</p>
     <ol>
-      <li>Di komputer server kantor, buka <strong>Command Prompt (CMD)</strong> lalu download kodingan terbaru dari GitHub:
-        <pre>git clone https://github.com/arisuplay97/material/
-cd material</pre>
-      </li>
-      <li>Pasang dependensi sistem:
-        <pre>pnpm install</pre>
-      </li>
-      <li>Buat satu file bernama <strong><code>.env</code></strong> di dalam folder <code>material</code> tersebut. Isikan baris berikut:
-        <pre>DATABASE_URL="postgresql://postgres:password_kantor@localhost:5432/pdam_gis"</pre>
-        <span style="font-size: 8.5pt; color: #64748b;">*(Ganti <code>password_kantor</code> dengan password pgAdmin kantor Anda. Pakai kata <code>localhost</code> karena databasenya ada di komputer server itu sendiri).*</span>
-      </li>
-      <li>Nyalakan WebGIS agar bisa diakses seluruh kantor:
-        <pre>pnpm run dev --host</pre>
-        <span style="font-size: 8.5pt; color: #64748b;">*(Opsi <code>--host</code> memastikan WebGIS bisa dibuka oleh perangkat lain lewat Wi-Fi kantor).*</span>
-      </li>
-    </ol>
-  </div>
-
-  <div class="page-break"></div>
-
-  <!-- TAHAP 3 -->
-  <div class="step-card">
-    <div class="step-header">
-      <div class="step-num">3</div>
-      <div class="step-title">Setting QGIS Teman Kantor (Alur Kerja Realtime Otomatis)</div>
-      <div class="step-target">Lokasi: Komputer Teman (GIS)</div>
-    </div>
-    <p>Tujuan: Menghubungkan QGIS teman Anda langsung ke server kantor. Apapun yang digambar langsung tersimpan otomatis!</p>
-    
-    <h3>A. Sambungkan QGIS ke Server Kantor (Cukup 1 Kali Saja):</h3>
-    <ol>
-      <li>Di komputer teman Anda, buka software <strong>QGIS</strong>.</li>
-      <li>Di panel kiri (panel <strong>Browser</strong>), cari tulisan gajah <strong>PostGIS</strong>.</li>
-      <li>Klik kanan <strong>PostGIS</strong> ➔ pilih <strong>New Connection...</strong> (Koneksi Baru).</li>
-      <li>Isikan form:
+      <li>Buka software <strong>QGIS</strong> di komputernya (bisa dari kantor atau dari rumah).</li>
+      <li>Di panel kiri (panel <strong>Browser</strong>), cari logo gajah bertuliskan <strong>PostGIS</strong>.</li>
+      <li>Klik kanan tulisan <strong>PostGIS</strong> ➔ pilih <strong>New Connection...</strong> (Koneksi Baru).</li>
+      <li>Isikan data koneksi resmi berikut:
         <table>
-          <tr><th style="width: 30%;">Kolom</th><th>Nilai Isian</th></tr>
-          <tr><td><strong>Name</strong></td><td><code>Database PDAM Kantor</code> (bebas)</td></tr>
-          <tr><td><strong>Host</strong></td><td><code>192.168.1.50</code> (masukkan IP komputer server kantor dari Tahap 1)</td></tr>
+          <tr><th style="width: 25%;">Kolom</th><th>Data Isian Resmi</th></tr>
+          <tr><td><strong>Name</strong></td><td><code>PDAM Cloud Neon</code> (bebas)</td></tr>
+          <tr><td><strong>Host</strong></td><td><code>ep-polished-darkness-azqug7at-pooler.c-3.ap-southeast-1.aws.neon.tech</code></td></tr>
           <tr><td><strong>Port</strong></td><td><code>5432</code></td></tr>
-          <tr><td><strong>Database</strong></td><td><code>pdam_gis</code></td></tr>
-          <tr><td><strong>User / Password</strong></td><td>User <code>postgres</code> dan password database kantor Anda</td></tr>
+          <tr><td><strong>Database</strong></td><td><code>neondb</code></td></tr>
+          <tr><td><strong>SSL Mode</strong></td><td>Pilih <strong>require</strong></td></tr>
+          <tr><td><strong>User Name</strong></td><td><code>neondb_owner</code></td></tr>
+          <tr><td><strong>Password</strong></td><td><code>[PASSWORD_DATABASE_ANDA]</code> <em>(Gunakan password resmi dari .env / Neon)</em></td></tr>
         </table>
       </li>
       <li>Klik tombol <strong>Test Connection</strong>. Begitu muncul pesan hijau sukses, klik <strong>OK</strong>.</li>
-      <li><strong>Pindahkan Data Pipa Awal:</strong> Cukup klik & tahan (Drag) layer pipa teman Anda, lalu lepaskan (Drop) ke dalam: <code>PostGIS ➔ Database PDAM Kantor ➔ public</code>. Selesai!</li>
+      <li><strong>Pindahkan Data Pipa Awal:</strong> Cukup klik & tahan (Drag) layer pipa teman Anda, lalu lepaskan (Drop) ke dalam: <code>PostGIS ➔ PDAM Cloud Neon ➔ public</code>. Selesai!</li>
     </ol>
+  </div>
 
-    <h3>B. Alur Kerja Harian Teman Anda (100% Realtime Otomatis):</h3>
+  <!-- BREAK TO PAGE 2 -->
+  <div class="page-break"></div>
+
+  <!-- ==================== HALAMAN 2 ==================== -->
+
+  <!-- LANGKAH 3 -->
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Alur Kerja Harian Teman Anda (100% Realtime Otomatis)</div>
+      <div class="step-target">Aktivitas di QGIS</div>
+    </div>
     <div class="tip-box">
-      <strong>Mulai sekarang teman Anda bekerja dengan cara praktis ini:</strong>
+      <strong>Mulai sekarang teman Anda bekerja dengan cara sangat praktis ini:</strong>
       <ol style="margin: 4px 0; padding-left: 18px;">
-        <li>Di QGIS, buka layer pipa langsung dari pohon <code>PostGIS ➔ Database PDAM Kantor ➔ gis_pipa</code> (klik dua kali).</li>
+        <li>Di QGIS, buka layer pipa langsung dari pohon: <code>PostGIS ➔ PDAM Cloud Neon ➔ gis_pipa</code> (klik dua kali).</li>
         <li>Klik ikon <strong>Pensil Kuning (Toggle Editing)</strong> di toolbar atas QGIS.</li>
         <li>Gambar jalur pipa baru, geser letak katup valve, atau ubah angka diameter pipa.</li>
-        <li>Begitu selesai, tekan <strong>Ctrl + S (Save Edits)</strong> di QGIS.</li>
-        <li><strong>Detik itu juga:</strong> Data pipa langsung tersimpan ke server kantor dan langsung otomatis muncul di layar WebGIS seluruh kantor! Tidak perlu kirim file atau ekspor apapun lagi.</li>
+        <li>Begitu selesai, tekan <strong>Ctrl + S (Save Edits)</strong> di keyboard QGIS.</li>
+        <li><strong>Detik itu juga:</strong> Data pipa langsung tersimpan ke cloud, dan peta di <strong>https://gudangtiara.vercel.app/gis</strong> otomatis terupdate seketika!</li>
       </ol>
     </div>
   </div>
 
-  <!-- TAHAP 4 -->
+  <!-- LANGKAH 4 -->
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">4</div>
       <div class="step-title">Cara Membuka WebGIS untuk Seluruh Kantor & Smartphone</div>
-      <div class="step-target">Lokasi: Semua Laptop / HP Kantor</div>
+      <div class="step-target">Siapapun & Dimanapun</div>
     </div>
-    <p>Semua staf, pimpinan, dan teknisi lapangan yang tersambung ke Wi-Fi kantor bisa langsung mengakses WebGIS:</p>
+    <p>Semua staf, pimpinan, dan petugas lapangan tidak perlu install apapun. Cukup buka browser:</p>
     <ol>
-      <li>Buka browser Google Chrome di laptop atau smartphone masing-masing.</li>
-      <li>Ketik alamat IP server kantor:
-        <pre>http://192.168.1.50:5173/gis</pre>
+      <li>Buka Google Chrome di smartphone atau laptop masing-masing.</li>
+      <li>Ketik alamat resmi WebGIS:
+        <pre>https://gudangtiara.vercel.app/gis</pre>
       </li>
-      <li><strong>Tips Cepat untuk Teman & Pimpinan:</strong> Buatkan <em>Shortcut Desktop</em> atau <em>Bookmark</em> bernama <strong>"WebGIS PDAM"</strong> di komputernya. Setiap pagi mereka tinggal klik satu kali, WebGIS langsung terbuka!</li>
-      <li><strong>Tampilan Lengkap Otomatis di WebGIS:</strong>
+      <li><strong>Tips Praktis:</strong> Buatkan Bookmark atau Shortcut di layar HP/Desktop bernama <em>"WebGIS PDAM"</em>.</li>
+      <li><strong>Fitur Otomatis yang Langsung Tampil:</strong>
         <ul>
-          <li><strong>Garis Pipa Otomatis Berwarna:</strong> Pipa transmisi besar merah tebal, pipa distribusi biru sedang, pipa retikulasi biru muda.</li>
-          <li><strong>Ikon Katup Valve:</strong> Gate Valve oranye <code>⚙</code>, PRV pengatur tekanan ungu <code>⎈</code>.</li>
-          <li><strong>Klik Pipa / Valve:</strong> Muncul popup spesifikasi teknis lengkap (Diameter mm, Bahan, Tekanan Bar, Panjang, Zona DMA).</li>
+          <li><strong>Pipa Transmisi Besar (200-250mm):</strong> Otomatis garis merah tebal.</li>
+          <li><strong>Pipa Distribusi Utama (150-160mm):</strong> Otomatis garis biru sedang.</li>
+          <li><strong>Pipa Lingkungan / Retikulasi (75-90mm):</strong> Otomatis garis biru muda.</li>
+          <li><strong>Katup Valve:</strong> Ikon Gate Valve <code>⚙</code>, Ikon PRV penurun tekanan <code>⎈</code>.</li>
+          <li><strong>Klik Pipa / Valve:</strong> Muncul kartu popup spesifikasi teknis lengkap (Diameter mm, Bahan, Panjang, Tekanan Bar, Zona DMA).</li>
         </ul>
       </li>
     </ol>
   </div>
 
-  <!-- TAHAP 5 -->
+  <!-- LANGKAH 5 -->
   <div class="step-card">
     <div class="step-header">
       <div class="step-num">5</div>
-      <div class="step-title">Alur Anda Sebagai Developer (Koding di Laptop)</div>
-      <div class="step-target">Lokasi: Laptop Pribadi Anda</div>
+      <div class="step-title">Alur Anda Sebagai Developer (Koding Santai di Laptop)</div>
+      <div class="step-target">Laptop Pribadi Anda</div>
     </div>
     <ol>
-      <li>Laptop Anda murni hanya untuk tempat membuat fitur baru, memoles desain, atau merombak kodingan.</li>
-      <li>Di laptop Anda, file <code>.env</code> cukup diarahkan ke IP server kantor untuk testing:
-        <pre>DATABASE_URL="postgresql://postgres:password_kantor@192.168.1.50:5432/pdam_gis"</pre>
+      <li>Laptop Anda murni hanya untuk coding fitur baru, styling tampilan, atau perbaikan bug.</li>
+      <li>Di laptop Anda, file <code>.env</code> tetap menggunakan database Neon Cloud yang sudah ada:
+        <pre>DATABASE_URL=postgresql://neondb_owner:[PASSWORD_ANDA]@ep-polished-darkness-azqug7at-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require</pre>
       </li>
       <li><strong>Saat Selesai Bikin Fitur Baru:</strong>
-        <ul>
-          <li>Di laptop Anda: ketik <code>git push</code> (file <code>.env</code> Anda otomatis aman dan tidak ikut ter-push).</li>
-          <li>Di server kantor: cukup ketik <code>git pull</code>.</li>
-          <li><strong>Selesai!</strong> Fitur baru buatan Anda langsung dinikmati oleh seluruh kantor secara instan.</li>
-        </ul>
+        <pre>git commit -m "feat: nama fitur baru"
+git push origin main</pre>
+        <em>(File <code>.env</code> Anda otomatis aman dan tidak pernah ikut ter-push).</em>
       </li>
+      <li><strong>Vercel Otomatis Meng-update Sendiri:</strong> Dalam 30 detik setelah Anda push ke GitHub, website <code>https://gudangtiara.vercel.app/</code> langsung terupdate otomatis ke seluruh dunia!</li>
     </ol>
   </div>
-
-  <!-- TROUBLESHOOTING RINGKAS -->
-  <h3>Solusi Cepat Kendala (Troubleshooting):</h3>
-  <table>
-    <tr><th style="width: 30%;">Kendala</th><th style="width: 35%;">Penyebab</th><th>Solusi</th></tr>
-    <tr>
-      <td><strong>Connection Refused (5432)</strong></td>
-      <td>Firewall server kantor memblokir port database.</td>
-      <td>Di server kantor: Buka Windows Firewall ➔ Inbound Rules ➔ New Rule ➔ Izinkan Port <code>5432</code>.</td>
-    </tr>
-    <tr>
-      <td><strong>no pg_hba.conf entry</strong></td>
-      <td>PostgreSQL belum mengizinkan koneksi dari IP Wi-Fi.</td>
-      <td>Buka file <code>pg_hba.conf</code> di folder PostgreSQL server kantor, tambahkan di baris paling bawah: <code>host all all 0.0.0.0/0 md5</code> lalu restart service PostgreSQL.</td>
-    </tr>
-  </table>
 
   <!-- FOOTER -->
   <div class="footer">
     <span>PDAM Tirta Ardhia Rinjani &mdash; Tim IT & Sistem Informasi Geografis</span>
-    <span>Dokumen Resmi &bull; Alur Kerja Realtime Multi-User</span>
+    <span>Dokumen Resmi &bull; Cloud Realtime Architecture (Vercel + Neon PostGIS)</span>
   </div>
 
 </body>
