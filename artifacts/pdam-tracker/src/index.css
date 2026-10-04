@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
-
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -15,11 +13,11 @@
 
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-  --color-card-border: hsl(var(--card-border));
+  --color-card-border: hsl(var(--border));
 
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-popover-border: hsl(var(--popover-border));
+  --color-popover-border: hsl(var(--border));
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
@@ -36,6 +34,13 @@
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 
+  --color-success: hsl(var(--success));
+  --color-success-soft: hsl(var(--success-soft));
+  --color-warning: hsl(var(--warning));
+  --color-warning-soft: hsl(var(--warning-soft));
+  --color-danger: hsl(var(--danger));
+  --color-danger-soft: hsl(var(--danger-soft));
+
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
@@ -45,9 +50,9 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-heading: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -55,90 +60,103 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ── LIGHT MODE (Modern Clean Crisp Enterprise) ── */
+/* ── Light: calm blue on cool neutral ── */
 :root {
-  --background: 210 40% 98%; /* #f8fafc */
-  --foreground: 222 47% 11%; /* #0f172a */
+  --background: 220 20% 98%;
+  --foreground: 222 22% 14%;
 
-  --border: 214 32% 91%; /* #e2e8f0 */
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
+  --border: 220 14% 90%;
+  --input: 220 13% 86%;
+  --ring: 213 52% 46%;
 
-  --card: 0 0% 100%; /* #ffffff */
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 22% 14%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 91%;
+  --popover-foreground: 222 22% 14%;
 
-  --primary: 217 91% 60%; /* #2563eb / #3b82f6 modern blue */
+  --primary: 213 52% 42%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11%;
+  --secondary: 220 16% 95%;
+  --secondary-foreground: 222 22% 20%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 220 16% 96%;
+  --muted-foreground: 220 9% 46%;
 
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 213 45% 95%;
+  --accent-foreground: 213 52% 32%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 100%;
+
+  --success: 152 45% 32%;
+  --success-soft: 150 40% 94%;
+  --warning: 34 80% 36%;
+  --warning-soft: 40 85% 93%;
+  --danger: 0 60% 46%;
+  --danger-soft: 0 75% 96%;
 
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 214 32% 91%;
-  --sidebar-primary: 217 91% 60%;
+  --sidebar-foreground: 222 15% 30%;
+  --sidebar-border: 220 14% 91%;
+  --sidebar-primary: 213 52% 42%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 210 40% 96.1%;
-  --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 217 91% 60%;
+  --sidebar-accent: 213 45% 95%;
+  --sidebar-accent-foreground: 213 52% 30%;
+  --sidebar-ring: 213 52% 46%;
 
-  --radius: 0.625rem; /* 10px rounded */
+  --radius: 0.625rem;
+  --shadow-card: 0 1px 2px hsl(222 30% 20% / 0.04), 0 1px 1px hsl(222 30% 20% / 0.02);
 }
 
-/* ── DARK MODE (Premium Sleek Deep Navy/Slate) ── */
+/* ── Dark: deep neutral, desaturated blue accent ── */
 .dark {
-  --background: 222 47% 7%; /* #080c16 deep midnight slate */
-  --foreground: 210 40% 98%; /* #f8fafc */
+  --background: 222 18% 7%;
+  --foreground: 220 15% 92%;
 
-  --border: 217 33% 16%; /* #1e293b crisp subtle border */
-  --input: 217 33% 16%;
-  --ring: 217 91% 60%;
+  --border: 222 12% 17%;
+  --input: 222 12% 20%;
+  --ring: 213 60% 60%;
 
-  --card: 222 40% 10%; /* #0f1626 card surface */
-  --card-foreground: 210 40% 98%;
-  --card-border: 217 33% 16%;
+  --card: 222 16% 10%;
+  --card-foreground: 220 15% 92%;
 
-  --popover: 222 40% 10%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217 33% 16%;
+  --popover: 222 16% 11%;
+  --popover-foreground: 220 15% 92%;
 
-  --primary: 217 91% 60%; /* #3b82f6 vibrant accent */
-  --primary-foreground: 0 0% 100%;
+  --primary: 213 62% 64%;
+  --primary-foreground: 222 30% 10%;
 
-  --secondary: 217 33% 16%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 222 13% 15%;
+  --secondary-foreground: 220 15% 90%;
 
-  --muted: 217 33% 15%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 222 13% 13%;
+  --muted-foreground: 220 9% 62%;
 
-  --accent: 217 33% 16%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 213 28% 17%;
+  --accent-foreground: 213 75% 82%;
 
-  --destructive: 0 72% 51%;
+  --destructive: 0 62% 55%;
   --destructive-foreground: 0 0% 100%;
 
-  --sidebar: 222 47% 8%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 217 33% 16%;
-  --sidebar-primary: 217 91% 60%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217 33% 14%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 217 91% 60%;
+  --success: 152 45% 58%;
+  --success-soft: 152 30% 14%;
+  --warning: 38 85% 60%;
+  --warning-soft: 36 40% 14%;
+  --danger: 0 72% 66%;
+  --danger-soft: 0 35% 15%;
+
+  --sidebar: 222 18% 8%;
+  --sidebar-foreground: 220 12% 75%;
+  --sidebar-border: 222 12% 15%;
+  --sidebar-primary: 213 62% 64%;
+  --sidebar-primary-foreground: 222 30% 10%;
+  --sidebar-accent: 213 25% 15%;
+  --sidebar-accent-foreground: 213 75% 85%;
+  --sidebar-ring: 213 60% 60%;
+
+  --shadow-card: 0 0 0 1px hsl(0 0% 100% / 0.02);
 }
 
 @layer base {
@@ -146,37 +164,62 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    @apply font-sans antialiased bg-background text-foreground transition-colors duration-200;
+    @apply font-sans antialiased bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-heading);
     @apply tracking-tight font-semibold text-foreground;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
-/* ── Leaflet Map Enhancements ── */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Staggered entrance (dashboard) ── */
+@keyframes d-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.d-rise {
+  animation: d-rise 0.65s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .d-rise { animation: none; }
+}
+
+/* ── Leaflet ── */
 .leaflet-container {
-  font-family: 'Inter', -apple-system, sans-serif !important;
+  font-family: var(--font-sans) !important;
   width: 100%;
   height: 100%;
-  background-color: #0b0f19;
-  z-index: 10;
+  background-color: hsl(var(--muted));
+  z-index: 0;
 }
 
-.dark .leaflet-container {
-  background-color: #080c16;
-}
-
-/* Custom Popup */
 .leaflet-popup-content-wrapper {
   padding: 0 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
-  border: 1px solid var(--border) !important;
-  background: var(--card) !important;
-  color: var(--card-foreground) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 24px -6px hsl(222 30% 10% / 0.25) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
   overflow: hidden;
 }
 
@@ -186,173 +229,79 @@
 }
 
 .leaflet-popup-tip {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
 }
 
-/* Custom Marker Styling */
-.gis-point-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  cursor: pointer;
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  background: hsl(var(--card) / 0.85) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+.leaflet-control-attribution a {
+  color: hsl(var(--primary)) !important;
 }
 
-.gis-point-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s ease;
-}
+/* Popup content (built as HTML string, values escaped) */
+.gis-popup { width: 248px; padding: 12px; font-size: 12px; }
+.gis-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid hsl(var(--border)); }
+.gis-popup-code { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 600; font-size: 12.5px; }
+.gis-popup-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; }
+.gis-popup-tag { font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.gis-popup-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.gis-popup-muted { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.35; }
+.gis-popup-alert { margin: 8px 0; padding: 6px 8px; border-radius: 6px; font-size: 11px; background: hsl(var(--danger-soft)); color: hsl(var(--danger)); }
+.gis-popup-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.gis-popup-meta strong { color: hsl(var(--foreground)); font-weight: 600; }
+.gis-popup-btn { width: 100%; margin-top: 10px; border: 0; padding: 7px 8px; font-size: 12px; font-weight: 500; border-radius: 6px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); cursor: pointer; }
+.gis-popup-btn:hover { filter: brightness(1.06); }
 
-.gis-point-marker:hover .gis-point-dot {
-  transform: scale(1.35);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
-}
+/* Customer point marker */
+.gis-point-marker { background: transparent; border: none; cursor: pointer; }
+.gis-point { position: relative; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.gis-point-dot { width: 12px; height: 12px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); transition: transform 120ms ease; }
+.gis-point-marker:hover .gis-point-dot { transform: scale(1.25); }
+.gis-point-flag { position: absolute; top: 0; right: 0; width: 6px; height: 6px; border-radius: 9999px; background: hsl(34 85% 50%); border: 1px solid #fff; }
+.gis-point-anomaly .gis-point-dot { border-color: hsl(0 70% 52%); }
+.gis-anomaly-ring { position: absolute; inset: -2px; border-radius: 9999px; border: 1.5px solid hsl(0 70% 52%); background: hsl(0 70% 52% / 0.18); animation: anomaly-beacon 2.4s infinite ease-in-out; pointer-events: none; }
 
-/* Spatial Anomaly Marker Pulsing Ring */
 @keyframes anomaly-beacon {
-  0% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(2.2); opacity: 0.15; }
-  100% { transform: scale(1); opacity: 0.9; }
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.9); opacity: 0.1; }
 }
 
-.gis-anomaly-ring {
-  position: absolute;
-  top: -5px;
-  left: -5px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.35);
-  border: 1.5px solid #ef4444;
-  animation: anomaly-beacon 2s infinite ease-in-out;
-  pointer-events: none;
-}
-
-/* Ensure no cards ever become transparent on hover */
-.card-solid {
-  background-color: var(--card) !important;
-}
-.card-solid:hover {
-  background-color: var(--card) !important;
-}
-
-/* Custom MarkerCluster Styling */
-.marker-cluster {
-  background-clip: padding-box;
-  border-radius: 20px;
-}
-
+/* Marker clusters — single-hue scale */
+.marker-cluster { background-clip: padding-box; border-radius: 9999px; }
 .marker-cluster div {
-  width: 32px;
-  height: 32px;
-  margin-left: 4px;
-  margin-top: 4px;
-  text-align: center;
-  border-radius: 50%;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
+  width: 30px; height: 30px; margin-left: 5px; margin-top: 5px; border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-sans); font-size: 11px; font-weight: 600; color: #fff;
+  font-variant-numeric: tabular-nums;
 }
+.marker-cluster-small { background-color: hsl(213 52% 50% / 0.25); }
+.marker-cluster-small div { background-color: hsl(213 52% 50%); }
+.marker-cluster-medium { background-color: hsl(213 55% 40% / 0.28); }
+.marker-cluster-medium div { background-color: hsl(213 55% 40%); }
+.marker-cluster-large { background-color: hsl(218 60% 28% / 0.3); }
+.marker-cluster-large div { background-color: hsl(218 60% 28%); }
 
-.marker-cluster-small {
-  background-color: rgba(59, 130, 246, 0.35);
-}
-.marker-cluster-small div {
-  background-color: rgba(37, 99, 235, 0.9);
-}
-
-.marker-cluster-medium {
-  background-color: rgba(16, 185, 129, 0.35);
-}
-.marker-cluster-medium div {
-  background-color: rgba(5, 150, 105, 0.9);
-}
-
-.marker-cluster-large {
-  background-color: rgba(239, 68, 68, 0.35);
-}
-.marker-cluster-large div {
-  background-color: rgba(220, 38, 38, 0.9);
-}
-
-/* ── Selected Marker Pulse (click/search only) ── */
+/* Selected marker pulse */
 @keyframes selected-pulse-ring {
   0% { transform: scale(0.5); opacity: 0.9; }
-  100% { transform: scale(3); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.gis-selected-pulse-wrapper { background: transparent !important; border: none !important; pointer-events: none !important; }
+.gis-selected-pulse { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.gis-selected-pulse-ring { position: absolute; width: 44px; height: 44px; border-radius: 9999px; border: 2px solid hsl(var(--primary)); background: hsl(var(--primary) / 0.12); animation: selected-pulse-ring 1.6s ease-out infinite; }
+.gis-selected-pulse-ring-2 { animation-delay: 0.55s; }
+.gis-selected-pulse-dot { width: 10px; height: 10px; border-radius: 9999px; background: hsl(var(--primary)); border: 2px solid #fff; box-shadow: 0 0 0 3px hsl(var(--primary) / 0.25); z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gis-anomaly-ring, .gis-selected-pulse-ring { animation: none; }
 }
 
-.gis-selected-pulse-wrapper {
-  background: transparent !important;
-  border: none !important;
-  pointer-events: none !important;
-}
-
-.gis-selected-pulse {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.gis-selected-pulse-ring {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 2.5px solid #2563EB;
-  background: rgba(37, 99, 235, 0.12);
-  animation: selected-pulse-ring 1.5s ease-out infinite;
-}
-
-.gis-selected-pulse-ring-2 {
-  animation-delay: 0.5s;
-}
-
-.gis-selected-pulse-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #2563EB;
-  border: 2px solid white;
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);
-  z-index: 5;
-}
-
-/* ── MapLibre GL Container Styling ── */
-.maplibregl-ctrl-attrib,
-.maplibregl-ctrl-logo {
-  display: none !important;
-}
-
-/* ── Fullscreen map adjustments ── */
-:fullscreen .leaflet-container {
-  z-index: 10;
-}
-
-/* Subtle scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.25);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.4);
-}
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.22); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }

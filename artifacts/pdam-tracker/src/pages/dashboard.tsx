@@ -1,727 +1,427 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { pdamService, KECAMATAN_LIST, KecamatanInfo } from '@/services/pdamDataService';
-import { Pelanggan, WilayahAcuan, UploadSnapshot, GolonganTarif, StatusSambungan } from '@/types/pdam';
+import React, { useState, useMemo } from 'react';
+import { usePdamData } from '@/hooks/usePdamData';
+import { useFilters, filterPelanggan, computeStats } from '@/lib/filters';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
+import { KECAMATAN_LIST, pdamService, kecamatanName } from '@/services/pdamDataService';
+import { Pelanggan } from '@/types/pdam';
 import {
   Users,
   CheckCircle2,
   AlertTriangle,
   Download,
-  Filter,
   Search,
   MapPin,
   RotateCcw,
-  BarChart3,
-  PieChart as PieIcon,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  Map as MapIcon,
-  ShieldCheck,
   Building2,
-  Layers,
-  Clock,
-  Sparkles,
   ArrowRight,
   AlertOctagon,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  X,
+  FileSpreadsheet,
+  Calendar,
+  ShieldCheck,
+  Layers,
+  Eye,
+  TrendingUp,
+  Activity,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  Cell,
-  PieChart,
-  Pie,
-} from 'recharts';
+  GOLONGAN_LIST,
+  GOLONGAN_META,
+  STATUS_META,
+  VALIDITY_TARGET,
+  formatNumber,
+  formatDate,
+} from '@/lib/constants';
+import { canSeePII, canExport, displayName } from '@/lib/privacy';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { pelanggan, wilayah, activeSnapshot, previousSnapshot } = usePdamData();
+  const { filters, update, reset, activeCount } = useFilters();
 
-  const [allPelanggan, setAllPelanggan] = useState<Pelanggan[]>([]);
-  const [wilayahList, setWilayahList] = useState<WilayahAcuan[]>([]);
-  const [activeSnapshot, setActiveSnapshot] = useState<UploadSnapshot | undefined>();
-
-  // Filter States
-  const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07'); // Default: 07 Praya Barat
-  const [selectedWilayah, setSelectedWilayah] = useState<string>('all');
-  const [selectedGolongan, setSelectedGolongan] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedQuality, setSelectedQuality] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Tab switch for donut chart (Golongan vs Status)
-  const [chartMetricTab, setChartMetricTab] = useState<'golongan' | 'status'>('golongan');
-
-  // Table pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 12;
+  const pageSize = 10;
 
-  // Load and subscribe to data
-  useEffect(() => {
-    const loadData = () => {
-      setAllPelanggan(pdamService.getPelangganList());
-      setWilayahList(pdamService.getWilayahList());
-      setActiveSnapshot(pdamService.getActiveSnapshot());
-    };
+  // Selected customer for detail sheet
+  const [selectedDetail, setSelectedDetail] = useState<Pelanggan | null>(null);
 
-    loadData();
-    const unsub = pdamService.subscribe(loadData);
-    return unsub;
-  }, []);
+  // Filtered customer list
+  const filteredList = useMemo(() => {
+    return filterPelanggan(pelanggan, filters, { searchPII: canSeePII(user?.role) });
+  }, [pelanggan, filters, user?.role]);
 
-  // Filter data by Kecamatan first
-  const kecamatanData = useMemo(() => {
-    if (selectedKecamatan === 'all') return allPelanggan;
-    return allPelanggan.filter((p) => p.kode_kecamatan === selectedKecamatan);
-  }, [allPelanggan, selectedKecamatan]);
+  // Aggregate stats in a single pass
+  const stats = useMemo(() => computeStats(filteredList), [filteredList]);
 
-  // Spatial Anomaly count in current kecamatan
-  const spatialAnomalyCount = useMemo(() => {
-    return kecamatanData.filter((p) => Boolean(p.spatial_anomaly)).length;
-  }, [kecamatanData]);
+  // Previous snapshot delta calculation
+  const totalDelta = useMemo(() => {
+    if (!previousSnapshot) return null;
+    return activeSnapshot ? activeSnapshot.total_rows - previousSnapshot.total_rows : null;
+  }, [activeSnapshot, previousSnapshot]);
 
-  // Wilayah color lookup map
+  // Wilayah lookup map
   const wilayahColorMap = useMemo(() => {
     const map = new Map<string, string>();
-    wilayahList.forEach((w) => map.set(w.kode, w.warna));
+    wilayah.forEach((w) => map.set(w.kode, w.warna));
     return map;
-  }, [wilayahList]);
+  }, [wilayah]);
 
-  // Filtered data for table and charts
-  const filteredData = useMemo(() => {
-    return kecamatanData.filter((item) => {
-      if (selectedWilayah !== 'all' && item.kode_wilayah !== selectedWilayah) {
-        return false;
-      }
-      if (selectedGolongan !== 'all' && item.golongan !== selectedGolongan) {
-        return false;
-      }
-      if (selectedStatus !== 'all' && item.status_sambungan !== selectedStatus) {
-        return false;
-      }
-      if (selectedQuality === 'flagged' && !item.is_flagged) {
-        return false;
-      }
-      if (selectedQuality === 'valid' && item.is_flagged) {
-        return false;
-      }
-      if (selectedQuality === 'anomaly' && !item.spatial_anomaly) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchKode = item.kode_pelanggan.toLowerCase().includes(q);
-        const matchNama = item.nama_pelanggan.toLowerCase().includes(q);
-        const matchAlamat = item.alamat.toLowerCase().includes(q);
-        const matchWilayah = item.nama_wilayah.toLowerCase().includes(q);
-        if (!matchKode && !matchNama && !matchAlamat && !matchWilayah) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [kecamatanData, selectedWilayah, selectedGolongan, selectedStatus, selectedQuality, searchQuery]);
+  // Wilayah filtered for current kecamatan
+  const currentKecamatanWilayah = useMemo(() => {
+    if (filters.kecamatan === 'all') return wilayah;
+    return wilayah.filter((w) => w.kodeKecamatan === filters.kecamatan);
+  }, [wilayah, filters.kecamatan]);
 
-  // Statistics calculation
-  const totalCount = filteredData.length;
-  const totalActive = filteredData.filter((p) => p.status_sambungan === 'Aktif').length;
-  const totalNonactive = filteredData.filter((p) => p.status_sambungan === 'Nonaktif').length;
-  const totalPutus = filteredData.filter((p) => p.status_sambungan === 'Putus').length;
-
-  const totalFlagged = filteredData.filter((p) => p.is_flagged).length;
-  const totalValid = totalCount - totalFlagged;
-  const validityPercentage = totalCount > 0 ? ((totalValid / totalCount) * 100).toFixed(1) : '100';
-  const activePercentage = totalCount > 0 ? ((totalActive / totalCount) * 100).toFixed(1) : '0';
-
-  // Golongan breakdown
-  const golonganCounts = useMemo(() => {
-    const counts: Record<string, number> = { R1: 0, R2: 0, B1: 0, S: 0, I: 0 };
-    filteredData.forEach((p) => {
-      if (counts[p.golongan] !== undefined) {
-        counts[p.golongan]++;
-      }
-    });
-    return counts;
-  }, [filteredData]);
-
-  // Chart data: Distribution per Wilayah
-  const wilayahChartData = useMemo(() => {
-    const map = new Map<string, { kode: string; nama: string; jumlah: number; warna: string }>();
-
-    wilayahList.forEach((w) => {
-      if (selectedWilayah === 'all' || selectedWilayah === w.kode) {
-        map.set(w.kode, {
+  // Sorted list of wilayah for horizontal distribution bar
+  const wilayahDistribution = useMemo(() => {
+    return currentKecamatanWilayah
+      .map((w) => {
+        const item = stats.perWilayah.get(w.kode) || { total: 0, flagged: 0 };
+        return {
           kode: w.kode,
           nama: w.nama,
-          jumlah: 0,
           warna: w.warna,
-        });
-      }
-    });
+          total: item.total,
+          flagged: item.flagged,
+          valid: item.total - item.flagged,
+        };
+      })
+      .filter((w) => filters.wilayah === 'all' || filters.wilayah === w.kode)
+      .sort((a, b) => b.total - a.total);
+  }, [currentKecamatanWilayah, stats, filters.wilayah]);
 
-    filteredData.forEach((p) => {
-      const entry = map.get(p.kode_wilayah);
-      if (entry) {
-        entry.jumlah++;
-      }
-    });
+  const maxWilayahTotal = useMemo(() => {
+    return Math.max(...wilayahDistribution.map((w) => w.total), 1);
+  }, [wilayahDistribution]);
 
-    return Array.from(map.values()).sort((a, b) => b.jumlah - a.jumlah);
-  }, [wilayahList, filteredData, selectedWilayah]);
-
-  // Chart data: Golongan Donut Chart
-  const golonganChartData = useMemo(() => {
-    const colors: Record<string, string> = {
-      R1: '#3B82F6',
-      R2: '#06B6D4',
-      B1: '#F59E0B',
-      S: '#10B981',
-      I: '#8B5CF6',
-    };
-
-    return Object.entries(golonganCounts).map(([key, val]) => ({
-      name: `Golongan ${key}`,
-      code: key,
-      value: val,
-      color: colors[key] || '#94A3B8',
-    }));
-  }, [golonganCounts]);
-
-  // Chart data: Status Sambungan Donut Chart
-  const statusChartData = useMemo(() => {
-    return [
-      { name: 'Aktif', code: 'Aktif', value: totalActive, color: '#10B981' },
-      { name: 'Nonaktif', code: 'Nonaktif', value: totalNonactive, color: '#F59E0B' },
-      { name: 'Putus', code: 'Putus', value: totalPutus, color: '#EF4444' },
-    ];
-  }, [totalActive, totalNonactive, totalPutus]);
-
-  // Pagination slice
-  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-  const paginatedPelanggan = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPage, pageSize]);
-
-  // Reset filter
-  const handleResetFilter = () => {
-    setSelectedWilayah('all');
-    setSelectedGolongan('all');
-    setSelectedStatus('all');
-    setSelectedQuality('all');
-    setSearchQuery('');
-    setCurrentPage(1);
-  };
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+  const paginatedList = useMemo(() => {
+    const safePage = Math.min(currentPage, totalPages);
+    const start = (safePage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, totalPages, pageSize]);
 
   // Export handler
-  const handleExport = () => {
-    const currentKecInfo = KECAMATAN_LIST.find((k) => k.kode === selectedKecamatan);
-    const prefix = currentKecInfo ? `Data_Pelanggan_${currentKecInfo.nama.replace(/\s+/g, '_')}` : 'Data_Pelanggan_Filtered';
-    pdamService.exportPelanggan(filteredData, prefix);
+  const handleExport = async () => {
+    const kecNama = filters.kecamatan === 'all' ? 'Semua_Kecamatan' : kecamatanName(filters.kecamatan);
+    await pdamService.exportPelanggan(
+      filteredList,
+      `Data_Pelanggan_${kecNama.replace(/\s+/g, '_')}`,
+      { includePII: canSeePII(user?.role) },
+    );
   };
 
-  // Navigate to GIS with selected customer ID
-  const handleViewOnMap = (kodePelanggan: string) => {
-    setLocation(`/gis?search=${kodePelanggan}`);
+  const handleOpenGis = (kodePelanggan?: string) => {
+    if (kodePelanggan) {
+      setLocation(`/gis?search=${encodeURIComponent(kodePelanggan)}`);
+    } else {
+      setLocation('/gis');
+    }
   };
 
-  // Masking personal info for Pimpinan role
-  const isPimpinan = user?.role === 'pimpinan';
-  const maskName = (name: string) => {
-    if (!isPimpinan) return name;
-    const parts = name.split(' ');
-    return parts[0] + ' ' + '*'.repeat(Math.max(4, parts.slice(1).join(' ').length));
-  };
-
-  const selectedKecamatanObj = KECAMATAN_LIST.find((k) => k.kode === selectedKecamatan);
+  const currentKecName = filters.kecamatan === 'all' ? 'Semua Kecamatan' : kecamatanName(filters.kecamatan);
+  const welcomeName = user?.name ? user.name.split(' ').slice(0, 2).join(' ') : 'Muh Sofiyan';
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* ── Breadcrumb & Top Bar (BoardUI Style) ── */}
-      <div className="flex flex-col gap-4 border-b border-border/80 pb-5">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-          <span>PDAM Tirta Ardhia Rinjani</span>
-          <span>/</span>
-          <span>Data Pelanggan</span>
-          <span>/</span>
-          <span className="text-foreground font-semibold">Dashboard Ringkasan</span>
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto text-neutral-900 dark:text-neutral-100">
+      {/* ── 1. FlowAI-Style Welcome Header ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-neutral-900 dark:text-white">
+            Welcome Back, {welcomeName}!
+          </h1>
+          <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-neutral-400 mt-1 font-normal">
+            Monitoring data sambungan, verifikasi mutu data, dan sebaran wilayah di {currentKecName}.
+          </p>
         </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-heading">
-              Dashboard Pelanggan
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Monitoring data sambungan, status verifikasi, dan sebaran wilayah se-Lombok Tengah.
-            </p>
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+          {/* Date Chip (FlowAI Style) */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+            <span>{formatDate(activeSnapshot?.uploaded_at || new Date().toISOString())}</span>
           </div>
 
-          {/* Top Controls: Kecamatan Selector + Snapshot + Actions */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Kecamatan Selector (PRD 13 Kecamatan Requirement) */}
-            <div className="flex items-center gap-1.5 bg-card border border-border rounded-xl px-2.5 py-1.5 shadow-xs">
-              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+          {/* Primary Action Button (FlowAI Solid Charcoal "+ Created Workflow" Style) */}
+          <Button
+            onClick={() => handleOpenGis()}
+            className="h-9 px-4 rounded-xl text-xs font-medium gap-2 bg-[#111827] hover:bg-[#1f2937] text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-2xs transition-all cursor-pointer border-0"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>+ Buka Peta GIS</span>
+          </Button>
+
+          {canExport(user?.role) && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={filteredList.length === 0}
+              className="h-9 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 shadow-2xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Ekspor Excel</span>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── 2. Top Row: 4 Metric Cards (FlowAI 1:1 Grid Layout) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* Card 1: Total Pelanggan */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Total Pelanggan</span>
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <span className="text-2xl sm:text-[32px] font-semibold tracking-tight text-neutral-900 dark:text-white tabular">
+                {formatNumber(stats.total)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+            {totalDelta !== null && totalDelta !== 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60">
+                {totalDelta >= 0 ? `+${totalDelta}` : totalDelta} baris
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                Stabil
+              </span>
+            )}
+            <span className="text-[11px] text-neutral-400 font-medium">
+              {wilayahDistribution.length} Wilayah
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Sambungan Aktif */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Sambungan Aktif</span>
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <span className="text-2xl sm:text-[32px] font-semibold tracking-tight text-neutral-900 dark:text-white tabular">
+                {formatNumber(stats.aktif)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60">
+              {stats.total ? ((stats.aktif / stats.total) * 100).toFixed(1) : 0}% aktif
+            </span>
+            <span className="text-[11px] text-neutral-400 font-medium">
+              Non: {stats.nonaktif} • Putus: {stats.putus}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Mutu Validitas Data */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Tingkat Validitas</span>
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <span className="text-2xl sm:text-[32px] font-semibold tracking-tight text-neutral-900 dark:text-white tabular">
+                {stats.validityPct.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                stats.validityPct >= VALIDITY_TARGET
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60'
+              }`}
+            >
+              Target ≥{VALIDITY_TARGET}%
+            </span>
+            <span className="text-[11px] text-neutral-400 font-medium">
+              {formatNumber(stats.valid)} data lolos
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Perlu Verifikasi */}
+        <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                </div>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Perlu Verifikasi</span>
+              </div>
+            </div>
+            <div className="mt-3.5">
+              <span className="text-2xl sm:text-[32px] font-semibold tracking-tight text-neutral-900 dark:text-white tabular">
+                {formatNumber(stats.flagged)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+            {stats.anomaly > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60">
+                {stats.anomaly} Anomali Spasial
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                0 Anomali
+              </span>
+            )}
+            <span className="text-[11px] text-neutral-400 font-medium">
+              {stats.total ? ((stats.flagged / stats.total) * 100).toFixed(1) : 0}% total
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. Spatial Anomaly Notice (Executive Style, Not Loud AI Slop) ── */}
+      {stats.anomaly > 0 && (
+        <div className="rounded-2xl border border-rose-200/80 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 flex items-center justify-center shrink-0 mt-0.5 border border-rose-200/50">
+              <AlertOctagon className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-neutral-900 dark:text-white text-xs sm:text-sm">
+                  Terdeteksi {stats.anomaly} Pelanggan dengan Koordinat di Luar Wilayah Kecamatan
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/70 dark:text-rose-200">
+                  Anomali Spasial
+                </span>
+              </div>
+              <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+                Titik GPS pelanggan tercatat berada di kecamatan tetangga. Disarankan untuk verifikasi fisik di lapangan.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                update({ quality: 'anomaly' });
+                setCurrentPage(1);
+              }}
+              className="h-8 px-3 text-xs rounded-xl bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 shadow-2xs"
+            >
+              Filter Anomali Ini
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setLocation('/gis?kual=anomaly')}
+              className="h-8 px-3 text-xs rounded-xl bg-[#111827] hover:bg-[#1f2937] text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 gap-1.5 shadow-2xs"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Tinjau di Peta</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. FlowAI-Style Main Section: "Active Workflows" -> "Daftar Pelanggan" ── */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 sm:p-6 shadow-2xs space-y-4">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">
+              Daftar Pelanggan
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+              {formatNumber(filteredList.length)} data
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
+            <span>Halaman {currentPage} dari {totalPages}</span>
+          </div>
+        </div>
+
+        {/* Filter Toolbar (Clean, Rounded-XL SaaS Controls) */}
+        <div className="pt-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {/* Kecamatan selector */}
+            <div>
               <Select
-                value={selectedKecamatan}
+                value={filters.kecamatan}
                 onValueChange={(val) => {
-                  setSelectedKecamatan(val);
-                  setSelectedWilayah('all');
+                  update({ kecamatan: val });
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-7 border-0 bg-transparent text-xs font-semibold focus:ring-0 p-0 pr-1 w-[180px]">
+                <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
                   <SelectValue placeholder="Pilih Kecamatan" />
                 </SelectTrigger>
-                <SelectContent className="max-h-80 border-border bg-card">
-                  <SelectItem value="all" className="text-xs font-medium">
+                <SelectContent className="max-h-72 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  <SelectItem value="all" className="text-xs">
                     Semua Kecamatan (13)
                   </SelectItem>
                   {KECAMATAN_LIST.map((kec) => (
                     <SelectItem key={kec.kode} value={kec.kode} className="text-xs">
-                      <span className="font-mono font-bold mr-1.5">{kec.kode}</span>
+                      <span className="font-mono font-semibold mr-1.5 text-neutral-400">{kec.kode}</span>
                       <span>{kec.nama}</span>
-                      {kec.kode === '07' && (
-                        <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">
-                          Pilot (642)
-                        </span>
-                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Snapshot Indicator Pill */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/60 border border-border text-xs">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Snapshot:</span>
-              <span className="font-mono font-medium text-foreground text-[11px]">
-                {activeSnapshot
-                  ? new Date(activeSnapshot.uploaded_at).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })
-                  : '1 Okt 2026'}
-              </span>
-            </div>
-
-            {/* GIS Map Link */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLocation('/gis')}
-              className="h-9 px-3 rounded-xl border-border gap-1.5 text-xs font-medium bg-card hover:bg-muted text-foreground shadow-xs"
-            >
-              <MapIcon className="w-3.5 h-3.5 text-primary" />
-              <span>Buka Peta GIS</span>
-            </Button>
-
-            {/* Export Excel Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              disabled={filteredData.length === 0}
-              className="h-9 px-3 rounded-xl border-border gap-1.5 text-xs font-medium bg-card hover:bg-muted text-foreground shadow-xs"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Ekspor Excel</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Empty State Notice if Selected Kecamatan has 0 Data ── */}
-      {selectedKecamatan !== 'all' && selectedKecamatan !== '07' && (
-        <Card className="rounded-2xl border border-dashed border-amber-300 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20 p-6 text-center">
-          <div className="flex flex-col items-center max-w-md mx-auto space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-foreground">
-                Data Kecamatan {selectedKecamatanObj?.nama || selectedKecamatan} Belum Tersedia
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Kecamatan ini telah terdaftar dalam sistem (13 Kecamatan se-Lombok Tengah). Tahap implementasi pilot saat ini aktif pada{' '}
-                <strong>Kecamatan 07 Praya Barat</strong> dengan 20 wilayah acuan dan 642 pelanggan.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setSelectedKecamatan('07')}
-              className="rounded-xl text-xs gap-1.5 shadow-xs"
-            >
-              <span>Beralih ke Kecamatan 07 Praya Barat</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* ── BoardUI Stat Cards Grid (Solid, High-Contrast, No Transparent Hover) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Pelanggan */}
-        <Card className="card-solid rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Total Pelanggan</span>
-            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 flex items-center justify-center shadow-xs">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground font-mono">
-              {totalCount.toLocaleString('id-ID')}
-            </span>
-            <span className="text-xs text-muted-foreground">Pelanggan</span>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Cakupan Wilayah:</span>
-            <span className="font-semibold text-foreground">
-              {selectedKecamatan === '07' ? '20 Wilayah (07)' : selectedKecamatan === 'all' ? '13 Kecamatan' : '0 Wilayah Aktif'}
-            </span>
-          </div>
-        </Card>
-
-        {/* Card 2: Sambungan Aktif */}
-        <Card className="card-solid rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Sambungan Aktif</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground font-mono">
-              {totalActive.toLocaleString('id-ID')}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-              {activePercentage}%
-            </span>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Nonaktif / Putus:</span>
-            <span className="font-semibold text-foreground font-mono">
-              {totalNonactive} / {totalPutus}
-            </span>
-          </div>
-        </Card>
-
-        {/* Card 3: Integritas Validasi */}
-        <Card className="card-solid rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Integritas Validasi (D-4)</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground font-mono">
-              {validityPercentage}%
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-              Target ≥95%
-            </span>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Data Lolos Bersih:</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-              {totalValid.toLocaleString('id-ID')} data
-            </span>
-          </div>
-        </Card>
-
-        {/* Card 4: Data Bertanda & Anomali */}
-        <Card className="card-solid rounded-2xl border border-border/80 bg-card p-5 shadow-xs hover:border-slate-300 dark:hover:border-zinc-700 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Data Bertanda & Anomali</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
-              {totalFlagged.toLocaleString('id-ID')}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-              Perlu Survei
-            </span>
-          </div>
-          <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Anomali Batas:</span>
-            <span className="font-semibold text-amber-600 dark:text-amber-400 font-mono">
-              {spatialAnomalyCount} titik
-            </span>
-          </div>
-        </Card>
-      </div>
-
-      {/* ── Spatial Anomaly Warning Alert Banner (BoardUI Style) ── */}
-      {spatialAnomalyCount > 0 && (
-        <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-              <AlertOctagon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-semibold text-foreground">
-                  Terdeteksi {spatialAnomalyCount} Pelanggan dengan Koordinat di Luar Wilayah Kecamatan
-                </h4>
-                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                  Anomali Spasial
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Terdapat data pelanggan dengan kode Kecamatan Praya Barat (07), namun titik koordinat GPS terdeteksi berada di kecamatan tetangga (Jonggat/Praya).
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setSelectedQuality('anomaly');
-                setCurrentPage(1);
-              }}
-              className="h-8 px-3 rounded-xl border-amber-300 dark:border-amber-800 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-900 dark:text-amber-200"
-            >
-              Filter Data Ini
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setLocation('/gis')}
-              className="h-8 px-3 rounded-xl text-xs gap-1 shadow-xs"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Tinjau di GIS</span>
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Charts Grid (BoardUI Aesthetic) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bar Chart: Sebaran per Wilayah (2/3 width) */}
-        <Card className="card-solid lg:col-span-2 rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/60">
-            <div>
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                <h3 className="text-sm sm:text-base font-semibold text-foreground font-heading">
-                  Sebaran Pelanggan per Wilayah (D-2)
-                </h3>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Warna bar sinkron dengan warna titik di peta GIS (PRD ID: D-8).
-              </p>
-            </div>
-            <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-muted text-xs font-mono font-medium text-muted-foreground">
-              {wilayahChartData.length} Wilayah
-            </div>
-          </div>
-
-          <div className="pt-6 h-72 w-full">
-            {wilayahChartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-muted-foreground font-mono">
-                Tidak ada data wilayah untuk filter saat ini.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={wilayahChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
-                  <XAxis
-                    dataKey="nama"
-                    stroke="currentColor"
-                    className="text-[10px] text-muted-foreground font-mono"
-                    angle={-45}
-                    textAnchor="end"
-                    interval={0}
-                    height={60}
-                    tick={{ fill: 'currentColor', fontSize: 10 }}
-                  />
-                  <YAxis
-                    stroke="currentColor"
-                    className="text-[10px] text-muted-foreground font-mono"
-                    tick={{ fill: 'currentColor', fontSize: 10 }}
-                  />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      borderColor: 'var(--border)',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      color: 'var(--card-foreground)',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    }}
-                    formatter={(value: any, name: any, item: any) => [
-                      `${value} Pelanggan`,
-                      `${item.payload.kode} - ${item.payload.nama}`,
-                    ]}
-                  />
-                  <Bar dataKey="jumlah" radius={[4, 4, 0, 0]}>
-                    {wilayahChartData.map((entry) => (
-                      <Cell key={entry.kode} fill={entry.warna} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
-
-        {/* Donut Chart: Komposisi Golongan / Status (1/3 width) */}
-        <Card className="card-solid rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <PieIcon className="w-4 h-4 text-primary" />
-                <h3 className="text-sm sm:text-base font-semibold text-foreground font-heading">
-                  Komposisi Data (D-3)
-                </h3>
-              </div>
-              {/* BoardUI Tab Pill Switcher */}
-              <div className="flex items-center bg-muted/80 p-0.5 rounded-lg border border-border/60">
-                <button
-                  onClick={() => setChartMetricTab('golongan')}
-                  className={`px-2 py-1 text-[11px] font-medium rounded-md transition-all ${
-                    chartMetricTab === 'golongan'
-                      ? 'bg-card text-foreground shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Tarif
-                </button>
-                <button
-                  onClick={() => setChartMetricTab('status')}
-                  className={`px-2 py-1 text-[11px] font-medium rounded-md transition-all ${
-                    chartMetricTab === 'status'
-                      ? 'bg-card text-foreground shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Status
-                </button>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground mt-2">
-              {chartMetricTab === 'golongan'
-                ? 'Distribusi kategori tarif R1, R2, B1, S, dan I.'
-                : 'Proporsi sambungan Aktif, Nonaktif, dan Putus.'}
-            </p>
-
-            <div className="h-44 w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartMetricTab === 'golongan' ? golonganChartData : statusChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={48}
-                    outerRadius={72}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {(chartMetricTab === 'golongan' ? golonganChartData : statusChartData).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      borderColor: 'var(--border)',
-                      borderRadius: '10px',
-                      fontSize: '12px',
-                      color: 'var(--card-foreground)',
-                    }}
-                    formatter={(val: any) => [`${val} Pelanggan`, '']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Breakdown List */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/60">
-            {(chartMetricTab === 'golongan' ? golonganChartData : statusChartData).map((item) => (
-              <div key={item.code} className="flex items-center justify-between text-xs p-2 rounded-xl bg-muted/40">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="font-mono font-medium truncate text-foreground">{item.code}</span>
-                </div>
-                <span className="font-mono font-bold text-foreground">{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* ── Table Section (BoardUI Style) ── */}
-      <Card className="card-solid rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
-        {/* Table Header & Toolbar */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <h3 className="text-base font-semibold text-foreground font-heading">
-                Tabel Data Pelanggan
-              </h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
-                {filteredData.length} Pelanggan
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground font-mono">
-              Halaman {currentPage} dari {totalPages}
-            </div>
-          </div>
-
-          {/* Filters Toolbar */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
-            {/* Search Input */}
-            <div className="lg:col-span-2 relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Cari kode 9 digit, nama, alamat..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-8.5 h-9 text-xs rounded-xl border-border bg-background"
-              />
-            </div>
-
-            {/* Filter Wilayah */}
+            {/* Wilayah selector */}
             <div>
               <Select
-                value={selectedWilayah}
+                value={filters.wilayah}
                 onValueChange={(val) => {
-                  setSelectedWilayah(val);
+                  update({ wilayah: val });
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs rounded-xl border-border bg-background">
+                <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
                   <SelectValue placeholder="Semua Wilayah" />
                 </SelectTrigger>
-                <SelectContent className="max-h-64 border-border bg-card">
-                  <SelectItem value="all">Semua Wilayah ({wilayahList.length})</SelectItem>
-                  {wilayahList.map((w) => (
-                    <SelectItem key={w.kode} value={w.kode}>
+                <SelectContent className="max-h-72 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  <SelectItem value="all" className="text-xs">
+                    Semua Wilayah ({currentKecamatanWilayah.length})
+                  </SelectItem>
+                  {currentKecamatanWilayah.map((w) => (
+                    <SelectItem key={w.kode} value={w.kode} className="text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.warna }} />
-                        <span>{w.kode} - {w.nama}</span>
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.warna }} />
+                        <span className="font-mono text-neutral-400">{w.kode}</span>
+                        <span className="truncate">{w.nama}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -729,183 +429,234 @@ export default function Dashboard() {
               </Select>
             </div>
 
-            {/* Filter Golongan */}
+            {/* Golongan selector */}
             <div>
               <Select
-                value={selectedGolongan}
+                value={filters.golongan}
                 onValueChange={(val) => {
-                  setSelectedGolongan(val);
+                  update({ golongan: val });
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs rounded-xl border-border bg-background">
+                <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
                   <SelectValue placeholder="Semua Golongan" />
                 </SelectTrigger>
-                <SelectContent className="border-border bg-card">
-                  <SelectItem value="all">Semua Golongan</SelectItem>
-                  <SelectItem value="R1">R1 - Rumah Tangga 1</SelectItem>
-                  <SelectItem value="R2">R2 - Rumah Tangga 2</SelectItem>
-                  <SelectItem value="B1">B1 - Niaga / Bisnis</SelectItem>
-                  <SelectItem value="S">S - Sosial</SelectItem>
-                  <SelectItem value="I">I - Instansi Pemerintah</SelectItem>
+                <SelectContent className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  <SelectItem value="all" className="text-xs">
+                    Semua Golongan
+                  </SelectItem>
+                  {GOLONGAN_LIST.map((g) => (
+                    <SelectItem key={g} value={g} className="text-xs">
+                      {g} — {GOLONGAN_META[g]?.label || g}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Filter Status */}
+            {/* Status selector */}
             <div>
               <Select
-                value={selectedStatus}
+                value={filters.status}
                 onValueChange={(val) => {
-                  setSelectedStatus(val);
+                  update({ status: val });
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs rounded-xl border-border bg-background">
+                <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
-                <SelectContent className="border-border bg-card">
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="Aktif">Aktif</SelectItem>
-                  <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                  <SelectItem value="Putus">Putus</SelectItem>
+                <SelectContent className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  <SelectItem value="all" className="text-xs">
+                    Semua Status
+                  </SelectItem>
+                  <SelectItem value="Aktif" className="text-xs">
+                    Aktif
+                  </SelectItem>
+                  <SelectItem value="Nonaktif" className="text-xs">
+                    Nonaktif
+                  </SelectItem>
+                  <SelectItem value="Putus" className="text-xs">
+                    Putus
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Filter Kualitas & Reset */}
-            <div className="flex items-center gap-1.5">
+            {/* Kualitas selector */}
+            <div>
               <Select
-                value={selectedQuality}
-                onValueChange={(val) => {
-                  setSelectedQuality(val);
+                value={filters.quality}
+                onValueChange={(val: any) => {
+                  update({ quality: val });
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs rounded-xl border-border bg-background flex-1">
+                <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
                   <SelectValue placeholder="Kualitas Data" />
                 </SelectTrigger>
-                <SelectContent className="border-border bg-card">
-                  <SelectItem value="all">Semua Data</SelectItem>
-                  <SelectItem value="valid">Data Valid</SelectItem>
-                  <SelectItem value="flagged">Data Bertanda</SelectItem>
-                  <SelectItem value="anomaly">Anomali Batas Wilayah</SelectItem>
+                <SelectContent className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  <SelectItem value="all" className="text-xs">
+                    Semua Kualitas
+                  </SelectItem>
+                  <SelectItem value="valid" className="text-xs">
+                    Data Valid
+                  </SelectItem>
+                  <SelectItem value="flagged" className="text-xs">
+                    Perlu Verifikasi
+                  </SelectItem>
+                  <SelectItem value="anomaly" className="text-xs">
+                    Anomali Batas
+                  </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleResetFilter}
-                className="h-9 w-9 p-0 rounded-xl hover:bg-muted text-muted-foreground shrink-0 border-border"
-                title="Reset Semua Filter"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </Button>
+            {/* Search + Reset */}
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <Input
+                  id="dashboard-search-input"
+                  placeholder="Cari kode/nama..."
+                  value={filters.q}
+                  onChange={(e) => {
+                    update({ q: e.target.value });
+                    setCurrentPage(1);
+                  }}
+                  className="pl-8.5 h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus-visible:ring-1 focus-visible:ring-neutral-400"
+                />
+              </div>
+
+              {activeCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={reset}
+                  className="h-9 px-2 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-white shrink-0 rounded-xl cursor-pointer"
+                  title="Reset filter"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* BoardUI Styled Table */}
-        <div className="overflow-x-auto">
+        {/* Clean FlowAI Table */}
+        <div className="overflow-x-auto -mx-5 sm:-mx-6">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/40 text-muted-foreground font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4 font-semibold">Kode (9 Digit)</th>
-                <th className="py-3.5 px-4 font-semibold">Nama Pelanggan</th>
-                <th className="py-3.5 px-4 font-semibold">Wilayah</th>
-                <th className="py-3.5 px-4 font-semibold">Golongan</th>
-                <th className="py-3.5 px-4 font-semibold">Status</th>
-                <th className="py-3.5 px-4 font-semibold">Koordinat (WGS84)</th>
-                <th className="py-3.5 px-4 font-semibold">Kualitas Data</th>
-                <th className="py-3.5 px-4 font-semibold text-right">Aksi</th>
+              <tr className="border-b border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-800/30 text-neutral-500 dark:text-neutral-400 text-[11px] font-medium">
+                <th className="py-3 px-5 sm:px-6 font-semibold">Kode Pelanggan</th>
+                <th className="py-3 px-4 font-semibold">Nama Pelanggan</th>
+                <th className="py-3 px-4 font-semibold">Wilayah</th>
+                <th className="py-3 px-4 font-semibold">Golongan</th>
+                <th className="py-3 px-4 font-semibold">Status</th>
+                <th className="py-3 px-4 font-semibold">Mutu Data</th>
+                <th className="py-3 px-5 sm:px-6 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
-              {paginatedPelanggan.length === 0 ? (
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60">
+              {paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted-foreground text-xs font-mono">
-                    Tidak ada data pelanggan yang sesuai dengan filter pencarian.
+                  <td colSpan={7} className="py-12 text-center text-neutral-400 text-xs">
+                    Tidak ada data pelanggan yang cocok dengan filter yang dipilih.
                   </td>
                 </tr>
               ) : (
-                paginatedPelanggan.map((item) => {
+                paginatedList.map((item) => {
                   const wilayahColor = wilayahColorMap.get(item.kode_wilayah) || '#94A3B8';
                   return (
-                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-foreground">
+                    <tr
+                      key={item.id}
+                      onClick={() => setSelectedDetail(item)}
+                      className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-3 px-5 sm:px-6 font-mono font-semibold text-neutral-900 dark:text-white">
                         {item.kode_pelanggan}
                       </td>
-                      <td className="py-3.5 px-4 font-medium text-foreground">
-                        {maskName(item.nama_pelanggan)}
+                      <td className="py-3 px-4 font-medium text-neutral-800 dark:text-neutral-200">
+                        {displayName(item.nama_pelanggan, user?.role)}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: wilayahColor }}
-                          />
-                          <span className="font-mono text-xs">{item.kode_wilayah}</span>
-                          <span className="text-muted-foreground text-[11px] truncate max-w-[120px]">
-                            {item.nama_wilayah}
-                          </span>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: wilayahColor }} />
+                          <span className="font-mono text-neutral-400 text-[11px]">{item.kode_wilayah}</span>
+                          <span className="truncate max-w-[130px] text-neutral-600 dark:text-neutral-300">{item.nama_wilayah}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <Badge variant="outline" className="font-mono text-[10px] py-0 px-2 border-border bg-background">
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center font-mono text-[10px] py-0.5 px-2 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium">
                           {item.golongan}
-                        </Badge>
+                        </span>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium font-mono ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
                             item.status_sambungan === 'Aktif'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50'
                               : item.status_sambungan === 'Nonaktif'
-                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40'
-                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/50'
+                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/50'
                           }`}
                         >
                           {item.status_sambungan}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
-                        {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
-                      </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {item.spatial_anomaly ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60"
-                            title={item.spatial_anomaly}
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            Anomali Batas
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60">
+                            <AlertOctagon className="w-2.5 h-2.5" />
+                            Anomali
                           </span>
                         ) : item.is_flagged ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60"
-                            title={item.flag_reasons.join(', ')}
-                          >
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60">
                             <AlertTriangle className="w-2.5 h-2.5" />
                             Bertanda
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
-                            Valid
-                          </span>
+                          <span className="text-[11px] text-neutral-400 font-normal">Valid</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewOnMap(item.kode_pelanggan)}
-                          className="h-7 px-2.5 text-[11px] rounded-lg gap-1 border-border bg-card hover:bg-muted text-foreground shadow-xs"
-                          title="Tampilkan titik di Peta GIS"
-                        >
-                          <MapPin className="w-3 h-3 text-primary" />
-                          <span>Peta</span>
-                        </Button>
+                      <td className="py-3 px-5 sm:px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDetail(item);
+                            }}
+                            className="text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                          >
+                            Detail
+                          </button>
+                          <span className="text-neutral-300 dark:text-neutral-700">•</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenGis(item.kode_pelanggan);
+                            }}
+                            className="text-xs font-medium text-neutral-900 dark:text-white hover:underline transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Tampilkan titik di Peta GIS internal"
+                          >
+                            <MapPin className="w-3 h-3 text-neutral-500" />
+                            <span>Peta</span>
+                          </button>
+                          <span className="text-neutral-300 dark:text-neutral-700">•</span>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors flex items-center gap-1 cursor-pointer"
+                            title={`Buka titik koordinat (${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}) di Google Maps`}
+                          >
+                            <ExternalLink className="w-3 h-3 text-blue-500" />
+                            <span>G-Maps</span>
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -915,23 +666,24 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* BoardUI Pagination Footer */}
-        <div className="p-3 sm:p-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-mono">
+        {/* Micro-Tick / Dotted Divider (FlowAI Signature Detail) */}
+        <div className="border-t border-dashed border-neutral-200 dark:border-neutral-800 pt-3 flex items-center justify-between text-xs text-neutral-500">
           <span>
-            Menampilkan {Math.min(filteredData.length, (currentPage - 1) * pageSize + 1)} -{' '}
-            {Math.min(filteredData.length, currentPage * pageSize)} dari {filteredData.length} total
+            Menampilkan {filteredList.length ? (currentPage - 1) * pageSize + 1 : 0} –{' '}
+            {Math.min(filteredList.length, currentPage * pageSize)} dari {formatNumber(filteredList.length)} data
           </span>
+
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="h-8 px-2.5 rounded-lg border-border bg-card hover:bg-muted"
+              disabled={currentPage <= 1}
+              className="h-8 px-2.5 rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
-            <span className="px-2 font-bold text-foreground">
+            <span className="px-2 font-mono font-medium text-neutral-800 dark:text-neutral-200">
               {currentPage} / {totalPages}
             </span>
             <Button
@@ -939,13 +691,263 @@ export default function Dashboard() {
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
-              className="h-8 px-2.5 rounded-lg border-border bg-card hover:bg-muted"
+              className="h-8 px-2.5 rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 cursor-pointer"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
+
+      {/* ── 5. Lower Section: "Recent Using Templates" -> Sebaran Wilayah & Komposisi Data ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-white">
+            Analisis Wilayah & Komposisi Data
+          </h2>
+          <span className="text-xs text-neutral-400 font-mono">
+            {wilayahDistribution.length} Wilayah Terdaftar
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Wilayah Distribution Bars (2/3 width) */}
+          <div className="lg:col-span-2 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-6 shadow-2xs">
+            <div className="flex items-center justify-between pb-3.5 border-b border-neutral-100 dark:border-neutral-800">
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Sebaran Pelanggan per Wilayah</h3>
+                <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Warna titik disinkronkan dengan acuan peta GIS. Klik baris untuk memfilter wilayah.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {wilayahDistribution.length === 0 ? (
+                <div className="py-12 text-center text-xs text-neutral-400">
+                  Tidak ada data wilayah untuk filter saat ini.
+                </div>
+              ) : (
+                wilayahDistribution.map((w) => {
+                  const pct = (w.total / maxWilayahTotal) * 100;
+                  return (
+                    <div
+                      key={w.kode}
+                      onClick={() => update({ wilayah: filters.wilayah === w.kode ? 'all' : w.kode })}
+                      className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer transition-colors text-xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs" style={{ backgroundColor: w.warna }} />
+                          <span className="font-mono text-[11px] text-neutral-400">{w.kode}</span>
+                          <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate">{w.nama}</span>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono text-[11px] tabular">
+                          <span className="font-semibold text-neutral-900 dark:text-white">{w.total}</span>
+                          {w.flagged > 0 && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                              ({w.flagged} flag)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Progress track */}
+                      <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden flex">
+                        <div
+                          className="h-full transition-all duration-300 rounded-full"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: w.warna,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Composition Summary (1/3 width) */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-6 shadow-2xs flex flex-col justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Komposisi Data</h3>
+              <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Rincian kategori tarif dan status sambungan pelanggan aktif.
+              </p>
+
+              {/* Golongan breakdown */}
+              <div className="mt-4 space-y-2">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-neutral-400 block font-semibold">
+                  Golongan Tarif
+                </span>
+                <div className="space-y-1.5">
+                  {GOLONGAN_LIST.map((g) => {
+                    const val = stats.golongan[g] || 0;
+                    const pct = stats.total ? ((val / stats.total) * 100).toFixed(1) : '0';
+                    return (
+                      <div key={g} className="flex items-center justify-between text-xs p-2 rounded-xl bg-neutral-50/70 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800">
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: GOLONGAN_META[g]?.color }} />
+                          <span className="font-semibold text-neutral-900 dark:text-white font-mono">{g}</span>
+                          <span className="text-[11px] text-neutral-400 truncate">{GOLONGAN_META[g]?.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] tabular">
+                          <span className="font-semibold text-neutral-900 dark:text-white">{val}</span>
+                          <span className="text-[10px] text-neutral-400">({pct}%)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Status breakdown */}
+              <div className="mt-5 space-y-2">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-neutral-400 block font-semibold">
+                  Status Sambungan
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Aktif', 'Nonaktif', 'Putus'] as const).map((st) => (
+                    <div key={st} className="p-2.5 rounded-xl bg-neutral-50/70 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800 text-center">
+                      <span className="text-[10px] text-neutral-400 block font-medium">{st}</span>
+                      <span className="text-sm font-bold text-neutral-900 dark:text-white font-mono tabular block mt-0.5">
+                        {stats.status[st] || 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Snapshot Info Footer */}
+            <div className="mt-5 pt-3.5 border-t border-neutral-100 dark:border-neutral-800 text-[11px] text-neutral-500 space-y-1">
+              <div className="flex items-center justify-between">
+                <span>File Aktif:</span>
+                <span className="font-mono text-neutral-800 dark:text-neutral-200 truncate max-w-[160px]">
+                  {activeSnapshot?.filename || '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Pengunggah:</span>
+                <span className="text-neutral-800 dark:text-neutral-200 font-medium">{activeSnapshot?.uploader_name || 'Admin'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Slide-Over Customer Detail Sheet (Clean FlowAI Drawer Style) ── */}
+      <Sheet open={Boolean(selectedDetail)} onOpenChange={(open) => !open && setSelectedDetail(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-white dark:bg-neutral-900 border-l border-neutral-200/80 dark:border-neutral-800">
+          {selectedDetail && (
+            <>
+              <SheetHeader className="p-5 border-b border-neutral-100 dark:border-neutral-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-base font-bold text-neutral-900 dark:text-white">
+                    {selectedDetail.kode_pelanggan}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-md font-mono text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                    {selectedDetail.golongan}
+                  </span>
+                </div>
+                <SheetTitle className="text-sm font-semibold text-neutral-900 dark:text-white text-left">
+                  {displayName(selectedDetail.nama_pelanggan, user?.role)}
+                </SheetTitle>
+              </SheetHeader>
+
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                {/* Anomaly Notice */}
+                {selectedDetail.spatial_anomaly && (
+                  <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <AlertOctagon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Anomali Spasial Terdeteksi</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">{selectedDetail.spatial_anomaly}</p>
+                  </div>
+                )}
+
+                {/* Flag reasons */}
+                {!selectedDetail.spatial_anomaly && selectedDetail.is_flagged && (
+                  <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Perlu Verifikasi</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">{selectedDetail.flag_reasons.join(', ')}</p>
+                  </div>
+                )}
+
+                {/* Detail Information Fields */}
+                <div className="space-y-3.5 p-4 rounded-xl bg-neutral-50/70 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Alamat</span>
+                    <span className="text-xs text-neutral-800 dark:text-neutral-200 mt-0.5 block leading-relaxed font-medium">
+                      {canSeePII(user?.role) ? selectedDetail.alamat : 'Tersensor (Hak Akses Terbatas)'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-neutral-200/60 dark:border-neutral-800">
+                    <div>
+                      <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Wilayah</span>
+                      <span className="font-semibold text-neutral-900 dark:text-white">{selectedDetail.nama_wilayah}</span>
+                      <span className="text-[10px] font-mono text-neutral-400 block">{selectedDetail.kode_wilayah}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Kecamatan</span>
+                      <span className="font-semibold text-neutral-900 dark:text-white">{kecamatanName(selectedDetail.kode_kecamatan)}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-neutral-200/60 dark:border-neutral-800">
+                    <div>
+                      <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Status Sambungan</span>
+                      <span className="font-semibold text-neutral-900 dark:text-white">{selectedDetail.status_sambungan}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Nomor Meter</span>
+                      <span className="font-mono text-neutral-900 dark:text-white">{selectedDetail.nomor_meter || '-'}</span>
+                    </div>
+                  </div>
+
+                  {canSeePII(user?.role) && (
+                    <div className="pt-2.5 border-t border-neutral-200/60 dark:border-neutral-800">
+                      <span className="text-[10px] uppercase font-mono text-neutral-400 block font-semibold">Koordinat WGS84</span>
+                      <span className="font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+                        {selectedDetail.latitude.toFixed(6)}, {selectedDetail.longitude.toFixed(6)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center gap-2.5 bg-white dark:bg-neutral-900">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    handleOpenGis(selectedDetail.kode_pelanggan);
+                    setSelectedDetail(null);
+                  }}
+                  className="flex-1 rounded-xl text-xs gap-1.5 h-9 bg-[#111827] hover:bg-[#1f2937] text-white dark:bg-white dark:text-neutral-900 cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Buka di Peta GIS</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDetail(null)}
+                  className="rounded-xl text-xs h-9 border-neutral-200/80 dark:border-neutral-800 cursor-pointer"
+                >
+                  Tutup
+                </Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -9,11 +9,13 @@ import materialRequestsRouter from "./materialRequests";
 import trackingsRouter from "./trackings";
 import dashboardRouter from "./dashboard";
 import reportsRouter from "./reports";
+import gisRouter from "./gis";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(gisRouter);
 router.use(usersRouter);
 router.use(branchesRouter);
 router.use(materialsRouter);

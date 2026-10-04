@@ -56,6 +56,8 @@ export interface UploadSnapshot {
   mode: 'replace' | 'update';
   is_active: boolean;
   notes?: string;
+  /** True for the generated demo dataset (not real customer data). */
+  is_demo?: boolean;
 }
 
 export interface ValidationErrorItem {

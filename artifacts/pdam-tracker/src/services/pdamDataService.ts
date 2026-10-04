@@ -1,8 +1,12 @@
 import { Pelanggan, WilayahAcuan, UploadSnapshot, GolonganTarif, StatusSambungan } from '@/types/pdam';
-import * as XLSX from 'xlsx';
+import { sanitizeSpreadsheetCell } from '@/lib/escape';
+
+type Bounds = { minLat: number; maxLat: number; minLng: number; maxLng: number };
 
 // ── Bounding box kasar per kecamatan untuk deteksi anomali spasial ──
-export const KECAMATAN_BOUNDS: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
+// NOTE: kotak-kotak ini saling tumpang tindih. Ganti dengan poligon resmi
+// (Geoportal BIG/BPS) + uji point-in-polygon pada fase backend.
+export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
   '01': { minLat: -8.75, maxLat: -8.60, minLng: 116.20, maxLng: 116.35 }, // Praya
   '02': { minLat: -8.70, maxLat: -8.55, minLng: 116.25, maxLng: 116.40 }, // Batukliang
   '03': { minLat: -8.72, maxLat: -8.58, minLng: 116.30, maxLng: 116.45 }, // Kopang
@@ -17,6 +21,17 @@ export const KECAMATAN_BOUNDS: Record<string, { minLat: number; maxLat: number; 
   '12': { minLat: -8.73, maxLat: -8.60, minLng: 116.18, maxLng: 116.30 }, // Jonggat
   '13': { minLat: -8.88, maxLat: -8.76, minLng: 116.08, maxLng: 116.22 }, // Praya Barat Daya
 };
+
+/** Batas kasar area layanan (Pulau Lombok). */
+export const SERVICE_AREA_BOUNDS: Bounds = { minLat: -9.12, maxLat: -8.18, minLng: 115.82, maxLng: 116.75 };
+
+export function isInBounds(lat: number, lng: number, b: Bounds): boolean {
+  return lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng;
+}
+
+export function boundsCenter(b: Bounds): [number, number] {
+  return [(b.minLat + b.maxLat) / 2, (b.minLng + b.maxLng) / 2];
+}
 
 // ── Master kecamatan registry ──
 export interface KecamatanInfo {
@@ -39,6 +54,10 @@ export const KECAMATAN_LIST: KecamatanInfo[] = [
   { kode: '12', nama: 'Jonggat' },
   { kode: '13', nama: 'Praya Barat Daya' },
 ];
+
+export function kecamatanName(kode: string): string {
+  return KECAMATAN_LIST.find((k) => k.kode === kode)?.nama || kode;
+}
 
 // ── 20 Acuan Wilayah Resmi Kecamatan 07 (Praya Barat) Sesuai PRD v1.2 ──
 export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
@@ -69,41 +88,83 @@ const STORAGE_KEYS = {
   PELANGGAN: 'pdam_tiara_pelanggan_v1',
   SNAPSHOTS: 'pdam_tiara_snapshots_v1',
   ACTIVE_SNAPSHOT_ID: 'pdam_tiara_active_snapshot_id_v1',
+  ARCHIVE_PREFIX: 'pdam_tiara_snapshot_data_v1:',
 };
 
+/** Jumlah maksimum arsip data snapshot yang disimpan untuk rollback. */
+const MAX_ARCHIVES = 5;
+
+/** Seed snapshot IDs from earlier builds (demo data, not real uploads). */
+const LEGACY_DEMO_IDS = new Set(['snap-2026-10-01-1400', 'snap-2026-09-18-1030']);
+
+export class StorageQuotaError extends Error {
+  constructor() {
+    super(
+      'Penyimpanan browser penuh. Data terlalu besar untuk mode lokal; fase backend diperlukan untuk dataset ini.',
+    );
+    this.name = 'StorageQuotaError';
+  }
+}
+
+function isQuotaError(err: unknown): boolean {
+  return (
+    err instanceof DOMException &&
+    (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED' || err.code === 22)
+  );
+}
+
+function writeStorage(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+  } catch (err) {
+    if (isQuotaError(err)) throw new StorageQuotaError();
+    throw err;
+  }
+}
+
 // ── Spatial anomaly check: does the coordinate sit inside its kecamatan's bounds? ──
-export function checkSpatialAnomaly(pelanggan: Pelanggan): string | null {
+export function checkSpatialAnomaly(pelanggan: Pick<Pelanggan, 'kode_kecamatan' | 'latitude' | 'longitude'>): string | null {
   const kodeKec = pelanggan.kode_kecamatan;
   const bounds = KECAMATAN_BOUNDS[kodeKec];
   if (!bounds) return null; // unknown kecamatan, skip check
 
   const { latitude, longitude } = pelanggan;
-  if (
-    latitude < bounds.minLat || latitude > bounds.maxLat ||
-    longitude < bounds.minLng || longitude > bounds.maxLng
-  ) {
-    // Try to find which kecamatan the coordinate actually falls in
-    let foundKec: string | null = null;
-    for (const [kec, b] of Object.entries(KECAMATAN_BOUNDS)) {
-      if (
-        latitude >= b.minLat && latitude <= b.maxLat &&
-        longitude >= b.minLng && longitude <= b.maxLng
-      ) {
-        foundKec = kec;
-        break;
-      }
+  if (isInBounds(latitude, longitude, bounds)) return null;
+
+  // Boxes overlap, so pick the containing kecamatan whose center is nearest
+  // instead of the first match.
+  let foundKec: string | null = null;
+  let bestDist = Infinity;
+  for (const [kec, b] of Object.entries(KECAMATAN_BOUNDS)) {
+    if (!isInBounds(latitude, longitude, b)) continue;
+    const [cLat, cLng] = boundsCenter(b);
+    const dist = (latitude - cLat) ** 2 + (longitude - cLng) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      foundKec = kec;
     }
-    const kecNama = KECAMATAN_LIST.find(k => k.kode === kodeKec)?.nama || kodeKec;
-    if (foundKec) {
-      const foundNama = KECAMATAN_LIST.find(k => k.kode === foundKec)?.nama || foundKec;
-      return `Kode pelanggan Kec. ${kecNama} (${kodeKec}) tapi koordinat berada di area Kec. ${foundNama} (${foundKec})`;
-    }
-    return `Koordinat di luar batas wajar Kec. ${kecNama} (${kodeKec})`;
   }
-  return null;
+
+  const kecNama = kecamatanName(kodeKec);
+  if (foundKec) {
+    return `Kode pelanggan Kec. ${kecNama} (${kodeKec}) tapi koordinat berada di area Kec. ${kecamatanName(foundKec)} (${foundKec})`;
+  }
+  return `Koordinat di luar batas wajar Kec. ${kecNama} (${kodeKec})`;
 }
 
-// ── Realistic seed customer generator for Praya Barat ──
+/** Recomputes spatial anomaly and keeps flag_reasons consistent. Returns true if changed. */
+function refreshAnomaly(p: Pelanggan): boolean {
+  const next = checkSpatialAnomaly(p);
+  if (next === p.spatial_anomaly) return false;
+  const reasons = (p.flag_reasons || []).filter((r) => r !== p.spatial_anomaly);
+  if (next) reasons.push(next);
+  p.flag_reasons = reasons;
+  p.spatial_anomaly = next;
+  p.is_flagged = reasons.length > 0;
+  return true;
+}
+
+// ── Realistic seed customer generator for Praya Barat (DEMO ONLY) ──
 function generateSeedPelanggan(): Pelanggan[] {
   const pelangganList: Pelanggan[] = [];
   const golongans: GolonganTarif[] = ['R1', 'R2', 'R2', 'R2', 'R1', 'B1', 'S', 'I'];
@@ -143,24 +204,19 @@ function generateSeedPelanggan(): Pelanggan[] {
       let lat = Number((wilayah.centerLat + latOffset).toFixed(6));
       let lng = Number((wilayah.centerLng + lngOffset).toFixed(6));
 
-      // Intentionally place ~3% of customers at coordinates that drift into another kecamatan
+      // Intentionally place ~3% of demo customers at coordinates that drift into another kecamatan
       // to demonstrate the spatial anomaly detection
       const isSpatialAnomaly = counter % 31 === 0;
       if (isSpatialAnomaly) {
-        // Shift latitude northward so it falls into Kec. 12 (Jonggat) or 01 (Praya) bounds
         lat = Number((-8.68 + (Math.sin(counter) * 0.03)).toFixed(6));
         lng = Number((116.22 + (Math.cos(counter) * 0.04)).toFixed(6));
       }
 
-      const isFlagged = counter % 29 === 0 || counter % 47 === 0;
       const flagReasons: string[] = [];
-      if (isFlagged) {
-        if (counter % 29 === 0) flagReasons.push('Koordinat perlu verifikasi lapangan');
-        if (counter % 47 === 0) flagReasons.push('Nama pemakai berbeda dengan arsip');
-      }
+      if (counter % 29 === 0) flagReasons.push('Koordinat perlu verifikasi lapangan');
+      if (counter % 47 === 0) flagReasons.push('Nama pemakai berbeda dengan arsip');
 
-      // Check spatial anomaly
-      const tempPelanggan: Pelanggan = {
+      const record: Pelanggan = {
         id: kodePelanggan,
         kode_pelanggan: kodePelanggan,
         nama_pelanggan: name,
@@ -172,23 +228,15 @@ function generateSeedPelanggan(): Pelanggan[] {
         status_sambungan: status,
         latitude: lat,
         longitude: lng,
-        is_flagged: isFlagged || isSpatialAnomaly,
+        is_flagged: flagReasons.length > 0,
         flag_reasons: flagReasons,
         spatial_anomaly: null,
         nomor_meter: `WM-${wilayah.kode}-${String(1000 + i)}`,
         tanggal_pasang: `202${(counter % 4) + 2}-0${(i % 9) + 1}-1${(i % 8) + 1}`,
       };
 
-      const anomaly = checkSpatialAnomaly(tempPelanggan);
-      if (anomaly) {
-        tempPelanggan.spatial_anomaly = anomaly;
-        tempPelanggan.is_flagged = true;
-        if (!tempPelanggan.flag_reasons.includes(anomaly)) {
-          tempPelanggan.flag_reasons.push(anomaly);
-        }
-      }
-
-      pelangganList.push(tempPelanggan);
+      refreshAnomaly(record);
+      pelangganList.push(record);
       counter++;
     }
   });
@@ -196,44 +244,44 @@ function generateSeedPelanggan(): Pelanggan[] {
   return pelangganList;
 }
 
-// ── Default Snapshot Records ──
-const INITIAL_SNAPSHOTS: UploadSnapshot[] = [
-  {
-    id: 'snap-2026-10-01-1400',
-    filename: 'Data_Pelanggan_Praya_Barat_Okt2026_Rev2.xlsx',
-    uploaded_at: '2026-10-01T14:00:00+08:00',
-    uploader_name: 'Muh Sofiyan Hawari',
-    uploader_role: 'Bidang IT',
-    total_rows: 642,
-    valid_rows: 620,
-    flagged_rows: 22,
-    error_rows: 0,
-    mode: 'replace',
-    is_active: true,
-    notes: 'Snapshot rilis resmi validasi tahap pilot Kecamatan 07 Praya Barat.',
-  },
-  {
-    id: 'snap-2026-09-18-1030',
-    filename: 'Data_Pelanggan_Praya_Barat_Sept2026_Draf.xlsx',
-    uploaded_at: '2026-09-18T10:30:00+08:00',
-    uploader_name: 'Tim Perapian Data IT',
-    uploader_role: 'Verifikator',
-    total_rows: 610,
-    valid_rows: 575,
-    flagged_rows: 35,
-    error_rows: 0,
-    mode: 'replace',
-    is_active: false,
-    notes: 'Snapshot pra-perapian koordinat GPS wilayah Kateng dan Bonder.',
-  },
-];
+function buildInitialSnapshots(seed: Pelanggan[]): UploadSnapshot[] {
+  const flagged = seed.filter((p) => p.is_flagged).length;
+  return [
+    {
+      id: 'snap-demo-2026-10-01',
+      filename: 'Data_Demo_Praya_Barat.xlsx',
+      uploaded_at: '2026-10-01T14:00:00+08:00',
+      uploader_name: 'Sistem (data demo)',
+      uploader_role: 'Demo',
+      total_rows: seed.length,
+      valid_rows: seed.length - flagged,
+      flagged_rows: flagged,
+      error_rows: 0,
+      mode: 'replace',
+      is_active: true,
+      is_demo: true,
+      notes: 'Data contoh untuk evaluasi. Upload file asli di menu Pengaturan untuk menggantinya.',
+    },
+  ];
+}
+
+function newSnapshotId(now: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `snap-${stamp}-${rand}`;
+}
+
+export type RestoreResult = { ok: true } | { ok: false; reason: string };
 
 class PdamDataService {
   private wilayah: WilayahAcuan[] = [];
   private pelanggan: Pelanggan[] = [];
   private snapshots: UploadSnapshot[] = [];
-  private activeSnapshotId: string = '';
-  private listeners: (() => void)[] = [];
+  private activeSnapshotId = '';
+  private archivedIds = new Set<string>();
+  private listeners = new Set<() => void>();
+  private version = 0;
 
   constructor() {
     this.init();
@@ -242,241 +290,358 @@ class PdamDataService {
   private init() {
     try {
       const storedWilayah = localStorage.getItem(STORAGE_KEYS.WILAYAH);
-      if (storedWilayah) {
-        this.wilayah = JSON.parse(storedWilayah);
-      } else {
-        this.wilayah = [...DEFAULT_WILAYAH_LIST];
-        this.saveWilayah();
-      }
+      this.wilayah = storedWilayah ? JSON.parse(storedWilayah) : [...DEFAULT_WILAYAH_LIST];
 
       const storedPelanggan = localStorage.getItem(STORAGE_KEYS.PELANGGAN);
       if (storedPelanggan) {
         this.pelanggan = JSON.parse(storedPelanggan);
-        let updated = false;
-        this.pelanggan.forEach(p => {
+        // Schema migration only — never touch coordinates or other real data.
+        let migrated = false;
+        for (const p of this.pelanggan) {
           if (!p.kode_kecamatan) {
-            p.kode_kecamatan = '07';
-            updated = true;
+            p.kode_kecamatan = p.kode_pelanggan?.slice(0, 2) || '07';
+            migrated = true;
           }
-          const anomaly = checkSpatialAnomaly(p);
-          if (anomaly && p.spatial_anomaly !== anomaly) {
-            p.spatial_anomaly = anomaly;
-            p.is_flagged = true;
-            if (!p.flag_reasons.includes(anomaly)) {
-              p.flag_reasons.push(anomaly);
-            }
-            updated = true;
+          if (!Array.isArray(p.flag_reasons)) {
+            p.flag_reasons = [];
+            migrated = true;
           }
-        });
-
-        // If existing stored data had no spatial anomaly yet, seed a few records for demonstration
-        const hasAnomaly = this.pelanggan.some(p => Boolean(p.spatial_anomaly));
-        if (!hasAnomaly && this.pelanggan.length > 25) {
-          for (let i = 5; i < this.pelanggan.length; i += 28) {
-            const p = this.pelanggan[i];
-            p.latitude = Number((-8.675 + (Math.sin(i) * 0.025)).toFixed(6));
-            p.longitude = Number((116.23 + (Math.cos(i) * 0.03)).toFixed(6));
-            const anomaly = checkSpatialAnomaly(p);
-            if (anomaly) {
-              p.spatial_anomaly = anomaly;
-              p.is_flagged = true;
-              if (!p.flag_reasons.includes(anomaly)) {
-                p.flag_reasons.push(anomaly);
-              }
-            }
-          }
-          updated = true;
+          if (refreshAnomaly(p)) migrated = true;
         }
-
-        if (updated) {
-          this.savePelanggan();
-        }
+        if (migrated) this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
       } else {
         this.pelanggan = generateSeedPelanggan();
-        this.savePelanggan();
       }
 
       const storedSnapshots = localStorage.getItem(STORAGE_KEYS.SNAPSHOTS);
-      if (storedSnapshots) {
-        this.snapshots = JSON.parse(storedSnapshots);
-      } else {
-        this.snapshots = [...INITIAL_SNAPSHOTS];
-        this.saveSnapshots();
-      }
+      this.snapshots = storedSnapshots ? JSON.parse(storedSnapshots) : buildInitialSnapshots(this.pelanggan);
+      this.snapshots = this.snapshots.map((s) => (LEGACY_DEMO_IDS.has(s.id) ? { ...s, is_demo: true } : s));
 
       const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_SNAPSHOT_ID);
-      this.activeSnapshotId = activeId || this.snapshots.find(s => s.is_active)?.id || this.snapshots[0]?.id || '';
+      this.activeSnapshotId =
+        (activeId && this.snapshots.some((s) => s.id === activeId) ? activeId : '') ||
+        this.snapshots.find((s) => s.is_active)?.id ||
+        this.snapshots[0]?.id ||
+        '';
+
+      this.scanArchives();
+
+      if (!storedWilayah) this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+      if (!storedPelanggan) this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+      if (!storedSnapshots) this.persistSnapshotMeta();
+
+      // Make sure the active dataset is archived so it can be restored later.
+      if (this.activeSnapshotId && !this.archivedIds.has(this.activeSnapshotId)) {
+        this.tryArchive(this.activeSnapshotId, this.pelanggan);
+      }
     } catch (err) {
       console.error('Error initializing PdamDataService:', err);
       this.wilayah = [...DEFAULT_WILAYAH_LIST];
       this.pelanggan = generateSeedPelanggan();
-      this.snapshots = [...INITIAL_SNAPSHOTS];
+      this.snapshots = buildInitialSnapshots(this.pelanggan);
       this.activeSnapshotId = this.snapshots[0]?.id || '';
     }
   }
 
-  public subscribe(listener: () => void): () => void {
-    this.listeners.push(listener);
-    return () => { this.listeners = this.listeners.filter(l => l !== listener); };
+  // ── Subscription (useSyncExternalStore compatible) ──
+  public subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  public getVersion = (): number => this.version;
+
+  private notify() {
+    this.version++;
+    this.listeners.forEach((fn) => fn());
   }
 
-  private notify() { this.listeners.forEach(fn => fn()); }
-
-  private saveWilayah() {
-    localStorage.setItem(STORAGE_KEYS.WILAYAH, JSON.stringify(this.wilayah));
-    this.notify();
-  }
-  private savePelanggan() {
-    localStorage.setItem(STORAGE_KEYS.PELANGGAN, JSON.stringify(this.pelanggan));
-    this.notify();
-  }
-  private saveSnapshots() {
-    localStorage.setItem(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(this.snapshots));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_SNAPSHOT_ID, this.activeSnapshotId);
-    this.notify();
+  // ── Persistence helpers ──
+  private safePersist(key: string, value: unknown): boolean {
+    try {
+      writeStorage(key, value);
+      return true;
+    } catch (err) {
+      console.error(`Gagal menyimpan ${key}:`, err);
+      return false;
+    }
   }
 
-  // Force regenerate seed data (useful after schema changes)
+  private persistSnapshotMeta() {
+    this.safePersist(STORAGE_KEYS.SNAPSHOTS, this.snapshots);
+    this.safePersist(STORAGE_KEYS.ACTIVE_SNAPSHOT_ID, this.activeSnapshotId);
+  }
+
+  private scanArchives() {
+    this.archivedIds.clear();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(STORAGE_KEYS.ARCHIVE_PREFIX)) {
+        this.archivedIds.add(key.slice(STORAGE_KEYS.ARCHIVE_PREFIX.length));
+      }
+    }
+  }
+
+  private archiveKey(id: string) {
+    return STORAGE_KEYS.ARCHIVE_PREFIX + id;
+  }
+
+  private removeArchive(id: string) {
+    localStorage.removeItem(this.archiveKey(id));
+    this.archivedIds.delete(id);
+  }
+
+  /** Oldest non-active archives first. */
+  private prunableArchiveIds(): string[] {
+    return this.snapshots
+      .filter((s) => this.archivedIds.has(s.id) && s.id !== this.activeSnapshotId)
+      .sort((a, b) => a.uploaded_at.localeCompare(b.uploaded_at))
+      .map((s) => s.id);
+  }
+
+  private enforceArchiveLimit() {
+    const prunable = this.prunableArchiveIds();
+    while (this.archivedIds.size > MAX_ARCHIVES && prunable.length) {
+      this.removeArchive(prunable.shift()!);
+    }
+  }
+
+  /** Writes with automatic pruning of old archives on quota errors. */
+  private writeWithPruning(key: string, value: unknown) {
+    const prunable = this.prunableArchiveIds();
+    for (;;) {
+      try {
+        writeStorage(key, value);
+        return;
+      } catch (err) {
+        if (!(err instanceof StorageQuotaError) || prunable.length === 0) throw err;
+        this.removeArchive(prunable.shift()!);
+      }
+    }
+  }
+
+  private tryArchive(id: string, data: Pelanggan[]): boolean {
+    try {
+      this.writeWithPruning(this.archiveKey(id), data);
+      this.archivedIds.add(id);
+      return true;
+    } catch (err) {
+      console.warn('Arsip snapshot tidak dapat disimpan:', err);
+      return false;
+    }
+  }
+
+  // ── Public API ──
   public resetAllData() {
-    localStorage.removeItem(STORAGE_KEYS.WILAYAH);
-    localStorage.removeItem(STORAGE_KEYS.PELANGGAN);
-    localStorage.removeItem(STORAGE_KEYS.SNAPSHOTS);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_SNAPSHOT_ID);
+    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+    Array.from(this.archivedIds).forEach((id) => this.removeArchive(id));
     this.wilayah = [...DEFAULT_WILAYAH_LIST];
     this.pelanggan = generateSeedPelanggan();
-    this.snapshots = [...INITIAL_SNAPSHOTS];
+    this.snapshots = buildInitialSnapshots(this.pelanggan);
     this.activeSnapshotId = this.snapshots[0]?.id || '';
-    this.saveWilayah();
-    this.savePelanggan();
-    this.saveSnapshots();
+    this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+    this.persistSnapshotMeta();
+    this.tryArchive(this.activeSnapshotId, this.pelanggan);
+    this.notify();
   }
 
   public getWilayahList(): WilayahAcuan[] {
     const countMap = new Map<string, number>();
-    this.pelanggan.forEach(p => {
+    for (const p of this.pelanggan) {
       countMap.set(p.kode_wilayah, (countMap.get(p.kode_wilayah) || 0) + 1);
-    });
-    return this.wilayah.map(w => ({ ...w, totalPelanggan: countMap.get(w.kode) || 0 }));
+    }
+    return this.wilayah.map((w) => ({ ...w, totalPelanggan: countMap.get(w.kode) || 0 }));
   }
 
   public getWilayahByKode(kode: string): WilayahAcuan | undefined {
-    return this.wilayah.find(w => w.kode === kode);
+    return this.wilayah.find((w) => w.kode === kode);
   }
 
   public updateWilayahColor(kode: string, warna: string) {
-    this.wilayah = this.wilayah.map(w => (w.kode === kode ? { ...w, warna } : w));
-    this.saveWilayah();
+    this.wilayah = this.wilayah.map((w) => (w.kode === kode ? { ...w, warna } : w));
+    this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.notify();
   }
 
   public addWilayah(newWilayah: WilayahAcuan) {
-    const existingIndex = this.wilayah.findIndex(w => w.kode === newWilayah.kode);
-    if (existingIndex >= 0) { this.wilayah[existingIndex] = newWilayah; }
-    else { this.wilayah.push(newWilayah); }
-    this.saveWilayah();
+    const existingIndex = this.wilayah.findIndex((w) => w.kode === newWilayah.kode);
+    if (existingIndex >= 0) {
+      this.wilayah = this.wilayah.map((w, i) => (i === existingIndex ? newWilayah : w));
+    } else {
+      this.wilayah = [...this.wilayah, newWilayah].sort((a, b) => a.kode.localeCompare(b.kode));
+    }
+    this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.notify();
   }
 
   public resetWilayahColors() {
-    const defaultColorMap = new Map(DEFAULT_WILAYAH_LIST.map(w => [w.kode, w.warna]));
-    this.wilayah = this.wilayah.map(w => ({ ...w, warna: defaultColorMap.get(w.kode) || w.warna }));
-    this.saveWilayah();
+    const defaultColorMap = new Map(DEFAULT_WILAYAH_LIST.map((w) => [w.kode, w.warna]));
+    this.wilayah = this.wilayah.map((w) => ({ ...w, warna: defaultColorMap.get(w.kode) || w.warna }));
+    this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.notify();
   }
 
   public getKecamatanList(): KecamatanInfo[] {
     return KECAMATAN_LIST;
   }
 
-  public getPelangganList(): Pelanggan[] { return this.pelanggan; }
-
-  public getPelangganByKecamatan(kodeKecamatan: string): Pelanggan[] {
-    if (!kodeKecamatan || kodeKecamatan === 'all') return this.pelanggan;
-    return this.pelanggan.filter(p => p.kode_kecamatan === kodeKecamatan);
-  }
-
-  public getWilayahByKecamatan(kodeKecamatan: string): WilayahAcuan[] {
-    if (!kodeKecamatan || kodeKecamatan === 'all') return this.getWilayahList();
-    return this.getWilayahList().filter(w => w.kodeKecamatan === kodeKecamatan);
+  public getPelangganList(): Pelanggan[] {
+    return this.pelanggan;
   }
 
   public getPelangganById(id: string): Pelanggan | undefined {
-    return this.pelanggan.find(p => p.kode_pelanggan === id || p.id === id);
+    return this.pelanggan.find((p) => p.kode_pelanggan === id || p.id === id);
   }
 
-  public getSnapshots(): UploadSnapshot[] { return this.snapshots; }
+  public getSnapshots(): UploadSnapshot[] {
+    return this.snapshots;
+  }
 
   public getActiveSnapshot(): UploadSnapshot | undefined {
-    return this.snapshots.find(s => s.id === this.activeSnapshotId) || this.snapshots[0];
+    return this.snapshots.find((s) => s.id === this.activeSnapshotId) || this.snapshots[0];
   }
 
-  public restoreSnapshot(snapshotId: string): boolean {
-    const target = this.snapshots.find(s => s.id === snapshotId);
-    if (!target) return false;
-    this.snapshots = this.snapshots.map(s => ({ ...s, is_active: s.id === snapshotId }));
-    this.activeSnapshotId = snapshotId;
-    this.saveSnapshots();
-    return true;
+  /** Previous snapshot (by upload time) relative to the active one, for deltas. */
+  public getPreviousSnapshot(): UploadSnapshot | undefined {
+    const active = this.getActiveSnapshot();
+    if (!active) return undefined;
+    return this.snapshots
+      .filter((s) => s.id !== active.id && s.uploaded_at < active.uploaded_at)
+      .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))[0];
   }
 
-  public applyUploadedData(
-    newRecords: Pelanggan[], mode: 'replace' | 'update',
-    filename: string, uploaderName: string = 'Muh Sofiyan Hawari', notes: string = ''
-  ): UploadSnapshot {
-    if (mode === 'replace') { this.pelanggan = newRecords; }
-    else {
-      const recordMap = new Map(this.pelanggan.map(p => [p.kode_pelanggan, p]));
-      newRecords.forEach(p => { recordMap.set(p.kode_pelanggan, p); });
-      this.pelanggan = Array.from(recordMap.values());
+  public hasArchive(snapshotId: string): boolean {
+    return this.archivedIds.has(snapshotId);
+  }
+
+  public restoreSnapshot(snapshotId: string): RestoreResult {
+    const target = this.snapshots.find((s) => s.id === snapshotId);
+    if (!target) return { ok: false, reason: 'Snapshot tidak ditemukan.' };
+
+    const raw = localStorage.getItem(this.archiveKey(snapshotId));
+    if (!raw) return { ok: false, reason: 'Arsip data untuk snapshot ini sudah tidak tersedia.' };
+
+    let data: Pelanggan[];
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return { ok: false, reason: 'Arsip data rusak dan tidak dapat dipulihkan.' };
     }
-    this.savePelanggan();
 
-    const flaggedCount = newRecords.filter(r => r.is_flagged).length;
-    const now = new Date();
-    const newSnapshotId = `snap-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    try {
+      this.writeWithPruning(STORAGE_KEYS.PELANGGAN, data);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : 'Gagal menyimpan data.' };
+    }
 
-    this.snapshots = this.snapshots.map(s => ({ ...s, is_active: false }));
-
-    const newSnapshot: UploadSnapshot = {
-      id: newSnapshotId, filename, uploaded_at: now.toISOString(),
-      uploader_name: uploaderName, uploader_role: 'Bidang IT',
-      total_rows: newRecords.length, valid_rows: newRecords.length - flaggedCount,
-      flagged_rows: flaggedCount, error_rows: 0, mode, is_active: true,
-      notes: notes || `Upload via Settingan (${mode === 'replace' ? 'Ganti Total' : 'Update ID'}).`,
-    };
-    this.snapshots.unshift(newSnapshot);
-    this.activeSnapshotId = newSnapshotId;
-    this.saveSnapshots();
-    return newSnapshot;
+    this.pelanggan = data;
+    this.snapshots = this.snapshots.map((s) => ({ ...s, is_active: s.id === snapshotId }));
+    this.activeSnapshotId = snapshotId;
+    this.persistSnapshotMeta();
+    this.notify();
+    return { ok: true };
   }
 
-  public generateTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
+  /**
+   * Applies validated records. Throws StorageQuotaError if the dataset cannot
+   * be persisted — in that case the previous active data stays untouched (PRD S-3).
+   */
+  public applyUploadedData(
+    newRecords: Pelanggan[],
+    mode: 'replace' | 'update',
+    filename: string,
+    uploaderName: string,
+    notes = '',
+  ): UploadSnapshot {
+    let next: Pelanggan[];
+    if (mode === 'replace') {
+      next = newRecords;
+    } else {
+      const recordMap = new Map(this.pelanggan.map((p) => [p.kode_pelanggan, p]));
+      newRecords.forEach((p) => recordMap.set(p.kode_pelanggan, p));
+      next = Array.from(recordMap.values());
+    }
+
+    // Persist first; only mutate in-memory state once storage succeeded.
+    this.writeWithPruning(STORAGE_KEYS.PELANGGAN, next);
+
+    const now = new Date();
+    const id = newSnapshotId(now);
+    const flaggedCount = next.filter((r) => r.is_flagged).length;
+
+    const snapshot: UploadSnapshot = {
+      id,
+      filename,
+      uploaded_at: now.toISOString(),
+      uploader_name: uploaderName,
+      uploader_role: 'Admin Data',
+      total_rows: next.length,
+      valid_rows: next.length - flaggedCount,
+      flagged_rows: flaggedCount,
+      error_rows: 0,
+      mode,
+      is_active: true,
+      notes:
+        notes ||
+        (mode === 'replace'
+          ? `Ganti total (${newRecords.length} baris dari file).`
+          : `Perbarui per ID (${newRecords.length} baris dari file).`),
+    };
+
+    this.pelanggan = next;
+    this.snapshots = [snapshot, ...this.snapshots.map((s) => ({ ...s, is_active: false }))];
+    this.activeSnapshotId = id;
+    this.persistSnapshotMeta();
+    this.tryArchive(id, next);
+    this.enforceArchiveLimit();
+    this.notify();
+    return snapshot;
+  }
+
+  public async generateTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
+    const XLSX = await import('xlsx');
     const templateRows = [
       { kode_pelanggan: '070100001', nama_pelanggan: 'Ahmad Zulkifli', alamat: 'Dusun Karang Anyar RT 01 RW 01, Ds. Karang Dalam', golongan: 'R1', status_sambungan: 'Aktif', latitude: -8.789254, longitude: 116.219812 },
       { kode_pelanggan: '070200002', nama_pelanggan: 'Baiq Nurul Aini', alamat: 'Dusun Dasan Baru RT 02 RW 01, Ds. Kateng', golongan: 'R2', status_sambungan: 'Aktif', latitude: -8.825120, longitude: 116.195230 },
       { kode_pelanggan: '070400003', nama_pelanggan: 'Lalu Muhammad Ridwan', alamat: 'Dusun Reak RT 03 RW 02, Ds. Bonder', golongan: 'B1', status_sambungan: 'Nonaktif', latitude: -8.775310, longitude: 116.205140 },
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateRows);
+    // Keep kode_pelanggan as text so leading zeros survive (PRD §1A).
+    templateRows.forEach((_, i) => {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: i + 1, c: 0 })];
+      if (cell) cell.t = 's';
+    });
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template_Pelanggan_PDAM');
-    if (format === 'csv') {
-      const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-      const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a'); link.href = url;
-      link.setAttribute('download', 'Template_Data_Pelanggan_PDAM_Tiara.csv');
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    } else {
-      XLSX.writeFile(workbook, 'Template_Data_Pelanggan_PDAM_Tiara.xlsx');
-    }
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template_Pelanggan');
+    XLSX.writeFile(
+      workbook,
+      format === 'csv' ? 'Template_Data_Pelanggan_PDAM_Tiara.csv' : 'Template_Data_Pelanggan_PDAM_Tiara.xlsx',
+      { bookType: format },
+    );
   }
 
-  public exportPelanggan(data: Pelanggan[], filenamePrefix: string = 'Data_Pelanggan_PDAM_Tiara') {
-    const exportRows = data.map(p => ({
-      'Kode Pelanggan': p.kode_pelanggan, 'Nama Pelanggan': p.nama_pelanggan, 'Alamat': p.alamat,
-      'Kode Kecamatan': p.kode_kecamatan, 'Kode Wilayah': p.kode_wilayah, 'Nama Wilayah': p.nama_wilayah,
-      'Golongan': p.golongan, 'Status Sambungan': p.status_sambungan,
-      'Latitude': p.latitude, 'Longitude': p.longitude,
-      'Kualitas Data': p.is_flagged ? `Bertanda` : 'Valid',
-      'Anomali Spasial': p.spatial_anomaly || '-',
-      'Catatan Flag': p.flag_reasons.join('; ') || '-',
+  public async exportPelanggan(
+    data: Pelanggan[],
+    filenamePrefix = 'Data_Pelanggan_PDAM_Tiara',
+    options: { includePII: boolean } = { includePII: false },
+  ) {
+    const XLSX = await import('xlsx');
+    const s = sanitizeSpreadsheetCell;
+    const exportRows = data.map((p) => ({
+      'Kode Pelanggan': p.kode_pelanggan,
+      ...(options.includePII ? { 'Nama Pelanggan': s(p.nama_pelanggan), Alamat: s(p.alamat) } : {}),
+      'Kode Kecamatan': p.kode_kecamatan,
+      'Kode Wilayah': p.kode_wilayah,
+      'Nama Wilayah': s(p.nama_wilayah),
+      Golongan: p.golongan,
+      'Status Sambungan': p.status_sambungan,
+      ...(options.includePII ? { Latitude: p.latitude, Longitude: p.longitude } : {}),
+      'Kualitas Data': p.is_flagged ? 'Perlu verifikasi' : 'Valid',
+      'Anomali Spasial': s(p.spatial_anomaly || '-'),
+      'Catatan Flag': s(p.flag_reasons.join('; ') || '-'),
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();

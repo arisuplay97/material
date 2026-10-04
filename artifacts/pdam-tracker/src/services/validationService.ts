@@ -1,70 +1,68 @@
 import { Pelanggan, WilayahAcuan, ValidationErrorItem, ValidationSummary, GolonganTarif, StatusSambungan } from '@/types/pdam';
-import * as XLSX from 'xlsx';
-import { checkSpatialAnomaly } from './pdamDataService';
+import { checkSpatialAnomaly, isInBounds, SERVICE_AREA_BOUNDS } from './pdamDataService';
+import { GOLONGAN_LIST, MAX_UPLOAD_BYTES } from '@/lib/constants';
+import type { SpreadsheetWorkerResponse } from './spreadsheet.worker';
 
-// Area Bounding Box Wajar untuk Kecamatan Praya Barat, Lombok Tengah (WGS84)
-const BOUNDS_PRAYA_BARAT = {
-  minLat: -8.9500,
-  maxLat: -8.6500,
-  minLng: 116.1000,
-  maxLng: 116.3500,
-};
-
-const VALID_GOLONGAN: GolonganTarif[] = ['R1', 'R2', 'B1', 'S', 'I'];
-const VALID_STATUS: StatusSambungan[] = ['Aktif', 'Nonaktif', 'Putus'];
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const ALLOWED_EXTENSIONS = /\.(xlsx|xls|csv)$/i;
 
 export interface ValidationOutput {
   summary: ValidationSummary;
   parsedRecords: Pelanggan[];
 }
 
+type RawRow = Record<string, unknown>;
+
+function parseInWorker(buffer: ArrayBuffer): Promise<RawRow[]> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./spreadsheet.worker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<SpreadsheetWorkerResponse>) => {
+      worker.terminate();
+      if (e.data.ok) resolve(e.data.rows);
+      else reject(new Error(e.data.error));
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      reject(new Error('Gagal memproses file.'));
+    };
+    worker.postMessage(buffer, [buffer]);
+  });
+}
+
+async function parseOnMainThread(buffer: ArrayBuffer): Promise<RawRow[]> {
+  const XLSX = await import('xlsx');
+  try {
+    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true, dense: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    return XLSX.utils.sheet_to_json<RawRow>(sheet, { raw: false, defval: '' });
+  } catch {
+    throw new Error('Format file tidak didukung atau file korup. Pastikan file berupa Excel (.xlsx, .xls) atau CSV.');
+  }
+}
+
+function str(v: unknown): string {
+  return v === null || v === undefined ? '' : String(v).trim();
+}
+
 export class ValidationService {
-  public static async parseAndValidateFile(
-    file: File,
-    wilayahAcuanList: WilayahAcuan[]
-  ): Promise<ValidationOutput> {
-    const rawData = await this.readRawDataFromFile(file);
-    return this.validateRawRows(rawData, wilayahAcuanList);
+  public static async parseAndValidateFile(file: File, wilayahAcuanList: WilayahAcuan[]): Promise<ValidationOutput> {
+    if (!ALLOWED_EXTENSIONS.test(file.name)) {
+      throw new Error('Jenis file tidak didukung. Gunakan .xlsx, .xls, atau .csv.');
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`Ukuran file ${(file.size / 1024 / 1024).toFixed(1)} MB melebihi batas 20 MB.`);
+    }
+    const buffer = await file.arrayBuffer();
+    const rows = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
+    return this.validateRawRows(rows, wilayahAcuanList);
   }
 
-  private static readRawDataFromFile(file: File): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true, cellNF: false, cellText: false });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          
-          // Read raw rows with headers
-          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, {
-            raw: false,
-            defval: '',
-          });
-
-          resolve(jsonData);
-        } catch (err) {
-          reject(new Error('Format file tidak didukung atau file korup. Pastikan file berupa Excel (.xlsx, .xls) atau CSV.'));
-        }
-      };
-
-      reader.onerror = () => reject(new Error('Gagal membaca file dari disk.'));
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  public static validateRawRows(
-    rows: any[],
-    wilayahAcuanList: WilayahAcuan[]
-  ): ValidationOutput {
+  public static validateRawRows(rows: RawRow[], wilayahAcuanList: WilayahAcuan[]): ValidationOutput {
     const errors: ValidationErrorItem[] = [];
     const warnings: ValidationErrorItem[] = [];
     const parsedRecords: Pelanggan[] = [];
     const seenIds = new Set<string>();
-
-    const wilayahMap = new Map<string, WilayahAcuan>(wilayahAcuanList.map(w => [w.kode, w]));
+    const wilayahMap = new Map<string, WilayahAcuan>(wilayahAcuanList.map((w) => [w.kode, w]));
 
     if (!rows || rows.length === 0) {
       errors.push({
@@ -74,224 +72,141 @@ export class ValidationService {
         message: 'File tidak memuat data baris pelanggan (kosong).',
         severity: 'error',
       });
-
       return {
-        summary: {
-          totalRows: 0,
-          validCount: 0,
-          flaggedCount: 0,
-          errorCount: 1,
-          canProceed: false,
-          errors,
-          warnings,
-        },
+        summary: { totalRows: 0, validCount: 0, flaggedCount: 0, errorCount: 1, canProceed: false, errors, warnings },
         parsedRecords: [],
       };
     }
 
     rows.forEach((row, index) => {
-      const rowNum = index + 2; // Row number in spreadsheet (accounting for 1-based index & header)
+      const rowNum = index + 2; // header is row 1
       let rowHasFatalError = false;
+      const flagReasons: string[] = [];
+      const warn = (field: string, value: unknown, message: string, flag?: string) => {
+        warnings.push({ rowNumber: rowNum, field, value, message, severity: 'warning' });
+        if (flag) flagReasons.push(flag);
+      };
+      const fail = (field: string, value: unknown, message: string) => {
+        errors.push({ rowNumber: rowNum, field, value, message, severity: 'error' });
+        rowHasFatalError = true;
+      };
 
-      // Normalize object keys: trim, lowercase, replace spaces/hyphens with underscores
-      const normalizedRow: Record<string, any> = {};
-      Object.keys(row).forEach(key => {
-        const cleanKey = key.trim().toLowerCase().replace(/[\s\-\.]+/g, '_');
-        normalizedRow[cleanKey] = typeof row[key] === 'string' ? row[key].trim() : row[key];
-      });
+      // Normalize keys into a prototype-less object (blocks prototype pollution).
+      const r: Record<string, unknown> = Object.create(null);
+      for (const key of Object.keys(row)) {
+        const cleanKey = key.trim().toLowerCase().replace(/[\s\-.]+/g, '_');
+        if (FORBIDDEN_KEYS.has(cleanKey)) continue;
+        const value = row[key];
+        r[cleanKey] = typeof value === 'string' ? value.trim() : value;
+      }
 
-      // ── 1. Kode Pelanggan (Wajib, tepat 9 digit angka KKWWxxxxx) ──
-      const rawKode = normalizedRow['kode_pelanggan'] || normalizedRow['id_pelanggan'] || normalizedRow['kode'] || normalizedRow['no_pelanggan'] || '';
-      const kodePelanggan = String(rawKode).trim();
+      // ── 1. Kode Pelanggan (wajib, 9 digit KKWWxxxxx) ──
+      let kodePelanggan = str(r.kode_pelanggan ?? r.id_pelanggan ?? r.kode ?? r.no_pelanggan).replace(/\s+/g, '');
+      if (/^\d{8}$/.test(kodePelanggan)) {
+        // Excel stripped the leading zero from a numeric cell.
+        kodePelanggan = `0${kodePelanggan}`;
+        warn('kode_pelanggan', kodePelanggan, 'Angka nol di depan hilang (sel Excel bertipe angka), dipulihkan otomatis. Simpan kolom sebagai teks.');
+      }
 
       if (!kodePelanggan) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'kode_pelanggan',
-          value: rawKode,
-          message: 'Kode pelanggan wajib diisi dan tidak boleh kosong.',
-          severity: 'error',
-        });
-        rowHasFatalError = true;
+        fail('kode_pelanggan', kodePelanggan, 'Kode pelanggan wajib diisi.');
       } else if (!/^\d{9}$/.test(kodePelanggan)) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'kode_pelanggan',
-          value: kodePelanggan,
-          message: `Kode pelanggan harus tepat 9 digit angka (format KKWWxxxxx). Ditemukan "${kodePelanggan}" (${kodePelanggan.length} karakter).`,
-          severity: 'error',
-        });
-        rowHasFatalError = true;
+        fail('kode_pelanggan', kodePelanggan, `Kode pelanggan harus 9 digit angka (KKWWxxxxx). Ditemukan "${kodePelanggan}" (${kodePelanggan.length} karakter).`);
       } else if (seenIds.has(kodePelanggan)) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'kode_pelanggan',
-          value: kodePelanggan,
-          message: `Duplikasi kode pelanggan "${kodePelanggan}". Setiap ID pelanggan harus unik.`,
-          severity: 'error',
-        });
-        rowHasFatalError = true;
+        fail('kode_pelanggan', kodePelanggan, `Kode pelanggan "${kodePelanggan}" duplikat.`);
       } else {
         seenIds.add(kodePelanggan);
       }
 
-      // ── 2. Wilayah Acuan (4 digit pertama KKWW) ──
-      const kodeKecamatan = kodePelanggan ? kodePelanggan.slice(0, 2) : '07';
-      const kodeWilayah = kodePelanggan ? kodePelanggan.slice(0, 4) : '';
+      // ── 2. Wilayah acuan (4 digit KKWW) ──
+      const isValidKode = /^\d{9}$/.test(kodePelanggan);
+      const kodeKecamatan = isValidKode ? kodePelanggan.slice(0, 2) : '';
+      const kodeWilayah = isValidKode ? kodePelanggan.slice(0, 4) : '';
       const wilayahMatch = wilayahMap.get(kodeWilayah);
-
-      if (kodePelanggan && /^\d{9}$/.test(kodePelanggan) && !wilayahMatch) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'kode_wilayah',
-          value: kodeWilayah,
-          message: `Kode wilayah "${kodeWilayah}" (4 digit awalan kode) tidak terdaftar pada tabel acuan wilayah Kecamatan ${kodeKecamatan}.`,
-          severity: 'error',
-        });
-        rowHasFatalError = true;
+      if (isValidKode && !wilayahMatch) {
+        fail('kode_wilayah', kodeWilayah, `Kode wilayah "${kodeWilayah}" belum terdaftar di tabel acuan wilayah.`);
       }
 
-      // ── 3. Nama Pelanggan (Wajib) ──
-      const namaPelanggan = String(normalizedRow['nama_pelanggan'] || normalizedRow['nama'] || normalizedRow['customer_name'] || '').trim();
-      if (!namaPelanggan) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'nama_pelanggan',
-          value: namaPelanggan,
-          message: 'Nama pelanggan tidak boleh kosong.',
-          severity: 'error',
-        });
-        rowHasFatalError = true;
+      // Optional explicit wilayah column must match the code prefix (PRD §8 rule 5).
+      const explicitWilayah = str(r.kode_wilayah);
+      if (explicitWilayah && kodeWilayah && explicitWilayah !== kodeWilayah) {
+        warn('kode_wilayah', explicitWilayah, `Kolom kode_wilayah "${explicitWilayah}" tidak sama dengan awalan kode pelanggan "${kodeWilayah}".`, 'Wilayah tidak cocok');
       }
 
-      // ── 4. Alamat (Opsional, fallback to Wilayah) ──
-      const alamat = String(normalizedRow['alamat'] || normalizedRow['address'] || `Ds. ${wilayahMatch?.nama || 'Praya Barat'}`).trim();
+      // ── 3. Nama (wajib) ──
+      const namaPelanggan = str(r.nama_pelanggan ?? r.nama ?? r.customer_name).slice(0, 200);
+      if (!namaPelanggan) fail('nama_pelanggan', namaPelanggan, 'Nama pelanggan wajib diisi.');
 
-      // ── 5. Koordinat Latitude & Longitude (Wajib, Desimal WGS84) ──
-      const rawLat = normalizedRow['latitude'] || normalizedRow['lat'] || normalizedRow['y'];
-      const rawLng = normalizedRow['longitude'] || normalizedRow['lng'] || normalizedRow['long'] || normalizedRow['x'];
+      // ── 4. Alamat (opsional) ──
+      const alamat = (str(r.alamat ?? r.address) || `Ds. ${wilayahMatch?.nama || '-'}`).slice(0, 300);
 
-      let lat = parseFloat(String(rawLat).replace(',', '.'));
-      let lng = parseFloat(String(rawLng).replace(',', '.'));
+      // ── 5. Koordinat (wajib, desimal WGS84) ──
+      const rawLat = r.latitude ?? r.lat ?? r.y;
+      const rawLng = r.longitude ?? r.lng ?? r.long ?? r.x;
+      let lat = parseFloat(str(rawLat).replace(',', '.'));
+      let lng = parseFloat(str(rawLng).replace(',', '.'));
 
-      const flagReasons: string[] = [];
-      let isFlagged = false;
-
-      // Check inverted lat/lng if user accidentally inverted coordinates
       if (lat > 100 && lng < 0) {
-        const temp = lat;
-        lat = lng;
-        lng = temp;
-        warnings.push({
-          rowNumber: rowNum,
-          field: 'koordinat',
-          value: `${rawLat}, ${rawLng}`,
-          message: 'Koordinat Latitude dan Longitude terbalik, sistem otomatis membalik posisi.',
-          severity: 'warning',
-        });
-        isFlagged = true;
-        flagReasons.push('Koordinat sempat terbalik (diperbaiki otomatis)');
+        [lat, lng] = [lng, lat];
+        warn('koordinat', `${rawLat}, ${rawLng}`, 'Latitude dan longitude tertukar, dibalik otomatis.', 'Koordinat sempat tertukar (diperbaiki otomatis)');
       }
 
-      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
-        errors.push({
-          rowNumber: rowNum,
-          field: 'koordinat',
-          value: `${rawLat}, ${rawLng}`,
-          message: 'Koordinat Latitude atau Longitude tidak valid (wajib berupa angka desimal WGS84).',
-          severity: 'error',
-        });
-        rowHasFatalError = true;
-      } else {
-        // Spatial bounds check for Praya Barat
-        if (
-          lat < BOUNDS_PRAYA_BARAT.minLat ||
-          lat > BOUNDS_PRAYA_BARAT.maxLat ||
-          lng < BOUNDS_PRAYA_BARAT.minLng ||
-          lng > BOUNDS_PRAYA_BARAT.maxLng
-        ) {
-          warnings.push({
-            rowNumber: rowNum,
-            field: 'koordinat_spasial',
-            value: `${lat}, ${lng}`,
-            message: `Titik koordinat (${lat.toFixed(5)}, ${lng.toFixed(5)}) berada di luar batas layanan wajar Kecamatan Praya Barat.`,
-            severity: 'warning',
-          });
-          isFlagged = true;
-          flagReasons.push('Koordinat di luar rentang batas wajar Praya Barat');
-        }
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        fail('koordinat', `${rawLat}, ${rawLng}`, 'Latitude/longitude tidak valid (wajib angka desimal WGS84, bukan 0).');
+      } else if (!isInBounds(lat, lng, SERVICE_AREA_BOUNDS)) {
+        warn('koordinat', `${lat}, ${lng}`, `Titik (${lat.toFixed(5)}, ${lng.toFixed(5)}) di luar area layanan Pulau Lombok.`, 'Koordinat di luar area layanan');
       }
 
-      // ── 6. Golongan Tarif ──
-      const rawGolongan = String(normalizedRow['golongan'] || normalizedRow['gol'] || normalizedRow['tarif'] || 'R1').toUpperCase().trim();
-      const golongan: GolonganTarif = VALID_GOLONGAN.includes(rawGolongan as any) ? (rawGolongan as GolonganTarif) : 'R1';
-      if (!VALID_GOLONGAN.includes(rawGolongan as any) && rawGolongan) {
-        warnings.push({
-          rowNumber: rowNum,
-          field: 'golongan',
-          value: rawGolongan,
-          message: `Golongan "${rawGolongan}" tidak baku. Disesuaikan otomatis ke R1.`,
-          severity: 'warning',
-        });
-        isFlagged = true;
-        flagReasons.push(`Golongan '${rawGolongan}' tidak baku`);
+      // ── 6. Golongan ──
+      const rawGolongan = str(r.golongan ?? r.gol ?? r.tarif).toUpperCase();
+      const golongan: GolonganTarif = (GOLONGAN_LIST as string[]).includes(rawGolongan) ? (rawGolongan as GolonganTarif) : 'R1';
+      if (rawGolongan && golongan !== rawGolongan) {
+        warn('golongan', rawGolongan, `Golongan "${rawGolongan}" tidak baku, disesuaikan ke R1.`, `Golongan '${rawGolongan}' tidak baku`);
       }
 
-      // ── 7. Status Sambungan ──
-      const rawStatus = String(normalizedRow['status_sambungan'] || normalizedRow['status'] || 'Aktif').trim();
+      // ── 7. Status sambungan ──
+      const rawStatus = str(r.status_sambungan ?? r.status);
       let status: StatusSambungan = 'Aktif';
-      if (/non/i.test(rawStatus) || /tutup/i.test(rawStatus) || /segel/i.test(rawStatus)) {
-        status = 'Nonaktif';
-      } else if (/putus/i.test(rawStatus) || /bongkar/i.test(rawStatus)) {
-        status = 'Putus';
-      } else {
-        status = 'Aktif';
+      if (/non|tutup|segel/i.test(rawStatus)) status = 'Nonaktif';
+      else if (/putus|bongkar/i.test(rawStatus)) status = 'Putus';
+
+      if (rowHasFatalError) return;
+
+      const record: Pelanggan = {
+        id: kodePelanggan,
+        kode_pelanggan: kodePelanggan,
+        nama_pelanggan: namaPelanggan,
+        alamat,
+        kode_kecamatan: kodeKecamatan,
+        kode_wilayah: kodeWilayah,
+        nama_wilayah: wilayahMatch?.nama || `Wilayah ${kodeWilayah}`,
+        golongan,
+        status_sambungan: status,
+        latitude: lat,
+        longitude: lng,
+        is_flagged: false,
+        flag_reasons: flagReasons,
+        spatial_anomaly: null,
+        nomor_meter: str(r.nomor_meter) || `WM-${kodeWilayah}-${kodePelanggan.slice(4)}`,
+        tanggal_pasang: str(r.tanggal_pasang) || undefined,
+      };
+
+      const anomaly = checkSpatialAnomaly(record);
+      if (anomaly) {
+        record.spatial_anomaly = anomaly;
+        warn('koordinat', `${lat}, ${lng}`, anomaly, anomaly);
       }
-
-      // ── Push record if no fatal error ──
-      if (!rowHasFatalError) {
-        const record: Pelanggan = {
-          id: kodePelanggan,
-          kode_pelanggan: kodePelanggan,
-          nama_pelanggan: namaPelanggan,
-          alamat,
-          kode_kecamatan: kodeKecamatan,
-          kode_wilayah: kodeWilayah,
-          nama_wilayah: wilayahMatch?.nama || 'Wilayah ' + kodeWilayah,
-          golongan,
-          status_sambungan: status,
-          latitude: lat,
-          longitude: lng,
-          is_flagged: isFlagged,
-          flag_reasons: flagReasons,
-          spatial_anomaly: null,
-          nomor_meter: normalizedRow['nomor_meter'] || `WM-${kodeWilayah}-${kodePelanggan.slice(4)}`,
-          tanggal_pasang: normalizedRow['tanggal_pasang'] || new Date().toISOString().slice(0, 10),
-        };
-
-        const anomaly = checkSpatialAnomaly(record);
-        if (anomaly) {
-          record.spatial_anomaly = anomaly;
-          record.is_flagged = true;
-          if (!record.flag_reasons.includes(anomaly)) {
-            record.flag_reasons.push(anomaly);
-          }
-        }
-
-        parsedRecords.push(record);
-      }
+      record.is_flagged = record.flag_reasons.length > 0;
+      parsedRecords.push(record);
     });
-
-    const fatalErrorCount = errors.length;
-    const canProceed = fatalErrorCount === 0;
 
     return {
       summary: {
         totalRows: rows.length,
         validCount: parsedRecords.length,
-        flaggedCount: parsedRecords.filter(p => p.is_flagged).length,
-        errorCount: fatalErrorCount,
-        canProceed,
+        flaggedCount: parsedRecords.filter((p) => p.is_flagged).length,
+        errorCount: errors.length,
+        canProceed: errors.length === 0,
         errors,
         warnings,
       },

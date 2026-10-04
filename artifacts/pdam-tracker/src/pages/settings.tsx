@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { pdamService, DEFAULT_WILAYAH_LIST } from '@/services/pdamDataService';
+import React, { useState, useRef, useCallback } from 'react';
+import { pdamService } from '@/services/pdamDataService';
 import { ValidationService, ValidationOutput } from '@/services/validationService';
-import { Pelanggan, WilayahAcuan, UploadSnapshot, ValidationErrorItem } from '@/types/pdam';
+import { WilayahAcuan, UploadSnapshot } from '@/types/pdam';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePdamData } from '@/hooks/usePdamData';
+import { safeColor } from '@/lib/escape';
+import { MAX_UPLOAD_BYTES, formatNumber } from '@/lib/constants';
+import { toast } from 'sonner';
+import { Link } from 'wouter';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -14,14 +19,18 @@ import {
   Palette,
   Shield,
   RotateCcw,
-  Sliders,
   History,
-  Layers,
   ArrowRight,
   RefreshCw,
   Plus,
-  Trash2,
   Lock,
+  ArrowLeft,
+  FileText,
+  Check,
+  Building2,
+  Database,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,136 +41,179 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 export default function Settings() {
-  const { user, switchRole } = useAuth();
+  const { user, logout } = useAuth();
+  const { wilayah: wilayahList, snapshots, activeSnapshot } = usePdamData();
 
-  const [wilayahList, setWilayahList] = useState<WilayahAcuan[]>([]);
-  const [snapshots, setSnapshots] = useState<UploadSnapshot[]>([]);
-  const [activeSnapshot, setActiveSnapshot] = useState<UploadSnapshot | undefined>();
-
-  // Upload States (S-1, S-2, S-3, S-4)
+  // Upload States
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [validationResult, setValidationResult] = useState<ValidationOutput | null>(null);
   const [uploadMode, setUploadMode] = useState<'replace' | 'update'>('replace');
-  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string>('');
 
-  // Wilayah editing state (S-6)
+  // Wilayah editing state
   const [newWilayahKode, setNewWilayahKode] = useState<string>('');
   const [newWilayahNama, setNewWilayahNama] = useState<string>('');
-  const [newWilayahWarna, setNewWilayahWarna] = useState<string>('#3B82F6');
+  const [newWilayahWarna, setNewWilayahWarna] = useState<string>('#3B6EA8');
   const [showAddWilayahModal, setShowAddWilayahModal] = useState<boolean>(false);
 
-  // Sync with service data
-  useEffect(() => {
-    const load = () => {
-      setWilayahList(pdamService.getWilayahList());
-      setSnapshots(pdamService.getSnapshots());
-      setActiveSnapshot(pdamService.getActiveSnapshot());
-    };
-    load();
-    const unsub = pdamService.subscribe(load);
-    return unsub;
-  }, []);
+  // Rollback confirmation modal
+  const [confirmRollbackId, setConfirmRollbackId] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
-  // Access guard for non-admin (PRD S-7)
+  // Access guard for non-admin (Removed backdoor S1)
   if (!isAdmin) {
     return (
-      <div className="p-8 max-w-2xl mx-auto mt-12 text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto">
+      <div className="p-6 md:p-12 max-w-2xl mx-auto mt-12 text-center space-y-5 animate-in fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto shadow-sm">
           <Lock className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-heading font-bold text-foreground">
-          Akses Khusus Admin Data (IT)
-        </h2>
-        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-          Menu <strong>Settingan & Upload</strong> hanya dapat diakses oleh peran <strong>Admin Data (IT)</strong> untuk menjamin keamanan dan integritas master data pelanggan (PRD ID: S-7).
-        </p>
-        <div className="pt-4">
+        <div className="space-y-2">
+          <h2 className="text-xl md:text-2xl font-heading font-bold text-foreground">
+            Akses Terbatas — Khusus Admin Data (IT)
+          </h2>
+          <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+            Menu <strong>Pengaturan & Upload Data</strong> hanya dapat diakses oleh akun dengan peran <strong>Admin Data (IT)</strong> untuk menjamin keamanan serta integritas master data pelanggan PDAM.
+          </p>
+        </div>
+        <div className="pt-2 flex items-center justify-center gap-3">
+          <Button asChild variant="outline" className="rounded-xl text-xs font-semibold gap-2">
+            <Link href="/dashboard">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Kembali ke Dashboard</span>
+            </Link>
+          </Button>
           <Button
-            onClick={() => switchRole('admin')}
-            className="rounded-xl px-5 text-xs font-semibold gap-2"
+            variant="destructive"
+            onClick={logout}
+            className="rounded-xl text-xs font-semibold gap-2"
           >
-            <Shield className="w-4 h-4" />
-            <span>Alihkan ke Peran Admin Data</span>
+            <span>Keluar Akun</span>
           </Button>
         </div>
       </div>
     );
   }
 
-  // Handle File Selection
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Handle File Selection with 20MB limit validation
+  const processFile = async (file: File) => {
     if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error('Ukuran file melebihi batas maksimal 20 MB.');
+      return;
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
+      toast.error('Format file tidak didukung. Harap gunakan file Excel (.xlsx, .xls) atau CSV.');
+      return;
+    }
 
     setSelectedFile(file);
     setIsParsing(true);
-    setUploadSuccessMessage('');
     setValidationResult(null);
 
     try {
       const result = await ValidationService.parseAndValidateFile(file, wilayahList);
       setValidationResult(result);
+      if (result.summary.canProceed) {
+        toast.success(`Validasi selesai: ${result.summary.validCount} data lolos bersih.`);
+      } else {
+        toast.error(`Validasi gagal: Ditemukan ${result.summary.errorCount} kesalahan fatal.`);
+      }
     } catch (err: any) {
-      alert(err.message || 'Gagal memproses file upload.');
+      toast.error(err.message || 'Gagal memproses file upload.');
+      setSelectedFile(null);
     } finally {
       setIsParsing(false);
     }
   };
 
-  // Handle Applying Validated Data (S-3, S-4)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+
+  // Apply Validated Data
   const handleApplyUpload = () => {
     if (!validationResult || !validationResult.summary.canProceed || !selectedFile) {
+      toast.error('Data belum siap untuk diterapkan.');
       return;
     }
 
-    const newSnapshot = pdamService.applyUploadedData(
-      validationResult.parsedRecords,
-      uploadMode,
-      selectedFile.name,
-      user?.name || 'Muh Sofiyan Hawari',
-      `Upload file ${selectedFile.name} (${uploadMode === 'replace' ? 'Ganti Total' : 'Perbarui per ID'}).`
-    );
+    try {
+      const newSnapshot = pdamService.applyUploadedData(
+        validationResult.parsedRecords,
+        uploadMode,
+        selectedFile.name,
+        user?.name || 'Administrator IT',
+        `Upload file ${selectedFile.name} (${uploadMode === 'replace' ? 'Ganti Total' : 'Perbarui per ID'}).`
+      );
 
-    setUploadSuccessMessage(
-      `Berhasil menerapkan ${validationResult.parsedRecords.length} data pelanggan ke sistem snapshot (${newSnapshot.id}).`
-    );
-    setSelectedFile(null);
-    setValidationResult(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      toast.success(
+        `Berhasil menerapkan ${validationResult.parsedRecords.length} data pelanggan ke snapshot baru!`
+      );
+      setSelectedFile(null);
+      setValidationResult(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menerapkan data.');
+    }
   };
 
-  // Handle Rollback snapshot (S-5)
+  // Execute Rollback snapshot
   const handleRollback = (snapshotId: string) => {
     const success = pdamService.restoreSnapshot(snapshotId);
     if (success) {
-      alert('Snapshot berhasil dipulihkan ke versi tanggal terpilih!');
+      toast.success('Snapshot berhasil dipulihkan ke versi tanggal terpilih!');
+      setConfirmRollbackId(null);
+    } else {
+      toast.error('Gagal memulihkan snapshot.');
     }
   };
 
-  // Handle Wilayah Color Change (S-6)
+  // Handle Wilayah Color Change
   const handleColorChange = (kode: string, warna: string) => {
-    pdamService.updateWilayahColor(kode, warna);
+    const cleaned = safeColor(warna, '#3B6EA8');
+    pdamService.updateWilayahColor(kode, cleaned);
+    toast.success(`Warna wilayah ${kode} diperbarui.`);
   };
 
-  // Handle Reset Wilayah Colors
+  // Reset Wilayah Colors
   const handleResetColors = () => {
-    if (confirm('Kembalikan semua warna wilayah ke konfigurasi awal PRD?')) {
-      pdamService.resetWilayahColors();
-    }
+    pdamService.resetWilayahColors();
+    toast.success('Palet warna wilayah telah dikembalikan ke standar.');
   };
 
-  // Handle Add New Wilayah
+  // Add New Wilayah
   const handleAddNewWilayah = () => {
     if (!newWilayahKode || !newWilayahNama) {
-      alert('Kode dan nama wilayah wajib diisi.');
+      toast.error('Kode dan nama wilayah wajib diisi.');
       return;
     }
     if (!/^\d{4}$/.test(newWilayahKode)) {
-      alert('Kode wilayah harus 4 digit angka (format KKWW, contoh: 0733).');
+      toast.error('Kode wilayah harus 4 digit angka (format KKWW, contoh: 0733).');
       return;
     }
 
@@ -170,11 +222,12 @@ export default function Settings() {
       nama: newWilayahNama,
       kodeKecamatan: newWilayahKode.slice(0, 2),
       namaKecamatan: 'Praya Barat',
-      warna: newWilayahWarna,
+      warna: safeColor(newWilayahWarna, '#3B6EA8'),
       centerLat: -8.7892,
       centerLng: 116.2051,
     });
 
+    toast.success(`Wilayah ${newWilayahKode} - ${newWilayahNama} berhasil ditambahkan.`);
     setNewWilayahKode('');
     setNewWilayahNama('');
     setShowAddWilayahModal(false);
@@ -185,20 +238,20 @@ export default function Settings() {
       {/* ── Top Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">
-              Settingan & Upload Data
+              Pengaturan & Master Data
             </h1>
             <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30 bg-primary/5">
-              Khusus Admin (IT)
+              Admin Data (IT)
             </Badge>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Unggah file pelanggan, validasi data, pengaturan tabel acuan wilayah dan palet warna titik GIS.
+            Unggah dataset pelanggan, validasi integritas format, konfigurasi kode acuan wilayah dan riwayat snapshot.
           </p>
         </div>
 
-        {/* Template Downloads (S-1) */}
+        {/* Template Downloads */}
         <div className="flex items-center gap-2 self-start md:self-auto">
           <Button
             variant="outline"
@@ -221,60 +274,49 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ── Success Alert Message ── */}
-      {uploadSuccessMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 flex items-center justify-between text-xs animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span className="font-medium">{uploadSuccessMessage}</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setUploadSuccessMessage('')}
-            className="h-6 px-2 text-xs hover:bg-emerald-500/20"
-          >
-            Tutup
-          </Button>
-        </div>
-      )}
-
       {/* ── Main Tabbed Content ── */}
       <Tabs defaultValue="upload" className="space-y-6">
         <TabsList className="h-10 bg-muted/50 p-1 border border-border rounded-xl">
           <TabsTrigger value="upload" className="rounded-lg text-xs font-medium gap-2">
             <UploadCloud className="w-3.5 h-3.5" />
-            <span>Upload File & Validasi</span>
+            <span>Upload & Validasi Data</span>
           </TabsTrigger>
           <TabsTrigger value="wilayah" className="rounded-lg text-xs font-medium gap-2">
             <Palette className="w-3.5 h-3.5" />
-            <span>Acuan Wilayah & Warna</span>
+            <span>Acuan Wilayah & Palet Warna</span>
           </TabsTrigger>
           <TabsTrigger value="history" className="rounded-lg text-xs font-medium gap-2">
             <History className="w-3.5 h-3.5" />
-            <span>Riwayat Upload & Rollback</span>
+            <span>Riwayat Snapshot & Rollback</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* ════ TAB 1: UPLOAD DATA & VALIDATION ENGINE (S-1, S-2, S-3, S-4) ════ */}
+        {/* ════ TAB 1: UPLOAD & VALIDASI ════ */}
         <TabsContent value="upload" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Upload Zone & Mode Settings (1/3 width) */}
-            <Card className="rounded-xl border border-border bg-card shadow-sm space-y-4">
+            {/* Upload Zone & Mode Settings */}
+            <Card className="rounded-2xl border border-border bg-card shadow-sm space-y-4">
               <CardHeader className="pb-3 border-b border-border/50">
                 <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
                   <UploadCloud className="w-4 h-4 text-primary" />
-                  Unggah File Pelanggan (S-1)
+                  Unggah File Pelanggan
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                  Format file didukung: Excel (.xlsx, .xls) dan CSV.
+                  Mendukung file Excel (.xlsx, .xls) dan CSV hingga 20 MB.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
-                {/* Drag and drop box */}
+                {/* Drag & drop box */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-6 text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                    isDragging
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40'
+                  }`}
                 >
                   <input
                     ref={fileInputRef}
@@ -296,36 +338,36 @@ export default function Settings() {
                   </span>
                 </div>
 
-                {/* Upload Mode Selector (S-4) */}
+                {/* Upload Mode Selector */}
                 <div className="space-y-2 pt-2 border-t border-border">
                   <label className="text-xs font-heading font-semibold text-foreground">
-                    Mode Penerapan Data (S-4)
+                    Mode Penerapan Data
                   </label>
                   <RadioGroup
                     value={uploadMode}
                     onValueChange={(val: any) => setUploadMode(val)}
                     className="space-y-2 text-xs"
                   >
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border bg-muted/20">
+                    <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-muted/20">
                       <RadioGroupItem value="replace" id="mode-replace" className="mt-0.5" />
                       <div className="flex flex-col">
                         <Label htmlFor="mode-replace" className="font-semibold text-xs cursor-pointer">
-                          Ganti Seluruh Data (Snapshot Baru)
+                          Ganti Total (Snapshot Baru)
                         </Label>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">
-                          Seluruh data aktif digantikan dengan data baru di file. Data lama diarsipkan di riwayat.
+                        <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                          Seluruh data aktif digantikan dengan data baru. Snapshot lama diarsipkan secara aman di riwayat.
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border bg-muted/20">
+                    <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-muted/20">
                       <RadioGroupItem value="update" id="mode-update" className="mt-0.5" />
                       <div className="flex flex-col">
                         <Label htmlFor="mode-update" className="font-semibold text-xs cursor-pointer">
-                          Perbarui Berdasarkan ID Pelanggan (Upsert)
+                          Perbarui / Upsert per ID Pelanggan
                         </Label>
-                        <span className="text-[11px] text-muted-foreground mt-0.5">
-                          ID yang cocok diperbarui datanya; ID baru otomatis ditambahkan ke daftar pelanggan.
+                        <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                          Data dengan ID yang cocok diperbarui nilainya; ID baru otomatis ditambahkan ke daftar.
                         </span>
                       </div>
                     </div>
@@ -334,16 +376,16 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Validation Report & Preview (2/3 width) (S-2, S-3) */}
-            <Card className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm flex flex-col">
+            {/* Validation Report & Preview */}
+            <Card className="lg:col-span-2 rounded-2xl border border-border bg-card shadow-sm flex flex-col">
               <CardHeader className="pb-3 border-b border-border/50 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Laporan Hasil Validasi (S-2)
+                    Laporan Hasil Validasi Data
                   </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                    Pemeriksaan format 9 digit KKWWxxxxx, kode wilayah acuan, dan rentang koordinat WGS84.
+                    Pemeriksaan format 9 digit KKWWxxxxx, kesesuaian kode wilayah acuan, dan rentang koordinat Pulau Lombok.
                   </CardDescription>
                 </div>
 
@@ -363,70 +405,70 @@ export default function Settings() {
                 {isParsing ? (
                   <div className="py-16 text-center space-y-3 font-mono text-xs text-primary animate-pulse">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
-                    <span>Sedang memvalidasi aturan data PRD...</span>
+                    <span>Sedang memvalidasi integritas data di Web Worker...</span>
                   </div>
                 ) : !validationResult ? (
                   <div className="py-16 text-center space-y-2 text-muted-foreground text-xs">
-                    <Shield className="w-8 h-8 mx-auto opacity-30 text-primary" />
-                    <span>Pilih file di panel sebelah kiri untuk memulai proses validasi data.</span>
+                    <Database className="w-8 h-8 mx-auto opacity-30 text-primary" />
+                    <span>Pilih file di panel sebelah kiri untuk memulai pemeriksaan validasi data.</span>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {/* Summary Counters */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      <div className="p-3 rounded-lg bg-muted/40 border border-border text-center">
+                      <div className="p-3 rounded-xl bg-muted/40 border border-border text-center">
                         <span className="text-[10px] font-mono uppercase text-muted-foreground block">Total Baris</span>
                         <span className="text-xl font-mono font-bold text-foreground">
-                          {validationResult.summary.totalRows}
+                          {formatNumber(validationResult.summary.totalRows)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-emerald-500 block">Lolos Bersih</span>
-                        <span className="text-xl font-mono font-bold text-emerald-500">
-                          {validationResult.summary.validCount}
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                        <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 block">Lolos Bersih</span>
+                        <span className="text-xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatNumber(validationResult.summary.validCount)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-amber-500 block">Peringatan (Flag)</span>
-                        <span className="text-xl font-mono font-bold text-amber-500">
-                          {validationResult.summary.flaggedCount}
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                        <span className="text-[10px] font-mono uppercase text-amber-600 dark:text-amber-400 block">Peringatan (Flag)</span>
+                        <span className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {formatNumber(validationResult.summary.flaggedCount)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-red-500 block">Error Blokir</span>
-                        <span className="text-xl font-mono font-bold text-red-500">
-                          {validationResult.summary.errorCount}
+                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-center">
+                        <span className="text-[10px] font-mono uppercase text-rose-600 dark:text-rose-400 block">Error Fatal</span>
+                        <span className="text-xl font-mono font-bold text-rose-600 dark:text-rose-400">
+                          {formatNumber(validationResult.summary.errorCount)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Fatal Error Status Notice (S-3) */}
+                    {/* Status Notice */}
                     {!validationResult.summary.canProceed ? (
-                      <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs space-y-1">
+                      <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs space-y-1">
                         <div className="flex items-center gap-2 font-bold">
-                          <XCircle className="w-4 h-4 shrink-0" />
-                          <span>Upload Ditolak — Terdapat Error Format Fatal (S-3)</span>
+                          <XCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                          <span>Penerapan Ditolak — Ditemukan Format Kolom / Kode Fatal</span>
                         </div>
-                        <p className="text-[11px] text-destructive/90 leading-relaxed pl-6">
-                          Sesuai aturan PRD ID S-3, data lama <strong>TIDAK AKAN TERTIMPA</strong> jika validasi gagal. Perbaiki baris di bawah pada file master Excel Anda lalu upload ulang.
+                        <p className="text-[11px] leading-relaxed pl-6 text-rose-800 dark:text-rose-200">
+                          Data master aktif yang sedang berjalan di PDAM <strong>TIDAK AKAN DIUBAH</strong>. Harap perbaiki baris data yang bermasalah pada tabel di bawah lalu unggah kembali file Anda.
                         </p>
                       </div>
                     ) : (
-                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span>Validasi lolos. File siap diterapkan ke sistem aktif PDAM Tiara.</span>
+                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                        <span>Validasi berhasil. File siap diterapkan ke sistem aktif PDAM Tirta Ardhia Rinjani.</span>
                       </div>
                     )}
 
-                    {/* Detailed Errors / Warnings Table */}
-                    <div className="border border-border rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                    {/* Detailed Errors Table */}
+                    <div className="border border-border rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                       <table className="w-full text-left text-xs border-collapse font-sans">
                         <thead>
                           <tr className="bg-muted/50 border-b border-border text-[10px] font-mono text-muted-foreground uppercase">
-                            <th className="py-2 px-3">Baris</th>
-                            <th className="py-2 px-3">Kolom</th>
-                            <th className="py-2 px-3">Pesan Validasi</th>
-                            <th className="py-2 px-3">Tingkat</th>
+                            <th className="py-2.5 px-3">Baris</th>
+                            <th className="py-2.5 px-3">Kolom</th>
+                            <th className="py-2.5 px-3">Keterangan Validasi</th>
+                            <th className="py-2.5 px-3">Tingkat</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/60">
@@ -434,7 +476,7 @@ export default function Settings() {
                           validationResult.summary.warnings.length === 0 ? (
                             <tr>
                               <td colSpan={4} className="py-6 text-center text-muted-foreground text-xs font-mono">
-                                Tidak ada error atau catatan peringatan ditemukan pada file ini.
+                                Tidak ada error atau catatan anomali pada file ini.
                               </td>
                             </tr>
                           ) : (
@@ -456,7 +498,7 @@ export default function Settings() {
                                         Error
                                       </Badge>
                                     ) : (
-                                      <Badge variant="outline" className="font-mono text-[9px] py-0 px-1.5 bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                      <Badge variant="outline" className="font-mono text-[9px] py-0 px-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
                                         Warning
                                       </Badge>
                                     )}
@@ -475,17 +517,17 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        {/* ════ TAB 2: ACUAN WILAYAH & WARNA PER KODE (S-6, D-8, G-1) ════ */}
+        {/* ════ TAB 2: ACUAN WILAYAH & WARNA ════ */}
         <TabsContent value="wilayah" className="space-y-6">
-          <Card className="rounded-xl border border-border bg-card shadow-sm">
+          <Card className="rounded-2xl border border-border bg-card shadow-sm">
             <CardHeader className="pb-3 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
                   <Palette className="w-4 h-4 text-primary" />
-                  Tabel Acuan Wilayah & Pengaturan Warna (S-6)
+                  Tabel Acuan Wilayah & Palet Warna Titik Spasial
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                  Warna tiap kode wilayah (0701-0732) langsung tercermin di Bar Chart Dashboard dan titik sebaran GIS.
+                  Kode wilayah (4 digit KKWW) digunakan sebagai acuan validasi ID pelanggan dan penentuan warna marker pada peta GIS.
                 </CardDescription>
               </div>
 
@@ -494,15 +536,15 @@ export default function Settings() {
                   variant="outline"
                   size="sm"
                   onClick={handleResetColors}
-                  className="h-8 px-3 rounded-lg border-border text-xs gap-1.5 hover:bg-muted"
+                  className="h-8 px-3 rounded-xl border-border text-xs gap-1.5 hover:bg-muted"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset Warna Default</span>
+                  <span>Reset Default</span>
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => setShowAddWilayahModal(true)}
-                  className="h-8 px-3 rounded-lg text-xs gap-1.5"
+                  className="h-8 px-3 rounded-xl text-xs gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Tambah Wilayah</span>
@@ -515,16 +557,16 @@ export default function Settings() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-muted-foreground font-mono text-[11px] uppercase tracking-wider">
-                      <th className="py-3 px-4 font-semibold">Kode (4 Digit)</th>
+                      <th className="py-3 px-4 font-semibold">Kode Acuan</th>
                       <th className="py-3 px-4 font-semibold">Nama Wilayah</th>
                       <th className="py-3 px-4 font-semibold">Kecamatan</th>
                       <th className="py-3 px-4 font-semibold">Jumlah Pelanggan</th>
-                      <th className="py-3 px-4 font-semibold">Warna Titik GIS</th>
-                      <th className="py-3 px-4 font-semibold">HEX Code</th>
+                      <th className="py-3 px-4 font-semibold">Warna Marker</th>
+                      <th className="py-3 px-4 font-semibold">Kode HEX</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-sans">
-                    {wilayahList.map((w) => (
+                    {wilayahList.map((w: WilayahAcuan) => (
                       <tr key={w.kode} className="hover:bg-muted/40 transition-colors">
                         <td className="py-3 px-4 font-mono font-bold text-foreground">
                           {w.kode}
@@ -536,7 +578,7 @@ export default function Settings() {
                           {w.kodeKecamatan} ({w.namaKecamatan})
                         </td>
                         <td className="py-3 px-4 font-mono text-muted-foreground">
-                          {w.totalPelanggan || 0} Pelanggan
+                          {formatNumber(w.totalPelanggan || 0)} Pelanggan
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
@@ -549,7 +591,7 @@ export default function Settings() {
                             />
                             <span
                               className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm border border-white/50"
-                              style={{ backgroundColor: w.warna }}
+                              style={{ backgroundColor: safeColor(w.warna, '#3B6EA8') }}
                             />
                           </div>
                         </td>
@@ -566,9 +608,10 @@ export default function Settings() {
 
           {/* Add Wilayah Modal Inline */}
           {showAddWilayahModal && (
-            <Card className="rounded-xl border border-border bg-card shadow-xl p-4 max-w-md mx-auto space-y-4 animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <span className="font-heading font-semibold text-sm text-foreground">
+            <Card className="rounded-2xl border border-border bg-card shadow-2xl p-5 max-w-md mx-auto space-y-4 animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <span className="font-heading font-semibold text-sm text-foreground flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" />
                   Tambah Acuan Wilayah Baru
                 </span>
                 <Button
@@ -581,58 +624,59 @@ export default function Settings() {
                 </Button>
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="space-y-3.5 text-xs">
                 <div>
                   <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Kode Wilayah (4 Digit, misal: 0733)
+                    Kode Wilayah (4 Digit Angka, misal: 0733)
                   </label>
                   <Input
                     placeholder="0733"
                     value={newWilayahKode}
+                    maxLength={4}
                     onChange={(e) => setNewWilayahKode(e.target.value)}
-                    className="h-8.5 rounded-lg text-xs"
+                    className="h-9 rounded-xl text-xs font-mono"
                   />
                 </div>
                 <div>
                   <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Nama Wilayah
+                    Nama Wilayah / Dusun
                   </label>
                   <Input
-                    placeholder="Nama desa / dusun"
+                    placeholder="Contoh: Desa Kateng"
                     value={newWilayahNama}
                     onChange={(e) => setNewWilayahNama(e.target.value)}
-                    className="h-8.5 rounded-lg text-xs"
+                    className="h-9 rounded-xl text-xs"
                   />
                 </div>
                 <div>
                   <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Pilih Warna
+                    Pilih Warna Marker
                   </label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
                       value={newWilayahWarna}
                       onChange={(e) => setNewWilayahWarna(e.target.value)}
-                      className="w-10 h-8 rounded-lg cursor-pointer"
+                      className="w-10 h-8 rounded-lg cursor-pointer border border-border"
                     />
-                    <span className="font-mono text-xs uppercase">{newWilayahWarna}</span>
+                    <span className="font-mono text-xs uppercase text-foreground">{newWilayahWarna}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowAddWilayahModal(false)}
-                  className="rounded-lg text-xs h-8"
+                  className="rounded-xl text-xs h-8 px-3"
                 >
                   Batal
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleAddNewWilayah}
-                  className="rounded-lg text-xs h-8"
+                  className="rounded-xl text-xs h-8 px-4"
                 >
                   Simpan Wilayah
                 </Button>
@@ -641,16 +685,16 @@ export default function Settings() {
           )}
         </TabsContent>
 
-        {/* ════ TAB 3: RIWAYAT UPLOAD & ROLLBACK (S-5) ════ */}
+        {/* ════ TAB 3: RIWAYAT SNAPSHOT & ROLLBACK ════ */}
         <TabsContent value="history" className="space-y-6">
-          <Card className="rounded-xl border border-border bg-card shadow-sm">
+          <Card className="rounded-2xl border border-border bg-card shadow-sm">
             <CardHeader className="pb-3 border-b border-border/50">
               <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
                 <History className="w-4 h-4 text-primary" />
-                Riwayat Snapshot Upload (S-5)
+                Riwayat Snapshot Dataset
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                Daftar potret data yang pernah diunggah. Admin dapat memulihkan (rollback) data ke versi sebelumnya.
+                Daftar potret data yang tersimpan di sistem. Administrator dapat memulihkan (rollback) data aktif ke versi snapshot sebelumnya secara instan.
               </CardDescription>
             </CardHeader>
 
@@ -659,13 +703,13 @@ export default function Settings() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-muted-foreground font-mono text-[11px] uppercase tracking-wider">
-                      <th className="py-3 px-4 font-semibold">Tanggal & Waktu</th>
+                      <th className="py-3 px-4 font-semibold">Tanggal Unggah (WITA)</th>
                       <th className="py-3 px-4 font-semibold">Nama File</th>
                       <th className="py-3 px-4 font-semibold">Pengunggah</th>
                       <th className="py-3 px-4 font-semibold">Total Baris</th>
-                      <th className="py-3 px-4 font-semibold">Valid / Flag</th>
+                      <th className="py-3 px-4 font-semibold">Lolos / Flag</th>
                       <th className="py-3 px-4 font-semibold">Status Versi</th>
-                      <th className="py-3 px-4 font-semibold text-right">Aksi</th>
+                      <th className="py-3 px-4 font-semibold text-right">Tindakan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-sans">
@@ -676,20 +720,31 @@ export default function Settings() {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric',
-                          }) + `, ${new Date(snap.uploaded_at).getHours().toString().padStart(2, '0')}:${new Date(snap.uploaded_at).getMinutes().toString().padStart(2, '0')} WITA`}
+                          }) +
+                            `, ${new Date(snap.uploaded_at).getHours().toString().padStart(2, '0')}:${new Date(
+                              snap.uploaded_at
+                            )
+                              .getMinutes()
+                              .toString()
+                              .padStart(2, '0')} WITA`}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
                           {snap.filename}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {snap.uploader_name} ({snap.uploader_role})
+                          {snap.uploader_name}
                         </td>
                         <td className="py-3 px-4 font-mono font-bold text-foreground">
-                          {snap.total_rows}
+                          {formatNumber(snap.total_rows)}
                         </td>
                         <td className="py-3 px-4 font-mono">
-                          <span className="text-emerald-500 font-bold">{snap.valid_rows}</span> /{' '}
-                          <span className="text-amber-500 font-bold">{snap.flagged_rows}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            {formatNumber(snap.valid_rows)}
+                          </span>{' '}
+                          /{' '}
+                          <span className="text-amber-600 dark:text-amber-400 font-bold">
+                            {formatNumber(snap.flagged_rows)}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           {snap.is_active ? (
@@ -707,7 +762,7 @@ export default function Settings() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRollback(snap.id)}
+                              onClick={() => setConfirmRollbackId(snap.id)}
                               className="h-7 px-2.5 text-[11px] rounded-lg border-border hover:bg-muted"
                               title="Pulihkan data aktif ke versi snapshot ini"
                             >
@@ -716,7 +771,7 @@ export default function Settings() {
                             </Button>
                           ) : (
                             <span className="text-[11px] font-mono text-primary font-semibold">
-                              Sedang Digunakan
+                              Aktif
                             </span>
                           )}
                         </td>
@@ -727,6 +782,47 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Rollback confirmation modal */}
+          {confirmRollbackId && (
+            <Card className="rounded-2xl border border-border bg-card shadow-2xl p-5 max-w-md mx-auto space-y-4 animate-in fade-in">
+              <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-sm text-foreground">
+                    Konfirmasi Pemulihan Data (Rollback)
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    ID Snapshot: <span className="font-mono font-semibold">{confirmRollbackId}</span>
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Apakah Anda yakin ingin memulihkan seluruh data aktif ke versi snapshot ini? Data pelanggan yang sedang berjalan akan digantikan dengan data pada arsip snapshot terpilih.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmRollbackId(null)}
+                  className="rounded-xl text-xs h-8 px-3"
+                >
+                  Batal
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleRollback(confirmRollbackId)}
+                  className="rounded-xl text-xs h-8 px-4 bg-primary text-primary-foreground"
+                >
+                  Ya, Pulihkan Versi Ini
+                </Button>
+              </div>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

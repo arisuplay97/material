@@ -1,15 +1,22 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { UserRole, UserProfile } from '@/types/pdam';
+
+/**
+ * DEMO AUTH — client-side only.
+ *
+ * There is no server yet, so this cannot protect data. It exists so the UI
+ * behaves like the real flow (no auto-login, no in-app role switching).
+ * Replace with the API-backed session in the backend phase.
+ */
 
 interface AuthContextType {
   user: UserProfile | null;
-  isLoading: boolean;
-  login: (role?: UserRole, name?: string) => void;
+  login: (email: string, password: string) => { ok: true } | { ok: false; error: string };
+  loginAsDemo: (role: UserRole) => void;
   logout: () => void;
-  switchRole: (role: UserRole) => void;
 }
 
-const DEFAULT_USERS: Record<UserRole, UserProfile> = {
+export const DEMO_USERS: Record<UserRole, UserProfile> = {
   admin: {
     id: 'usr-admin-01',
     name: 'Muh Sofiyan Hawari',
@@ -33,64 +40,65 @@ const DEFAULT_USERS: Record<UserRole, UserProfile> = {
   },
 };
 
+const STORAGE_KEY = 'pdam_tiara_session_v2';
+const LEGACY_STORAGE_KEY = 'pdam_tiara_auth_user';
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+interface StoredSession {
+  userId: string;
+  expiresAt: number;
+}
+
+function readSession(): UserProfile | null {
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as StoredSession;
+    if (!session || typeof session.expiresAt !== 'number' || session.expiresAt < Date.now()) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    // Only trust the stored id; profile data always comes from the registry.
+    return Object.values(DEMO_USERS).find((u) => u.id === session.userId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEYS = {
-  USER: 'pdam_tiara_auth_user',
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.USER);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Error reading auth state', e);
-    }
-    // Default to admin for seamless evaluation
-    return DEFAULT_USERS.admin;
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(readSession);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
+    try {
+      if (user) {
+        const session: StoredSession = { userId: user.id, expiresAt: Date.now() + SESSION_TTL_MS };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      /* storage unavailable — session stays in memory */
     }
   }, [user]);
 
-  const login = (role: UserRole = 'admin', customName?: string) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const baseUser = DEFAULT_USERS[role] || DEFAULT_USERS.admin;
-      const newUser: UserProfile = {
-        ...baseUser,
-        name: customName || baseUser.name,
-      };
-      setUser(newUser);
-      setIsLoading(false);
-    }, 200);
-  };
+  const login = useCallback<AuthContextType['login']>((email, password) => {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized || !password) return { ok: false, error: 'Email dan kata sandi wajib diisi.' };
+    const match = Object.values(DEMO_USERS).find((u) => u.email === normalized);
+    if (!match) return { ok: false, error: 'Akun tidak terdaftar.' };
+    setUser(match);
+    return { ok: true };
+  }, []);
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-  };
+  const loginAsDemo = useCallback((role: UserRole) => setUser(DEMO_USERS[role]), []);
+  const logout = useCallback(() => setUser(null), []);
 
-  const switchRole = (role: UserRole) => {
-    const newUser = DEFAULT_USERS[role] || DEFAULT_USERS.admin;
-    setUser(newUser);
-  };
+  const value = useMemo(() => ({ user, login, loginAsDemo, logout }), [user, login, loginAsDemo, logout]);
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, switchRole }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

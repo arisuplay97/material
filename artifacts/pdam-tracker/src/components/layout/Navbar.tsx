@@ -1,113 +1,97 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { pdamService, KECAMATAN_LIST } from '@/services/pdamDataService';
-import { UserRole } from '@/types/pdam';
-import {
-  Sun,
-  Moon,
-  Shield,
-  UserCheck,
-  Building,
-  Calendar,
-  ChevronDown,
-  LogOut,
-  Database,
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import { usePdamData } from '@/hooks/usePdamData';
+import { useLocation } from 'wouter';
+import { Sun, Moon, CalendarDays, LayoutDashboard, MapPin, Settings as SettingsIcon, Search } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ROLE_LABEL } from '@/lib/privacy';
+import { formatDate } from '@/lib/constants';
 
 export function Navbar() {
-  const { user, switchRole, logout } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [snapshot, setSnapshot] = useState(pdamService.getActiveSnapshot());
+  const { activeSnapshot } = usePdamData();
+  const [location] = useLocation();
 
-  useEffect(() => {
-    const unsub = pdamService.subscribe(() => {
-      setSnapshot(pdamService.getActiveSnapshot());
-    });
-    return unsub;
-  }, []);
-
-  const roleLabels: Record<UserRole, { label: string; icon: typeof Shield; cls: string }> = {
-    admin: { label: 'Admin Data', icon: Shield, cls: 'text-blue-600 dark:text-blue-400' },
-    verifikator: { label: 'Verifikator', icon: UserCheck, cls: 'text-emerald-600 dark:text-emerald-400' },
-    pimpinan: { label: 'Pimpinan', icon: Building, cls: 'text-violet-600 dark:text-violet-400' },
+  const getPageInfo = (path: string) => {
+    if (path.startsWith('/gis')) return { title: 'Peta GIS', icon: MapPin };
+    if (path.startsWith('/settings')) return { title: 'Pengaturan', icon: SettingsIcon };
+    return { title: 'Dashboard', icon: LayoutDashboard };
   };
 
-  const currentRole = user?.role || 'admin';
-  const roleConfig = roleLabels[currentRole];
-  const RoleIcon = roleConfig.icon;
-
-  const fmtDate = (iso?: string) => {
-    if (!iso) return '1 Okt 2026';
-    try {
-      return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch { return iso; }
-  };
+  const pageInfo = getPageInfo(location);
+  const PageIcon = pageInfo.icon;
+  const roleText = user?.role ? ROLE_LABEL[user.role] : 'Petugas';
 
   return (
-    <header className="h-14 border-b border-border/60 bg-card px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
-      {/* Left: Brand */}
-      <div className="flex items-center gap-2.5">
-        <Database className="w-5 h-5 text-foreground/70" />
-        <div className="hidden sm:flex flex-col leading-none">
-          <span className="text-[13px] font-semibold tracking-tight text-foreground">Data Pelanggan</span>
-          <span className="text-[10px] text-muted-foreground">PDAM Tirta Ardhia Rinjani</span>
+    <header className="sticky top-0 z-30 flex h-[62px] shrink-0 items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 px-4 sm:px-6 md:px-8 backdrop-blur-xl">
+      {/* Left: Breadcrumb / Current View */}
+      <div className="flex items-center gap-3">
+        <SidebarTrigger className="-ml-1 h-8 w-8 rounded-lg border-0 bg-transparent text-neutral-500 shadow-none hover:bg-neutral-100 hover:text-neutral-900 md:hidden" />
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+            <PageIcon className="h-3.5 w-3.5" />
+          </div>
+          <span className="font-semibold text-sm text-neutral-900 dark:text-white tracking-tight">
+            {pageInfo.title}
+          </span>
         </div>
       </div>
 
-      {/* Center: Snapshot date */}
-      <div className="hidden md:flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Calendar className="w-3 h-3" />
-        <span>Snapshot {fmtDate(snapshot?.uploaded_at)}</span>
-        <span className="text-foreground font-medium ml-1">{snapshot?.total_rows || 0} data</span>
+      {/* Center: Search Bar (FlowAI Style) */}
+      <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
+        <div className="relative w-full">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            placeholder="Cari kode, nama pelanggan..."
+            className="w-full h-8.5 pl-9 pr-3 rounded-xl bg-neutral-100/70 dark:bg-neutral-800/60 border border-neutral-200/40 dark:border-neutral-800 text-xs text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300 dark:focus:border-neutral-700 transition-all"
+            onClick={() => {
+              const el = document.getElementById('dashboard-search-input');
+              if (el) el.focus();
+            }}
+            readOnly
+          />
+        </div>
       </div>
 
-      {/* Right: Controls */}
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant="ghost" size="icon"
-          onClick={toggleTheme}
-          className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+      {/* Right: Date info & actions */}
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 py-1.5 px-3 text-xs text-neutral-600 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-800">
+          <CalendarDays className="h-3.5 w-3.5 text-neutral-400" />
+          <span className="hidden sm:inline text-neutral-400">Data per</span>
+          <span className="font-medium text-neutral-800 dark:text-neutral-200">{formatDate(activeSnapshot?.uploaded_at)}</span>
+          {activeSnapshot?.is_demo && (
+            <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 border border-amber-200/50">
+              Demo
+            </span>
+          )}
+        </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 px-2 rounded-lg gap-1.5 text-xs">
-              <RoleIcon className={`w-3.5 h-3.5 ${roleConfig.cls}`} />
-              <span className="hidden sm:inline font-medium text-foreground">{user?.name?.split(' ')[0]}</span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Peran</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {(['admin', 'verifikator', 'pimpinan'] as UserRole[]).map(role => {
-              const cfg = roleLabels[role];
-              const Icon = cfg.icon;
-              return (
-                <DropdownMenuItem key={role} onClick={() => switchRole(role)} className={`text-xs gap-2 ${currentRole === role ? 'font-semibold' : ''}`}>
-                  <Icon className={`w-3.5 h-3.5 ${cfg.cls}`} />
-                  {cfg.label}
-                </DropdownMenuItem>
-              );
-            })}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-xs gap-2 text-destructive">
-              <LogOut className="w-3.5 h-3.5" /> Keluar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label="Ganti Tema"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors cursor-pointer"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-neutral-600" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            {theme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="hidden items-center gap-2.5 border-l border-neutral-200 dark:border-neutral-800 pl-3 md:flex">
+          <div className="flex flex-col text-right leading-none">
+            <span className="text-xs font-semibold text-neutral-900 dark:text-white">{user?.name || 'Petugas'}</span>
+            <span className="mt-1 text-[10px] text-neutral-400">{roleText}</span>
+          </div>
+        </div>
       </div>
     </header>
   );
