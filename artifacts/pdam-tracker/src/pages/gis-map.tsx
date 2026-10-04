@@ -622,6 +622,7 @@ export default function GisMap() {
 
   // Drawers & Panes
   const [showLegend, setShowLegend] = useState<boolean>(true);
+  const [legendTab, setLegendTab] = useState<'pipa' | 'wilayah'>('pipa');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -1573,61 +1574,149 @@ export default function GisMap() {
         </Card>
       )}
 
-      {/* ── Interactive Wilayah Legend Card ── */}
+      {/* ── Interactive GIS Legend Card (Pipelines & Wilayah) ── */}
       {showLegend && !selectedCustomer && (
-        <Card className="absolute bottom-5 right-3 z-[450] w-64 max-h-[350px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-          <div className="p-2.5 border-b border-border flex items-center justify-between bg-muted/40">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-              <span className="font-heading font-semibold text-xs text-foreground">
-                Legenda Wilayah
-              </span>
+        <Card className="absolute bottom-5 right-3 z-[450] w-72 max-h-[380px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+          {/* Header with Tab Switcher */}
+          <div className="p-2 border-b border-border flex items-center justify-between bg-muted/40 gap-1">
+            <span className="font-heading font-semibold text-xs text-foreground shrink-0 pl-1">
+              Legenda GIS
+            </span>
+            <div className="flex items-center bg-muted/70 rounded-lg p-0.5 border border-border/40">
+              <button
+                type="button"
+                onClick={() => setLegendTab('pipa')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                  legendTab === 'pipa'
+                    ? 'bg-background text-primary shadow-xs font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Pipa & Valve
+              </button>
+              <button
+                type="button"
+                onClick={() => setLegendTab('wilayah')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                  legendTab === 'wilayah'
+                    ? 'bg-background text-primary shadow-xs font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Wilayah
+              </button>
             </div>
-            <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 h-4.5 bg-background">
-              {filteredCustomers.length} Titik
-            </Badge>
           </div>
 
-          <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5">
-            Klik wilayah untuk filter & zoom:
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-            {wilayahList.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground font-mono">
-                Tidak ada data wilayah acuan.
+          {/* TAB 1: Jaringan Pipa & Aksesoris (QGIS) */}
+          {legendTab === 'pipa' && (
+            <>
+              <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
+                <span>Simbol Jaringan QGIS</span>
+                <span className="text-blue-600 font-semibold font-sans">
+                  {qgisStats.pipes > 0 ? `${qgisStats.pipes} Pipa Terdeteksi` : 'PostGIS Realtime'}
+                </span>
               </div>
-            ) : (
-              wilayahList.map((w: WilayahAcuan) => {
-                const isSelected = filters.wilayah === w.kode;
-                const countInWilayah = pelangganList.filter((p: Pelanggan) => p.kode_wilayah === w.kode).length;
 
-                return (
-                  <div
-                    key={w.kode}
-                    onClick={() => handleLegendClick(w.kode)}
-                    className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer text-xs transition-colors border ${
-                      isSelected
-                        ? 'bg-primary/10 border-primary/40 font-semibold text-primary'
-                        : 'hover:bg-muted/60 border-transparent text-foreground'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
-                        style={{ backgroundColor: safeColor(w.warna, '#3B6EA8') }}
-                      />
-                      <span className="font-mono text-[11px]">{w.kode}</span>
-                      <span className="text-[11px] truncate">{w.nama}</span>
-                    </div>
-                    <span className="font-mono text-[10px] text-muted-foreground ml-2">
-                      {countInWilayah}
-                    </span>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+                {/* Transmisi */}
+                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="w-6 h-1.5 rounded-full bg-[#E11D48] shrink-0 shadow-xs" style={{ height: '4.5px' }} />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Transmisi Utama</span>
+                    <span className="text-[9.5px] text-muted-foreground">Diameter ≥ 200 mm (HDPE PN-16)</span>
                   </div>
-                );
-              })
-            )}
-          </div>
+                </div>
+
+                {/* Distribusi Primer */}
+                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="w-6 h-1 rounded-full bg-[#2563EB] shrink-0 shadow-xs" style={{ height: '3.5px' }} />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground text-[11px] leading-snug">Distribusi Primer</span>
+                    <span className="text-[9.5px] text-muted-foreground">Diameter 150 - 160 mm (PVC RRJ)</span>
+                  </div>
+                </div>
+
+                {/* Retikulasi */}
+                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="w-6 h-0.5 rounded-full bg-[#0284C7] shrink-0 shadow-xs" style={{ height: '2px' }} />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Retikulasi</span>
+                    <span className="text-[9.5px] text-muted-foreground">Diameter ≤ 90 mm (Pipa Lingkungan)</span>
+                  </div>
+                </div>
+
+                {/* Katup Valve */}
+                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="w-5 h-5 rounded-full bg-amber-500 border border-white text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">
+                    ⚙
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground text-[11px] leading-snug">Katup Valve (Gate / PRV)</span>
+                    <span className="text-[9.5px] text-muted-foreground">Pengatur Debit & Tekanan Air</span>
+                  </div>
+                </div>
+
+                {/* Batas DMA */}
+                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="w-5 h-3.5 border-1.5 border-dashed border-[#0284C7] bg-[#0284C7]/10 rounded shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground text-[11px] leading-snug">Zona DMA Distribusi</span>
+                    <span className="text-[9.5px] text-muted-foreground">Poligon Wilayah Aliran Mandiri</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 2: Wilayah Pelanggan */}
+          {legendTab === 'wilayah' && (
+            <>
+              <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
+                <span>Klik untuk zoom wilayah:</span>
+                <Badge variant="outline" className="font-mono text-[9px] py-0 px-1 h-4 bg-background">
+                  {filteredCustomers.length} Titik
+                </Badge>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+                {wilayahList.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground font-mono">
+                    Tidak ada data wilayah acuan.
+                  </div>
+                ) : (
+                  wilayahList.map((w: WilayahAcuan) => {
+                    const isSelected = filters.wilayah === w.kode;
+                    const countInWilayah = pelangganList.filter((p: Pelanggan) => p.kode_wilayah === w.kode).length;
+
+                    return (
+                      <div
+                        key={w.kode}
+                        onClick={() => handleLegendClick(w.kode)}
+                        className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer text-xs transition-colors border ${
+                          isSelected
+                            ? 'bg-primary/10 border-primary/40 font-semibold text-primary'
+                            : 'hover:bg-muted/60 border-transparent text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                            style={{ backgroundColor: safeColor(w.warna, '#3B6EA8') }}
+                          />
+                          <span className="font-mono text-[11px]">{w.kode}</span>
+                          <span className="text-[11px] truncate">{w.nama}</span>
+                        </div>
+                        <span className="font-mono text-[10px] text-muted-foreground ml-2">
+                          {countInWilayah}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </Card>
       )}
 
