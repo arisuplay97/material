@@ -177,30 +177,6 @@
         "type": "Point",
         "coordinates": [116.2400, -8.7600]
       }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "id": "DMA-01",
-        "nama_zona": "Zona DMA 01 - Penujak & Praya Barat",
-        "kategori": "Zona DMA",
-        "inflow_m3_hari": 1450,
-        "nrw_percent": 18.4,
-        "jumlah_sr": 720,
-        "status_aliran": "24 Jam Kontinu"
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [116.1850, -8.7750],
-            [116.2300, -8.7750],
-            [116.2300, -8.8150],
-            [116.1850, -8.8150],
-            [116.1850, -8.7750]
-          ]
-        ]
-      }
     }
   ]
 }

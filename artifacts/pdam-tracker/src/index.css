@@ -211,6 +211,29 @@
   height: 100%;
   background-color: hsl(var(--muted));
   z-index: 0;
+  outline: none !important;
+}
+
+/* Hilangkan kotak hitam saat garis pipa, objek, atau popup diklik */
+.leaflet-container :focus,
+.leaflet-container path:focus,
+.leaflet-container svg:focus,
+.leaflet-interactive:focus,
+path.leaflet-interactive:focus,
+.leaflet-popup:focus,
+.leaflet-popup-content-wrapper:focus,
+.leaflet-popup-content:focus,
+svg.leaflet-zoom-animated path:focus,
+.leaflet-marker-icon:focus,
+*:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+path.leaflet-interactive,
+svg.leaflet-zoom-animated {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 .leaflet-popup-content-wrapper {

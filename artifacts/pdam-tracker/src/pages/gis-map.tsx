@@ -278,6 +278,14 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
 
     try {
       const geoLayer = L.geoJSON(data, {
+        filter: (feature: any) => {
+          // Abaikan Polygon (kotak area DMA / batas zona) agar peta bersih fokus ke jalur pipa & valve
+          const geomType = feature?.geometry?.type;
+          if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
+            return false;
+          }
+          return true;
+        },
         style: (feature: any) => {
           const props = feature?.properties || {};
           const geomType = feature?.geometry?.type;
@@ -356,6 +364,17 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
         },
 
         onEachFeature: (feature: any, layer: L.Layer) => {
+          // Hilangkan outline hitam browser saat diklik
+          layer.on('click', (e: any) => {
+            try {
+              if (e?.originalEvent?.target?.blur) e.originalEvent.target.blur();
+              const container = (layer as any)?._map?.getContainer();
+              if (container && document.activeElement === e?.originalEvent?.target) {
+                container.focus();
+              }
+            } catch {}
+          });
+
           const props = feature?.properties || {};
           const geomType = feature?.geometry?.type;
 
@@ -629,6 +648,7 @@ export default function GisMap() {
 
   // Quick anomaly filter toggle
   const [onlyAnomaly, setOnlyAnomaly] = useState<boolean>(false);
+  const [showCustomerPoints, setShowCustomerPoints] = useState<boolean>(true);
 
   // ── QGIS Live Sync State ──
   const [qgisLayerActive, setQgisLayerActive] = useState<boolean>(true);
@@ -1104,6 +1124,24 @@ export default function GisMap() {
               <Radio className="w-3 h-3 text-blue-500" />
             </button>
           </div>
+
+          {/* Toggle Titik Pelanggan (Lingkaran Biru) */}
+          <button
+            type="button"
+            onClick={() => setShowCustomerPoints(!showCustomerPoints)}
+            className={`h-8 px-2.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card/95 backdrop-blur-md shadow-xs ${
+              showCustomerPoints
+                ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold'
+                : 'border-border text-muted-foreground hover:text-foreground'
+            }`}
+            title="Klik untuk tampilkan / sembunyikan lingkaran titik pelanggan"
+          >
+            <span className={`w-2 h-2 rounded-full ${showCustomerPoints ? 'bg-blue-600' : 'bg-neutral-300'}`} />
+            <span>Titik Pelanggan</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold">
+              {filteredCustomers.length}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -1773,12 +1811,14 @@ export default function GisMap() {
           data={qgisData}
         />
 
-        <CustomerClusterLayer
-          customers={filteredCustomers}
-          wilayahMap={wilayahMap}
-          userRole={user?.role}
-          onSelectCustomer={handleSelectCustomer}
-        />
+        {showCustomerPoints && (
+          <CustomerClusterLayer
+            customers={filteredCustomers}
+            wilayahMap={wilayahMap}
+            userRole={user?.role}
+            onSelectCustomer={handleSelectCustomer}
+          />
+        )}
       </MapContainer>
 
       {/* ── Modal Dialog: QGIS Realtime Hub ── */}
