@@ -709,26 +709,49 @@ export default function GisMap() {
       let json: any = null;
       let activeSource = 'PostgreSQL / PostGIS Server';
 
+      let isDbConnected = false;
+      let dbEmptyNotice = '';
+
       try {
         const dbRes = await fetch(`/api/gis/pipa?t=${Date.now()}`);
         if (dbRes.ok) {
           const dbJson = await dbRes.json();
-          if (dbJson && Array.isArray(dbJson.features) && dbJson.features.length > 0) {
-            json = dbJson;
-            activeSource = 'PostgreSQL / PostGIS (Database Kantor)';
+          if (dbJson && Array.isArray(dbJson.features)) {
+            isDbConnected = true;
+            if (dbJson.features.length > 0) {
+              json = dbJson;
+              activeSource = 'PostgreSQL / PostGIS (Neon Cloud)';
+            } else {
+              dbEmptyNotice = dbJson.notice || 'Tabel Neon terhubung, namun data fitur pipa & aksesoris masih 0 baris. Silakan ekspor layer fitur dari QGIS.';
+            }
           }
         }
       } catch {}
 
       if (!json) {
-        activeSource = 'Folder QGIS (public/qgis)';
-        const fileRes = await fetch(`/qgis/jaringan_pipa.geojson?t=${Date.now()}`);
-        if (fileRes.ok) {
-          json = await fileRes.json();
-        }
+        try {
+          const fileRes = await fetch(`/qgis/jaringan_pipa.geojson?t=${Date.now()}`);
+          if (fileRes.ok) {
+            const fileJson = await fileRes.json();
+            if (fileJson && Array.isArray(fileJson.features) && fileJson.features.length > 0) {
+              json = fileJson;
+              activeSource = 'Folder Cadangan (public/qgis)';
+            }
+          }
+        } catch {}
       }
 
-      if (!json) throw new Error('Data QGIS belum tersedia');
+      if (!json) {
+        if (isDbConnected && dbEmptyNotice) {
+          setQgisSource('PostgreSQL / PostGIS (Neon Cloud)');
+          setQgisStats({ pipes: 0, valves: 0, dma: 0 });
+          if (isManual) {
+            toast.info(dbEmptyNotice, { duration: 6000 });
+          }
+          return;
+        }
+        throw new Error('Data QGIS belum tersedia');
+      }
 
       setQgisData(json);
       setQgisSource(activeSource);

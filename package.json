@@ -9,6 +9,7 @@
   },
   "private": true,
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@replit/connectors-sdk": "^0.4.1"
   },
   "devDependencies": {
