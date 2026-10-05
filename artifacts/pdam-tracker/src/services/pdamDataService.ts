@@ -10,19 +10,19 @@ type Bounds = { minLat: number; maxLat: number; minLng: number; maxLng: number }
 // secara berlebihan, khususnya antara Praya Barat (07) dan Kota Praya (01).
 // Referensi: titik pusat desa terluar dari DEFAULT_WILAYAH_LIST + peta OSM.
 export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
-  '01': { minLat: -8.755, maxLat: -8.63, minLng: 116.24, maxLng: 116.34 }, // Praya (kota)
-  '02': { minLat: -8.70, maxLat: -8.55, minLng: 116.28, maxLng: 116.40 }, // Batukliang
-  '03': { minLat: -8.72, maxLat: -8.58, minLng: 116.33, maxLng: 116.45 }, // Kopang
-  '04': { minLat: -8.80, maxLat: -8.70, minLng: 116.28, maxLng: 116.38 }, // Janapria
-  '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.33, maxLng: 116.45 }, // Praya Timur
-  '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.248, maxLng: 116.42 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
-  '07': { minLat: -8.845, maxLat: -8.725, minLng: 116.14, maxLng: 116.262 }, // Praya Barat (selatan dibatasi Lolat/Kentawang, timur dibatasi Batujai/Wage)
-  '08': { minLat: -8.68, maxLat: -8.55, minLng: 116.22, maxLng: 116.33 }, // Pringgarata
-  '09': { minLat: -8.96, maxLat: -8.86, minLng: 116.22, maxLng: 116.35 }, // Kuta (pesisir selatan Pujut/Kuta)
-  '10': { minLat: -8.62, maxLat: -8.48, minLng: 116.28, maxLng: 116.42 }, // Batukliang Utara
-  '11': { minLat: -8.78, maxLat: -8.70, minLng: 116.25, maxLng: 116.34 }, // Praya Tengah
-  '12': { minLat: -8.73, maxLat: -8.62, minLng: 116.18, maxLng: 116.27 }, // Jonggat
-  '13': { minLat: -8.92, maxLat: -8.76, minLng: 116.08, maxLng: 116.20 }, // Praya Barat Daya
+  '01': { minLat: -8.735, maxLat: -8.66, minLng: 116.265, maxLng: 116.32 }, // Praya (kota)
+  '02': { minLat: -8.66, maxLat: -8.56, minLng: 116.27, maxLng: 116.36 }, // Batukliang
+  '03': { minLat: -8.68, maxLat: -8.58, minLng: 116.32, maxLng: 116.42 }, // Kopang
+  '04': { minLat: -8.74, maxLat: -8.65, minLng: 116.36, maxLng: 116.46 }, // Janapria
+  '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.32, maxLng: 116.44 }, // Praya Timur
+  '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.265, maxLng: 116.36 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
+  '07': { minLat: -8.86, maxLat: -8.705, minLng: 116.12, maxLng: 116.266 }, // Praya Barat (selatan: Selong Belanak/Lolat, utara: Belemong/Penujak, timur: Batujai/Kr. Daye)
+  '08': { minLat: -8.67, maxLat: -8.56, minLng: 116.20, maxLng: 116.29 }, // Pringgarata
+  '09': { minLat: -8.96, maxLat: -8.86, minLng: 116.24, maxLng: 116.35 }, // Kuta (pesisir selatan Pujut/Kuta)
+  '10': { minLat: -8.58, maxLat: -8.45, minLng: 116.26, maxLng: 116.40 }, // Batukliang Utara
+  '11': { minLat: -8.745, maxLat: -8.65, minLng: 116.275, maxLng: 116.36 }, // Praya Tengah (Batunyala, Kelebuh, Sasake)
+  '12': { minLat: -8.700, maxLat: -8.62, minLng: 116.16, maxLng: 116.26 }, // Jonggat (Sukarara, Puyung, Ubung)
+  '13': { minLat: -8.92, maxLat: -8.74, minLng: 116.08, maxLng: 116.19 }, // Praya Barat Daya (Darek, Pelambik)
 };
 
 /** Batas kasar area layanan (Pulau Lombok). */
@@ -137,14 +137,16 @@ export function checkSpatialAnomaly(pelanggan: Pick<Pelanggan, 'kode_kecamatan' 
 
   // Periksa batas mikro spesifik Praya Barat (07):
   if (kodeKec === '07' && isInside) {
-    // 1. Batas Tenggara (Pujut / Tanak Awu / Prabu):
-    // Di selatan lat -8.76, wilayah di timur lng 116.248 adalah wilayah Kecamatan Pujut (Tanak Awu & Bandara BIL)
-    if (latitude < -8.76 && longitude > 116.248) {
+    // 1. Batas Tenggara (Pujut / Tanak Awu):
+    // Di selatan lat -8.770, wilayah di timur lng 116.265 adalah wilayah Kecamatan Pujut (Tanak Awu & Sengkol).
+    // Wilayah Karang Daye / Penujak barat bandara (lat > -8.770, lng <= 116.265) tetap sah Praya Barat.
+    if (latitude < -8.770 && longitude > 116.265) {
       isInside = false;
     }
     // 2. Batas Timur Laut (Kota Praya / Renteng):
-    // Di utara lat -8.735, koordinat di timur lng 116.258 sudah masuk wilayah Kota Praya
-    if (latitude > -8.735 && longitude > 116.258) {
+    // Di utara lat -8.725, koordinat di timur lng 116.265 sudah masuk wilayah Kota Praya (Renteng / Tiwugalih).
+    // Batujai & BTN Salva (lng <= 116.265) tetap sah Praya Barat.
+    if (latitude > -8.725 && longitude > 116.265) {
       isInside = false;
     }
   }
@@ -385,11 +387,11 @@ class PdamDataService {
       const storedWilayah = localStorage.getItem(STORAGE_KEYS.WILAYAH);
       this.wilayah = storedWilayah ? JSON.parse(storedWilayah) : [...DEFAULT_WILAYAH_LIST];
 
+      let migrated = false;
       const storedPelanggan = localStorage.getItem(STORAGE_KEYS.PELANGGAN);
       if (storedPelanggan) {
         this.pelanggan = JSON.parse(storedPelanggan);
         // Schema migration only — never touch coordinates or other real data.
-        let migrated = false;
         for (const p of this.pelanggan) {
           if (!p.kode_kecamatan) {
             p.kode_kecamatan = p.kode_pelanggan?.slice(0, 2) || '07';
@@ -402,7 +404,6 @@ class PdamDataService {
           if (refreshAnomaly(p)) migrated = true;
         }
         if (detectColocationAnomalies(this.pelanggan)) migrated = true;
-        if (migrated) this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
       } else {
         this.pelanggan = generateSeedPelanggan();
       }
@@ -419,6 +420,17 @@ class PdamDataService {
         '';
 
       this.scanArchives();
+
+      if (migrated) {
+        this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+        const activeSnap = this.snapshots.find((s) => s.id === this.activeSnapshotId);
+        if (activeSnap) {
+          const flagged = this.pelanggan.filter((p) => p.is_flagged).length;
+          activeSnap.flagged_rows = flagged;
+          activeSnap.valid_rows = this.pelanggan.length - flagged;
+          this.persistSnapshotMeta();
+        }
+      }
 
       if (!storedWilayah) this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
       if (!storedPelanggan) this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
