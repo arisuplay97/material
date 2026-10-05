@@ -242,6 +242,7 @@ interface QgisVectorLayerProps {
   active: boolean;
   data: any;
   hiddenLayers?: Set<string>;
+  layerColors?: Record<string, string>;
 }
 
 export interface QgisLayerItem {
@@ -251,6 +252,7 @@ export interface QgisLayerItem {
   geomType: 'line' | 'point' | 'polygon';
   count: number;
   color: string;
+  defaultColor?: string;
 }
 
 // Helper cerdas pendeteksi alias nama kolom QGIS (misal: DIA, DIAMETER, DN, UKURAN, BAHAN, MATERIAL)
@@ -449,7 +451,7 @@ export function getFeatureLayerKey(feature: any): string {
   return 'area_dma.geojson';
 }
 
-function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
+function QgisVectorLayer({ active, data, hiddenLayers, layerColors }: QgisVectorLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
 
@@ -491,6 +493,8 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
         style: (feature: any) => {
           const props = feature?.properties || {};
           const geomType = feature?.geometry?.type;
+          const layerKey = getFeatureLayerKey(feature);
+          const customColor = layerColors?.[layerKey];
 
           if (geomType === 'LineString' || geomType === 'MultiLineString') {
             const rawKat = getProp(props, ['kategori', 'category', 'fungsi', 'jenis', 'kelas', 'type']) || '';
@@ -498,15 +502,23 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
             const rawDiam = getProp(props, ['diameter_mm', 'diameter', 'diam', 'dia', 'dn', 'ukuran', 'd_mm', 'size', 'dim']) || 100;
             const diam = Number(String(rawDiam).replace(/[^\d.-]/g, '')) || 100;
 
-            let color = '#2563EB'; // Royal Blue untuk distribusi primer
+            let color = customColor || '#2563EB'; // Royal Blue default
             let weight = 3.5;
 
-            if (kategori.includes('transmisi') || diam >= 200) {
-              color = '#E11D48'; // Rose/Red untuk transmisi pipa besar
-              weight = 4.5;
-            } else if (kategori.includes('retikulasi') || diam <= 90) {
-              color = '#0284C7'; // Sky Blue untuk pipa retikulasi perumahan
-              weight = 2.5;
+            if (!customColor) {
+              if (kategori.includes('transmisi') || diam >= 200) {
+                color = '#E11D48'; // Rose/Red untuk transmisi pipa besar
+                weight = 4.5;
+              } else if (kategori.includes('retikulasi') || diam <= 90) {
+                color = '#0284C7'; // Sky Blue untuk pipa retikulasi perumahan
+                weight = 2.5;
+              }
+            } else {
+              if (kategori.includes('transmisi') || diam >= 200) {
+                weight = 4.5;
+              } else if (kategori.includes('retikulasi') || diam <= 90) {
+                weight = 2.5;
+              }
             }
 
             return {
@@ -520,21 +532,24 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
 
           if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
             return {
-              color: '#0284C7',
+              color: customColor || '#0284C7',
               weight: 1.5,
               dashArray: '5, 5',
-              fillColor: '#0284C7',
+              fillColor: customColor || '#0284C7',
               fillOpacity: 0.08,
             };
           }
 
-          return { color: '#2563EB', weight: 2 };
+          return { color: customColor || '#2563EB', weight: 2 };
         },
 
         pointToLayer: (feature: any, latlng: L.LatLng) => {
           const props = feature?.properties || {};
+          const layerKey = getFeatureLayerKey(feature);
+          const customColor = layerColors?.[layerKey];
           const diam = parseAccessoryDiameter(props);
           const meta = getAccessoryMeta(props);
+          const markerColor = customColor || meta.color;
           const { outerPx, innerPx } = getMarkerSize(diam);
 
           const hasCenterDot = outerPx >= 13;
@@ -544,7 +559,7 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
 
           const iconHtml = `
             <div style="
-              background-color: ${meta.color};
+              background-color: ${markerColor};
               width: ${outerPx}px;
               height: ${outerPx}px;
               border-radius: 50%;
@@ -623,9 +638,11 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
             `;
           }
 
+          const layerKey = getFeatureLayerKey(feature);
+          const customColor = layerColors?.[layerKey];
           const pointMeta = isPoint ? getAccessoryMeta(props) : null;
           const pointDiam = isPoint ? parseAccessoryDiameter(props) : null;
-          const headerBadgeColor = isPoint ? (pointMeta?.color || '#D97706') : '#2563EB';
+          const headerBadgeColor = isPoint ? (customColor || pointMeta?.color || '#D97706') : (customColor || '#2563EB');
           const headerTitle = isPoint ? `${pointMeta?.label || 'Aksesoris'} ${pointDiam ? `Ø${pointDiam}mm` : ''}` : title;
 
           const popupContent = `
@@ -664,7 +681,7 @@ function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
         layerRef.current = null;
       }
     };
-  }, [active, data, map, hiddenLayers]);
+  }, [active, data, map, hiddenLayers, layerColors]);
 
   return null;
 }
@@ -911,6 +928,36 @@ export default function GisMap() {
   const [legendTab, setLegendTab] = useState<'pipa' | 'wilayah'>('pipa');
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
   const [showTechnicalSymbols, setShowTechnicalSymbols] = useState<boolean>(false);
+
+  // Kustomisasi warna per layer GeoJSON (tersimpan di browser localStorage)
+  const [layerColors, setLayerColors] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('pdam_layer_colors');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const handleUpdateLayerColor = (layerId: string, newColor: string) => {
+    setLayerColors((prev) => {
+      const next = { ...prev, [layerId]: newColor };
+      try {
+        localStorage.setItem('pdam_layer_colors', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleResetLayerColor = (layerId: string) => {
+    setLayerColors((prev) => {
+      const next = { ...prev };
+      delete next[layerId];
+      try {
+        localStorage.setItem('pdam_layer_colors', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Toggle hide/show per layer GeoJSON
   const toggleLayerVisibility = (layerId: string) => {
@@ -1375,14 +1422,15 @@ export default function GisMap() {
         category: info.category,
         geomType: info.geomType,
         count: info.count,
-        color: info.color,
+        defaultColor: info.color,
+        color: layerColors[id] || info.color,
       }))
       .sort((a, b) => {
         if (a.geomType === 'line' && b.geomType !== 'line') return -1;
         if (a.geomType !== 'line' && b.geomType === 'line') return 1;
         return a.name.localeCompare(b.name);
       });
-  }, [qgisData]);
+  }, [qgisData, layerColors]);
 
   // Wilayah Map lookup
   const wilayahMap = useMemo(() => {
@@ -2411,19 +2459,31 @@ export default function GisMap() {
                         >
                           {/* Indicator & File Details */}
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            {layer.geomType === 'line' ? (
-                              <div
-                                className="w-4 h-1.5 rounded-full shrink-0 shadow-xs transition-transform group-hover:scale-110"
-                                style={{ backgroundColor: layer.color, height: '4px' }}
+                            {/* Interactive Color Picker (Ubah Warna Langsung dari Layer) */}
+                            <label
+                              className="relative cursor-pointer group/color shrink-0 flex items-center justify-center p-0.5 rounded-md hover:bg-muted/80 transition-all"
+                              title="Klik untuk ubah warna layer ini langsung di peta"
+                            >
+                              <input
+                                type="color"
+                                value={layer.color}
+                                onChange={(e) => handleUpdateLayerColor(layer.id, e.target.value)}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                               />
-                            ) : (
-                              <div
-                                className="w-3.5 h-3.5 rounded-full border border-white shrink-0 shadow-xs transition-transform group-hover:scale-110 flex items-center justify-center"
-                                style={{ backgroundColor: layer.color }}
-                              >
-                                <div className="w-1 h-1 rounded-full bg-white/90" />
-                              </div>
-                            )}
+                              {layer.geomType === 'line' ? (
+                                <div
+                                  className="w-4 h-2 rounded-full border border-black/20 shadow-xs transition-transform group-hover/color:scale-125"
+                                  style={{ backgroundColor: layer.color, height: '5px' }}
+                                />
+                              ) : (
+                                <div
+                                  className="w-3.5 h-3.5 rounded-full border-1.5 border-white shadow-xs transition-transform group-hover/color:scale-125 flex items-center justify-center ring-1 ring-black/15"
+                                  style={{ backgroundColor: layer.color }}
+                                >
+                                  <div className="w-1 h-1 rounded-full bg-white/95" />
+                                </div>
+                              )}
+                            </label>
 
                             <div className="flex flex-col min-w-0 flex-1 pr-1">
                               <div className="flex items-center gap-1.5">
@@ -2435,6 +2495,19 @@ export default function GisMap() {
                                 >
                                   {layer.name}
                                 </span>
+                                {layerColors[layer.id] && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResetLayerColor(layer.id);
+                                    }}
+                                    className="text-[8.5px] px-1 py-0 rounded bg-muted/90 text-muted-foreground hover:text-foreground font-sans cursor-pointer hover:bg-muted border border-border/50"
+                                    title="Reset ke warna standar"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
                               </div>
                               <span className="text-[9px] text-muted-foreground truncate">
                                 {layer.category} • <strong className="font-mono text-foreground/80">{layer.count.toLocaleString('id-ID')}</strong> {layer.geomType === 'line' ? 'jalur' : 'titik'}
@@ -2474,6 +2547,25 @@ export default function GisMap() {
                         </div>
                       );
                     })
+                  )}
+                  {uploadedLayers.length > 0 && (
+                    <div className="text-[9px] text-muted-foreground px-1 pt-0.5 flex items-center justify-between">
+                      <span className="italic">💡 Klik warna layer untuk mengubahnya</span>
+                      {Object.keys(layerColors).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLayerColors({});
+                            try {
+                              localStorage.removeItem('pdam_layer_colors');
+                            } catch {}
+                          }}
+                          className="text-[8.5px] text-primary hover:underline font-medium cursor-pointer"
+                        >
+                          Reset Semua Warna
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -2724,6 +2816,7 @@ export default function GisMap() {
           active={qgisLayerActive}
           data={qgisData}
           hiddenLayers={hiddenLayers}
+          layerColors={layerColors}
         />
 
         {showCustomerPoints && (
