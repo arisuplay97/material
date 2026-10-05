@@ -264,6 +264,7 @@ export default function Dashboard() {
     valid: 'Valid',
     flagged: 'Perlu verifikasi',
     anomaly: 'Anomali batas',
+    colocation: 'Titik sama beda wilayah',
   };
 
   return (

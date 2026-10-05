@@ -15,14 +15,14 @@ export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
   '03': { minLat: -8.72, maxLat: -8.58, minLng: 116.33, maxLng: 116.45 }, // Kopang
   '04': { minLat: -8.80, maxLat: -8.70, minLng: 116.28, maxLng: 116.38 }, // Janapria
   '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.33, maxLng: 116.45 }, // Praya Timur
-  '06': { minLat: -8.95, maxLat: -8.82, minLng: 116.20, maxLng: 116.40 }, // Pujut
-  '07': { minLat: -8.90, maxLat: -8.725, minLng: 116.10, maxLng: 116.265 }, // Praya Barat  ← diperkecil agar tidak masuk kota Praya
+  '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.248, maxLng: 116.42 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
+  '07': { minLat: -8.845, maxLat: -8.725, minLng: 116.14, maxLng: 116.262 }, // Praya Barat (selatan dibatasi Lolat/Kentawang, timur dibatasi Batujai/Wage)
   '08': { minLat: -8.68, maxLat: -8.55, minLng: 116.22, maxLng: 116.33 }, // Pringgarata
-  '09': { minLat: -8.95, maxLat: -8.85, minLng: 116.15, maxLng: 116.30 }, // Kuta
+  '09': { minLat: -8.96, maxLat: -8.86, minLng: 116.22, maxLng: 116.35 }, // Kuta (pesisir selatan Pujut/Kuta)
   '10': { minLat: -8.62, maxLat: -8.48, minLng: 116.28, maxLng: 116.42 }, // Batukliang Utara
   '11': { minLat: -8.78, maxLat: -8.70, minLng: 116.25, maxLng: 116.34 }, // Praya Tengah
   '12': { minLat: -8.73, maxLat: -8.62, minLng: 116.18, maxLng: 116.27 }, // Jonggat
-  '13': { minLat: -8.88, maxLat: -8.76, minLng: 116.08, maxLng: 116.20 }, // Praya Barat Daya
+  '13': { minLat: -8.92, maxLat: -8.76, minLng: 116.08, maxLng: 116.20 }, // Praya Barat Daya
 };
 
 /** Batas kasar area layanan (Pulau Lombok). */
@@ -132,13 +132,31 @@ export function checkSpatialAnomaly(pelanggan: Pick<Pelanggan, 'kode_kecamatan' 
   if (!bounds) return null; // unknown kecamatan, skip check
 
   const { latitude, longitude } = pelanggan;
-  if (isInBounds(latitude, longitude, bounds)) return null;
+
+  let isInside = isInBounds(latitude, longitude, bounds);
+
+  // Periksa batas mikro spesifik Praya Barat (07):
+  if (kodeKec === '07' && isInside) {
+    // 1. Batas Tenggara (Pujut / Tanak Awu / Prabu):
+    // Di selatan lat -8.76, wilayah di timur lng 116.248 adalah wilayah Kecamatan Pujut (Tanak Awu & Bandara BIL)
+    if (latitude < -8.76 && longitude > 116.248) {
+      isInside = false;
+    }
+    // 2. Batas Timur Laut (Kota Praya / Renteng):
+    // Di utara lat -8.735, koordinat di timur lng 116.258 sudah masuk wilayah Kota Praya
+    if (latitude > -8.735 && longitude > 116.258) {
+      isInside = false;
+    }
+  }
+
+  if (isInside) return null;
 
   // Boxes overlap, so pick the containing kecamatan whose center is nearest
   // instead of the first match.
   let foundKec: string | null = null;
   let bestDist = Infinity;
   for (const [kec, b] of Object.entries(KECAMATAN_BOUNDS)) {
+    if (kec === kodeKec) continue; // Jangan bandingkan dengan kecamatan asal yang sudah terbukti di luar batas
     if (!isInBounds(latitude, longitude, b)) continue;
     const [cLat, cLng] = boundsCenter(b);
     const dist = (latitude - cLat) ** 2 + (longitude - cLng) ** 2;
