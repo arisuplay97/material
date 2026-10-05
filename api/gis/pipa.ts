@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 export default async function handler(req: any, res: any) {
   // Setup CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -15,6 +15,70 @@ export default async function handler(req: any, res: any) {
       features: [],
       error: 'DATABASE_URL belum dikonfigurasi di Environment Variables.',
     });
+  }
+
+  // Handle POST: Upload GeoJSON directly to Neon database
+  if (req.method === 'POST') {
+    try {
+      const sql = neon(databaseUrl);
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const features = Array.isArray(body?.features) ? body.features : [];
+
+      if (features.length === 0) {
+        return res.status(400).json({ error: 'Tidak ada features dalam GeoJSON yang diunggah.' });
+      }
+
+      // Truncate tabel existing sebelum mengisi ulang data baru
+      try {
+        await sql.query('TRUNCATE TABLE existing');
+      } catch {}
+
+      let savedPipes = 0;
+
+      // Filter fitur LineString / MultiLineString
+      const lines = features.filter((f: any) => {
+        const t = f?.geometry?.type;
+        return t === 'LineString' || t === 'MultiLineString';
+      });
+
+      // Batch insert dalam kelipatan 50 baris
+      for (let i = 0; i < lines.length; i += 50) {
+        const chunk = lines.slice(i, i + 50);
+        const valueClauses: string[] = [];
+        const params: any[] = [];
+        let pIdx = 1;
+
+        for (const item of chunk) {
+          const props = item.properties || {};
+          const geomStr = JSON.stringify(item.geometry);
+          const nama = String(props.nama || props.nama_jalur || props.name || `Pipa ${savedPipes + 1}`).slice(0, 255);
+          const diameter = String(props.diameter || props.diameter_mm || props.dia || '100').slice(0, 50);
+          const jns_pipa = String(props.jns_pipa || props.kategori || 'Distribusi').slice(0, 50);
+          const materipipa = String(props.materipipa || props.material || 'PVC').slice(0, 50);
+          const panjang = Number(props.panjang || props.panjang_m) || 0;
+
+          valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, ST_SetSRID(ST_GeomFromGeoJSON($${pIdx++}), 4326))`);
+          params.push(nama, diameter, jns_pipa, materipipa, panjang, geomStr);
+          savedPipes++;
+        }
+
+        if (valueClauses.length > 0) {
+          await sql.query(
+            `INSERT INTO existing (nama, diameter, jns_pipa, materipipa, panjang, geom) VALUES ${valueClauses.join(', ')}`,
+            params
+          );
+        }
+      }
+
+      return res.status(200).json({
+        ok: true,
+        savedCount: savedPipes,
+        message: `Berhasil mengunggah ${savedPipes} pipa ke database Neon!`,
+      });
+    } catch (postErr: any) {
+      console.error('Error saving uploaded GeoJSON to Neon:', postErr);
+      return res.status(500).json({ error: postErr.message });
+    }
   }
 
   try {

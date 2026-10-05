@@ -712,6 +712,15 @@ export default function GisMap() {
       let isDbConnected = false;
       let dbEmptyNotice = '';
 
+      // Cek apakah ada file GeoJSON yang sebelumnya diunggah oleh pengguna di browser ini
+      let localGeoJson: any = null;
+      try {
+        const localSaved = localStorage.getItem('pdam_user_qgis_geojson');
+        if (localSaved) {
+          localGeoJson = JSON.parse(localSaved);
+        }
+      } catch {}
+
       try {
         const dbRes = await fetch(`/api/gis/pipa?t=${Date.now()}`);
         if (dbRes.ok) {
@@ -722,13 +731,20 @@ export default function GisMap() {
               json = dbJson;
               activeSource = 'PostgreSQL / PostGIS (Neon Cloud)';
             } else {
-              dbEmptyNotice = dbJson.notice || 'Tabel Neon terhubung, namun data fitur pipa & aksesoris masih 0 baris. Silakan ekspor layer fitur dari QGIS.';
+              dbEmptyNotice = dbJson.notice || 'Tabel Neon terhubung, namun data fitur pipa & aksesoris masih 0 baris.';
             }
           }
         }
       } catch {}
 
-      if (!json) {
+      // Jika database belum ada datanya, gunakan file GeoJSON yang diunggah pengguna (JANGAN timpa dengan dummy!)
+      if (!json && localGeoJson && Array.isArray(localGeoJson.features) && localGeoJson.features.length > 0) {
+        json = localGeoJson;
+        activeSource = 'File QGIS Unggahan Anda (Tersimpan Lokal)';
+      }
+
+      // Fallback ke folder public hanya jika tidak ada data sama sekali
+      if (!json && !localGeoJson) {
         try {
           const fileRes = await fetch(`/qgis/jaringan_pipa.geojson?t=${Date.now()}`);
           if (fileRes.ok) {
@@ -805,10 +821,17 @@ export default function GisMap() {
         const text = e.target?.result as string;
         const parsed = JSON.parse(text);
         if (parsed && (parsed.type === 'FeatureCollection' || parsed.features)) {
+          // 1. Simpan di localStorage agar tidak hilang saat polling auto-sync atau refresh
+          try {
+            localStorage.setItem('pdam_user_qgis_geojson', text);
+          } catch (storageErr) {
+            console.warn('Ukuran file melebihi kapasitas localStorage browser:', storageErr);
+          }
+
           setQgisData(parsed);
           setQgisLayerActive(true);
           const now = new Date();
-          setQgisLastSyncTime(now.toLocaleTimeString('id-ID') + ' (File Lokal)');
+          setQgisLastSyncTime(now.toLocaleTimeString('id-ID') + ' (File Terunggah)');
 
           let pipes = 0;
           let valves = 0;
@@ -824,6 +847,22 @@ export default function GisMap() {
           setQgisStats({ pipes, valves, dma });
           toast.success(`File ${file.name} berhasil dimuat (${pipes} pipa, ${valves} aksesoris)`);
           setShowQgisModal(false);
+
+          // 2. Kirim ke server agar tersimpan otomatis di database Neon Cloud
+          fetch('/api/gis/pipa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: text,
+          })
+            .then(async (r) => {
+              if (r.ok) {
+                const resJson = await r.json();
+                if (resJson.savedCount) {
+                  toast.success(`Tersimpan ke Neon Cloud (${resJson.savedCount} pipa)`, { duration: 4000 });
+                }
+              }
+            })
+            .catch(() => {});
         } else {
           toast.error('Format GeoJSON tidak valid (harus FeatureCollection)');
         }
