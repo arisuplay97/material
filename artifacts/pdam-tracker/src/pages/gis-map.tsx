@@ -44,6 +44,8 @@ import {
   Activity,
   CheckCircle2,
   UploadCloud,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -254,6 +256,148 @@ function getProp(props: any, keys: string[]): any {
   return undefined;
 }
 
+// Helper cerdas ekstraksi diameter aksesoris (dalam milimeter mm)
+function parseAccessoryDiameter(props: Record<string, any>): number | null {
+  const directVal = getProp(props, [
+    'diameter_mm', 'diameter', 'dimensi', 'dimensi_av', 
+    'dia', 'dn', 'ukuran', 'size', 'dim', 'd_mm', 'd'
+  ]);
+  if (directVal !== undefined && directVal !== null && directVal !== '') {
+    const raw = String(directVal).replace(/[^\d.]/g, '');
+    const num = parseFloat(raw);
+    if (!isNaN(num) && num > 0) {
+      if (num <= 24 && (String(directVal).includes('"') || String(directVal).toLowerCase().includes('in') || num <= 12)) {
+        return Math.round(num * 25.4);
+      }
+      return num;
+    }
+  }
+
+  const textVal = String(props.nama || props.jns_valve || props.jenis || props.keterangan || props.nama_aksesoris || '');
+  const match = textVal.match(/(?:DN|Ø|DIA|DIAMETER)?\s*(\d{2,4})\s*(?:mm|"|”)?/i);
+  if (match && match[1]) {
+    const num = parseFloat(match[1]);
+    if (!isNaN(num) && num >= 15 && num <= 2500) return num;
+  }
+  return null;
+}
+
+interface AccessoryStyle {
+  color: string;
+  borderColor: string;
+  label: string;
+  category: string;
+  iconSymbol: string;
+}
+
+function getAccessoryMeta(props: Record<string, any>): AccessoryStyle {
+  const text = (
+    String(props.kategori || '') + ' ' +
+    String(props.tipe || '') + ' ' +
+    String(props.type || '') + ' ' +
+    String(props.nama || '') + ' ' +
+    String(props.nama_aksesoris || '') + ' ' +
+    String(props.jns_valve || '') + ' ' +
+    String(props.jenis || '')
+  ).toLowerCase();
+
+  if (text.includes('airvalve') || text.includes('air valve') || text.includes('pelepas udara') || text.includes('udara')) {
+    return {
+      color: '#0284C7', // Sky Blue
+      borderColor: '#BAE6FD',
+      label: 'Air Valve',
+      category: 'airvalve',
+      iconSymbol: '⎈',
+    };
+  }
+  if (text.includes('washout') || text.includes('penguras') || text.includes('blow off') || text.includes('wash out')) {
+    return {
+      color: '#7C3AED', // Violet
+      borderColor: '#DDD6FE',
+      label: 'Washout (Penguras)',
+      category: 'washout',
+      iconSymbol: '💧',
+    };
+  }
+  if (text.includes('reservoir') || text.includes('bak penampung') || text.includes('tandon')) {
+    return {
+      color: '#059669', // Emerald
+      borderColor: '#A7F3D0',
+      label: 'Reservoir Air',
+      category: 'reservoir',
+      iconSymbol: '🏛️',
+    };
+  }
+  if (text.includes('ipa') || text.includes('wtp') || text.includes('pengolahan')) {
+    return {
+      color: '#4F46E5', // Indigo
+      borderColor: '#C7D2FE',
+      label: 'IPA (Pengolahan)',
+      category: 'ipa',
+      iconSymbol: '🏭',
+    };
+  }
+  if (text.includes('manometer') || text.includes('tekanan') || text.includes('pressure')) {
+    return {
+      color: '#E11D48', // Rose
+      borderColor: '#FECDD3',
+      label: 'Manometer',
+      category: 'manometer',
+      iconSymbol: '⏱️',
+    };
+  }
+  if (text.includes('bpt') || text.includes('pelepas tekan')) {
+    return {
+      color: '#0D9488', // Teal
+      borderColor: '#99F6E4',
+      label: 'Bak Pelepas Tekan (BPT)',
+      category: 'bpt',
+      iconSymbol: '⛨',
+    };
+  }
+  if (text.includes('dop') || text.includes('end cap') || text.includes('tutup')) {
+    return {
+      color: '#475569', // Slate
+      borderColor: '#CBD5E1',
+      label: 'End Cap (Dop)',
+      category: 'dop',
+      iconSymbol: '⊘',
+    };
+  }
+
+  // Default: Gate Valve / Katup
+  return {
+    color: '#D97706', // Amber 600
+    borderColor: '#FEF3C7',
+    label: 'Katup Valve (Gate)',
+    category: 'valve',
+    iconSymbol: '⚙',
+  };
+}
+
+// Skala ukuran titik Leaflet yang proporsional dan tidak menutupi peta (8px s/d 18px)
+function getMarkerSize(diameterMm: number | null): { outerPx: number; innerPx: number } {
+  if (diameterMm === null) {
+    return { outerPx: 10, innerPx: 3 };
+  }
+  if (diameterMm <= 50) {
+    return { outerPx: 8, innerPx: 2 };   // Retikulasi kecil <= 2"
+  }
+  if (diameterMm <= 80) {
+    return { outerPx: 10, innerPx: 3 };  // 2.5" - 3"
+  }
+  if (diameterMm <= 115) {
+    return { outerPx: 12, innerPx: 4 };  // 4" (100mm)
+  }
+  if (diameterMm <= 165) {
+    return { outerPx: 14, innerPx: 5 };  // 6" (150mm)
+  }
+  if (diameterMm <= 225) {
+    return { outerPx: 16, innerPx: 6 };  // 8" (200mm)
+  }
+  return { outerPx: 18, innerPx: 7 };    // Transmisi besar >= 10" (250mm+)
+}
+
 function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
@@ -331,33 +475,40 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
 
         pointToLayer: (feature: any, latlng: L.LatLng) => {
           const props = feature?.properties || {};
-          const kat = String(getProp(props, ['kategori', 'tipe', 'type', 'nama', 'nama_aksesoris']) || '').toLowerCase();
-          const isValve = kat.includes('valve') || kat.includes('katup') || kat.includes('prv') || kat.includes('gate');
+          const diam = parseAccessoryDiameter(props);
+          const meta = getAccessoryMeta(props);
+          const { outerPx, innerPx } = getMarkerSize(diam);
+
+          const hasCenterDot = outerPx >= 13;
+          const centerDotHtml = hasCenterDot
+            ? `<div style="width: ${innerPx}px; height: ${innerPx}px; border-radius: 50%; background-color: #FFFFFF; opacity: 0.95;"></div>`
+            : '';
 
           const iconHtml = `
             <div style="
-              background-color: ${isValve ? '#D97706' : '#7C3AED'};
-              width: 22px;
-              height: 22px;
+              background-color: ${meta.color};
+              width: ${outerPx}px;
+              height: ${outerPx}px;
               border-radius: 50%;
-              border: 2px solid white;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+              border: 1.5px solid #FFFFFF;
+              box-shadow: 0 1px 4px rgba(0,0,0,0.38), 0 0 0 1px rgba(0,0,0,0.12);
               display: flex;
               align-items: center;
               justify-content: center;
-              color: white;
-              font-size: 11px;
-              font-weight: bold;
+              cursor: pointer;
+              transition: transform 0.15s ease;
             ">
-              ${isValve ? '⚙' : '●'}
+              ${centerDotHtml}
             </div>
           `;
 
+          const half = Math.round(outerPx / 2);
           const customIcon = L.divIcon({
             html: iconHtml,
-            className: 'qgis-node-icon',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
+            className: 'qgis-accessory-marker',
+            iconSize: [outerPx, outerPx],
+            iconAnchor: [half, half],
+            popupAnchor: [0, -half - 2],
           });
 
           return L.marker(latlng, { icon: customIcon });
@@ -377,15 +528,27 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
 
           const props = feature?.properties || {};
           const geomType = feature?.geometry?.type;
+          const isPoint = geomType === 'Point';
 
           const rawTitle = getProp(props, ['nama_jalur', 'nama', 'name', 'jalur', 'jalan', 'lokasi', 'keterangan', 'nama_aksesoris', 'nama_zona', 'kode_pipa', 'id']);
           const title = escapeHtml(String(rawTitle || 'Fitur Jaringan PDAM'));
           const subtitle = escapeHtml(String(getProp(props, ['kategori', 'category', 'jenis', 'tipe']) || geomType));
 
-          // Hover Tooltip
-          layer.bindTooltip(`<strong>${title}</strong><br/><span style="font-size:10px; color:#64748b;">${subtitle}</span>`, {
-            sticky: true,
-          });
+          // Hover Tooltip: Menyesuaikan apakah garis pipa atau titik aksesoris
+          if (isPoint) {
+            const meta = getAccessoryMeta(props);
+            const diam = parseAccessoryDiameter(props);
+            const diamStr = diam ? ` • Ø ${diam} mm` : '';
+            layer.bindTooltip(
+              `<strong>${escapeHtml(meta.label)}${diamStr}</strong><br/><span style="font-size:10px; color:#64748b;">${escapeHtml(title)}</span>`,
+              { sticky: true }
+            );
+          } else {
+            layer.bindTooltip(
+              `<strong>${title}</strong><br/><span style="font-size:10px; color:#64748b;">${subtitle}</span>`,
+              { sticky: true }
+            );
+          }
 
           // Dynamic Table Popup: Menampilkan SEMUA kolom atribut apapun namanya
           let tableRows = '';
@@ -402,11 +565,16 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
             `;
           }
 
+          const pointMeta = isPoint ? getAccessoryMeta(props) : null;
+          const pointDiam = isPoint ? parseAccessoryDiameter(props) : null;
+          const headerBadgeColor = isPoint ? (pointMeta?.color || '#D97706') : '#2563EB';
+          const headerTitle = isPoint ? `${pointMeta?.label || 'Aksesoris'} ${pointDiam ? `Ø${pointDiam}mm` : ''}` : title;
+
           const popupContent = `
             <div style="font-family: system-ui, sans-serif; min-width: 210px; padding: 2px;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #2563eb; margin-top: 2px;"></span>
-                <span style="font-weight: 700; font-size: 13px; color: #0f172a; line-height: 1.2;">${title}</span>
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${headerBadgeColor}; margin-top: 2px;"></span>
+                <span style="font-weight: 700; font-size: 13px; color: #0f172a; line-height: 1.2;">${escapeHtml(headerTitle)}</span>
               </div>
               <div style="font-size: 10px; color: #0284c7; font-weight: 600; margin-bottom: 8px; text-transform: uppercase;">
                 ${subtitle} • QGIS Realtime
@@ -813,65 +981,197 @@ export default function GisMap() {
     return () => clearInterval(interval);
   }, [qgisAutoSync, fetchQgisData]);
 
-  // Handle local GeoJSON file drag & drop override
-  const handleDropGeoJson = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const parsed = JSON.parse(text);
-        if (parsed && (parsed.type === 'FeatureCollection' || parsed.features)) {
-          // 1. Simpan di localStorage agar tidak hilang saat polling auto-sync atau refresh
-          try {
-            localStorage.setItem('pdam_user_qgis_geojson', text);
-          } catch (storageErr) {
-            console.warn('Ukuran file melebihi kapasitas localStorage browser:', storageErr);
-          }
+  // Handle multi-file GeoJSON upload & smart layer merging (Pipa + Valve + Aksesoris)
+  const handleProcessGeoJsonFiles = async (inputFiles: FileList | File[] | File) => {
+    const fileList: File[] = (inputFiles instanceof File) 
+      ? [inputFiles] 
+      : Array.from(inputFiles as any);
 
-          setQgisData(parsed);
-          setQgisLayerActive(true);
-          const now = new Date();
-          setQgisLastSyncTime(now.toLocaleTimeString('id-ID') + ' (File Terunggah)');
+    if (fileList.length === 0) return;
 
-          let pipes = 0;
-          let valves = 0;
-          let dma = 0;
-          if (Array.isArray(parsed.features)) {
-            parsed.features.forEach((f: any) => {
-              const type = f.geometry?.type;
-              if (type === 'LineString' || type === 'MultiLineString') pipes++;
-              else if (type === 'Point') valves++;
-              else if (type === 'Polygon' || type === 'MultiPolygon') dma++;
-            });
-          }
-          setQgisStats({ pipes, valves, dma });
-          toast.success(`File ${file.name} berhasil dimuat (${pipes} pipa, ${valves} aksesoris)`);
-          setShowQgisModal(false);
-
-          // 2. Kirim ke server agar tersimpan otomatis di database Neon Cloud
-          fetch('/api/gis/pipa', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: text,
-          })
-            .then(async (r) => {
-              if (r.ok) {
-                const resJson = await r.json();
-                if (resJson.savedCount) {
-                  toast.success(`Tersimpan ke Neon Cloud (${resJson.savedCount} pipa)`, { duration: 4000 });
-                }
-              }
-            })
-            .catch(() => {});
-        } else {
-          toast.error('Format GeoJSON tidak valid (harus FeatureCollection)');
-        }
-      } catch (err) {
-        toast.error('Gagal membaca format file GeoJSON');
+    try {
+      let currentFeatures: any[] = [];
+      if (qgisData && Array.isArray(qgisData.features)) {
+        currentFeatures = [...qgisData.features];
       }
-    };
-    reader.readAsText(file);
+
+      const fileNames: string[] = [];
+      let totalPipes = 0;
+      let totalValves = 0;
+
+      for (const file of fileList) {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || (!parsed.features && parsed.type !== 'FeatureCollection')) {
+          toast.error(`File ${file.name} bukan format GeoJSON FeatureCollection yang valid.`);
+          continue;
+        }
+
+        const features = Array.isArray(parsed.features) ? parsed.features : [];
+        const layerTag = file.name.replace(/\.geojson$/i, '').toLowerCase();
+
+        const fileLines = features.filter((f: any) => {
+          const t = f?.geometry?.type;
+          return t === 'LineString' || t === 'MultiLineString';
+        });
+
+        const filePoints = features.filter((f: any) => f?.geometry?.type === 'Point');
+
+        // Jika file membawa garis pipa (misal: existing.geojson), perbarui layer pipa
+        if (fileLines.length > 0) {
+          // Tandai metadata sumber layer
+          fileLines.forEach((l: any) => {
+            if (!l.properties) l.properties = {};
+            l.properties.layer_source = l.properties.layer_source || file.name;
+          });
+
+          // Bersihkan garis lama yang berasal dari sumber sama atau ganti semua pipa jika belum ada layer_source
+          currentFeatures = currentFeatures.filter((f: any) => {
+            const t = f?.geometry?.type;
+            if (t !== 'LineString' && t !== 'MultiLineString') return true;
+            return false; // Timpa set pipa agar tidak tumpang tindih duplikat
+          });
+
+          currentFeatures.push(...fileLines);
+          totalPipes += fileLines.length;
+        }
+
+        // Jika file membawa titik aksesoris (misal: valve.geojson, airvalve.geojson)
+        if (filePoints.length > 0) {
+          filePoints.forEach((p: any) => {
+            if (!p.properties) p.properties = {};
+            p.properties.layer_source = p.properties.layer_source || file.name;
+          });
+
+          // Hapus titik lama dari layer_source yang sama agar tidak duplikat
+          currentFeatures = currentFeatures.filter((f: any) => {
+            if (f?.geometry?.type !== 'Point') return true;
+            const src = String(f?.properties?.layer_source || '').toLowerCase();
+            return src !== file.name.toLowerCase() && src !== layerTag;
+          });
+
+          currentFeatures.push(...filePoints);
+          totalValves += filePoints.length;
+        }
+
+        fileNames.push(file.name);
+      }
+
+      if (currentFeatures.length === 0) {
+        toast.error('Tidak ada fitur spasial yang berhasil diekstrak.');
+        return;
+      }
+
+      const combinedCollection = {
+        type: 'FeatureCollection',
+        name: 'PDAM_Lombok_Tengah_MultiLayer',
+        crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+        features: currentFeatures,
+      };
+
+      // 1. Simpan di localStorage agar tetap muncul saat refresh
+      try {
+        localStorage.setItem('pdam_user_qgis_geojson', JSON.stringify(combinedCollection));
+      } catch (storageErr) {
+        console.warn('LocalStorage browser penuh, data aktif di sesi memori:', storageErr);
+      }
+
+      setQgisData(combinedCollection);
+      setQgisLayerActive(true);
+      const now = new Date();
+      setQgisLastSyncTime(now.toLocaleTimeString('id-ID') + ` (${fileNames.join(', ')})`);
+
+      let pipes = 0;
+      let valves = 0;
+      let dma = 0;
+      currentFeatures.forEach((f: any) => {
+        const type = f.geometry?.type;
+        if (type === 'LineString' || type === 'MultiLineString') pipes++;
+        else if (type === 'Point') valves++;
+        else if (type === 'Polygon' || type === 'MultiPolygon') dma++;
+      });
+      setQgisStats({ pipes, valves, dma });
+
+      toast.success(`Berhasil memuat ${fileNames.length} file layer (${pipes} pipa, ${valves} aksesoris)`);
+      setShowQgisModal(false);
+
+      // 2. Unggah data gabungan ke Neon Cloud DB agar tersinkron ke SEMUA device & laptop lain
+      fetch('/api/gis/pipa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(combinedCollection),
+      })
+        .then(async (r) => {
+          if (r.ok) {
+            const resJson = await r.json();
+            if (resJson.savedCount) {
+              toast.success(`Tersinkron ke Cloud Neon (${resJson.savedCount} fitur). Semua device sekarang menampilkan data ini!`, { duration: 5000 });
+            }
+          }
+        })
+        .catch(() => {});
+    } catch (err: any) {
+      console.error('Error memproses file GeoJSON:', err);
+      toast.error('Gagal membaca file: ' + (err?.message || 'Format tidak sesuai'));
+    }
   };
+
+  // Reset / Hapus Layer Kustom dari browser
+  const handleClearCustomLayers = () => {
+    try {
+      localStorage.removeItem('pdam_user_qgis_geojson');
+      setQgisData(null);
+      setQgisStats({ pipes: 0, valves: 0, dma: 0 });
+      fetchQgisData(true);
+      toast.info('Layer kustom telah dibersihkan. Memuat ulang dari server.');
+    } catch {}
+  };
+
+  // Kalkulasi statistik rincian layer QGIS untuk Legenda Dinamis
+  const qgisBreakdown = useMemo(() => {
+    const result = {
+      transmisi: 0,
+      distribusi: 0,
+      retikulasi: 0,
+      valves: 0,
+      airvalves: 0,
+      washouts: 0,
+      reservoirs: 0,
+      ipas: 0,
+      others: 0,
+    };
+
+    if (!qgisData || !Array.isArray(qgisData.features)) return result;
+
+    for (const f of qgisData.features) {
+      const type = f.geometry?.type;
+      const props = f.properties || {};
+
+      if (type === 'LineString' || type === 'MultiLineString') {
+        const rawKat = String(getProp(props, ['kategori', 'category', 'fungsi', 'jenis', 'kelas', 'type']) || '').toLowerCase();
+        const rawDiam = getProp(props, ['diameter_mm', 'diameter', 'diam', 'dia', 'dn', 'ukuran', 'd_mm', 'size', 'dim']) || 100;
+        const diam = Number(String(rawDiam).replace(/[^\d.-]/g, '')) || 100;
+
+        if (rawKat.includes('transmisi') || diam >= 200) {
+          result.transmisi++;
+        } else if (rawKat.includes('retikulasi') || diam <= 90) {
+          result.retikulasi++;
+        } else {
+          result.distribusi++;
+        }
+      } else if (type === 'Point') {
+        const meta = getAccessoryMeta(props);
+        if (meta.category === 'valve') result.valves++;
+        else if (meta.category === 'airvalve') result.airvalves++;
+        else if (meta.category === 'washout') result.washouts++;
+        else if (meta.category === 'reservoir') result.reservoirs++;
+        else if (meta.category === 'ipa') result.ipas++;
+        else result.others++;
+      }
+    }
+
+    return result;
+  }, [qgisData]);
 
   // Wilayah Map lookup
   const wilayahMap = useMemo(() => {
@@ -1845,55 +2145,156 @@ export default function GisMap() {
               <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
                 <span>Simbol Jaringan QGIS</span>
                 <span className="text-blue-600 font-semibold font-sans">
-                  {qgisStats.pipes > 0 ? `${qgisStats.pipes} Pipa Terdeteksi` : 'PostGIS Realtime'}
+                  {qgisStats.pipes + qgisStats.valves > 0
+                    ? `${qgisStats.pipes} Pipa • ${qgisStats.valves} Aksesoris`
+                    : 'PostGIS Realtime'}
                 </span>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+              <div className="flex-1 overflow-y-auto p-2 space-y-1 text-xs">
+                {/* Section Header: Jaringan Pipa */}
+                <div className="text-[9.5px] font-mono uppercase text-muted-foreground font-bold px-1 pt-0.5">
+                  Jalur Pipa Air
+                </div>
+
                 {/* Transmisi */}
-                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="w-6 h-1.5 rounded-full bg-[#E11D48] shrink-0 shadow-xs" style={{ height: '4.5px' }} />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Transmisi Utama</span>
-                    <span className="text-[9.5px] text-muted-foreground">Diameter ≥ 200 mm (HDPE PN-16)</span>
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-1.5 rounded-full bg-[#E11D48] shrink-0 shadow-xs" style={{ height: '4px' }} />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Transmisi Utama</span>
+                      <span className="text-[9px] text-muted-foreground">Diameter ≥ 200 mm (HDPE/DI)</span>
+                    </div>
                   </div>
+                  {qgisBreakdown.transmisi > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-rose-300 text-rose-600">
+                      {qgisBreakdown.transmisi}
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Distribusi Primer */}
-                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="w-6 h-1 rounded-full bg-[#2563EB] shrink-0 shadow-xs" style={{ height: '3.5px' }} />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-[11px] leading-snug">Distribusi Primer</span>
-                    <span className="text-[9.5px] text-muted-foreground">Diameter 150 - 160 mm (PVC RRJ)</span>
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-1 rounded-full bg-[#2563EB] shrink-0 shadow-xs" style={{ height: '3px' }} />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Distribusi Primer</span>
+                      <span className="text-[9px] text-muted-foreground">Diameter 100 - 160 mm (PVC/GI)</span>
+                    </div>
                   </div>
+                  {qgisBreakdown.distribusi > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-blue-300 text-blue-600">
+                      {qgisBreakdown.distribusi}
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Retikulasi */}
-                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="w-6 h-0.5 rounded-full bg-[#0284C7] shrink-0 shadow-xs" style={{ height: '2px' }} />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Retikulasi</span>
-                    <span className="text-[9.5px] text-muted-foreground">Diameter ≤ 90 mm (Pipa Lingkungan)</span>
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-0.5 rounded-full bg-[#0284C7] shrink-0 shadow-xs" style={{ height: '2px' }} />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Retikulasi</span>
+                      <span className="text-[9px] text-muted-foreground">Diameter ≤ 90 mm (Pipa Lingkungan)</span>
+                    </div>
                   </div>
+                  {qgisBreakdown.retikulasi > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-sky-300 text-sky-600">
+                      {qgisBreakdown.retikulasi}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Section Header: Katup & Aksesoris */}
+                <div className="text-[9.5px] font-mono uppercase text-muted-foreground font-bold px-1 pt-2 border-t border-border/40">
+                  Katup & Aksesoris
                 </div>
 
                 {/* Katup Valve */}
-                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="w-5 h-5 rounded-full bg-amber-500 border border-white text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">
-                    ⚙
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#D97706] border border-white shadow-xs shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Katup Valve (Gate / PRV)</span>
+                      <span className="text-[9px] text-muted-foreground">Pengatur Debit & Tekanan</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-[11px] leading-snug">Katup Valve (Gate / PRV)</span>
-                    <span className="text-[9.5px] text-muted-foreground">Pengatur Debit & Tekanan Air</span>
-                  </div>
+                  {qgisBreakdown.valves > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-amber-300 text-amber-600 font-bold">
+                      {qgisBreakdown.valves}
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Batas DMA */}
-                <div className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="w-5 h-3.5 border-1.5 border-dashed border-[#0284C7] bg-[#0284C7]/10 rounded shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-[11px] leading-snug">Zona DMA Distribusi</span>
-                    <span className="text-[9.5px] text-muted-foreground">Poligon Wilayah Aliran Mandiri</span>
+                {/* Air Valve */}
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#0284C7] border border-white shadow-xs shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Air Valve</span>
+                      <span className="text-[9px] text-muted-foreground">Pelepas Udara Otomatis</span>
+                    </div>
+                  </div>
+                  {qgisBreakdown.airvalves > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-sky-300 text-sky-600">
+                      {qgisBreakdown.airvalves}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Washout */}
+                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#7C3AED] border border-white shadow-xs shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-foreground text-[11px] leading-snug">Washout</span>
+                      <span className="text-[9px] text-muted-foreground">Katup Penguras Lumpur</span>
+                    </div>
+                  </div>
+                  {qgisBreakdown.washouts > 0 && (
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-purple-300 text-purple-600">
+                      {qgisBreakdown.washouts}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Reservoir / IPA */}
+                {(qgisBreakdown.reservoirs > 0 || qgisBreakdown.ipas > 0) && (
+                  <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#059669] border border-white shadow-xs shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-foreground text-[11px] leading-snug">Reservoir / IPA</span>
+                        <span className="text-[9px] text-muted-foreground">Penampungan & Pengolahan</span>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-emerald-300 text-emerald-600">
+                      {qgisBreakdown.reservoirs + qgisBreakdown.ipas}
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Visual Scale Indicator for Valve Diameters */}
+                <div className="p-2 rounded-xl bg-muted/40 border border-border/60 mt-1 space-y-1">
+                  <div className="text-[9px] font-mono text-muted-foreground font-semibold flex items-center justify-between">
+                    <span>Skala Ukuran Titik Valve:</span>
+                    <span className="text-[8.5px] text-primary">Proporsional</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-0.5 px-1">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-amber-500 border border-white shadow-xs" />
+                      <span className="text-[9px] font-mono text-muted-foreground">≤Ø50mm</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-amber-500 border border-white shadow-xs" />
+                      <span className="text-[9px] font-mono text-muted-foreground">Ø100mm</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 rounded-full bg-amber-500 border border-white shadow-xs flex items-center justify-center">
+                        <div className="w-1 h-1 rounded-full bg-white" />
+                      </div>
+                      <span className="text-[9px] font-mono text-muted-foreground">≥Ø200mm</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2115,27 +2516,53 @@ export default function GisMap() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) handleDropGeoJson(file);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  handleProcessGeoJsonFiles(e.dataTransfer.files);
+                }
               }}
               className="p-4 border-2 border-dashed border-border rounded-xl text-center bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer"
               onClick={() => {
                 const input = document.createElement('input');
                 input.type = 'file';
+                input.multiple = true;
                 input.accept = '.geojson,.json';
                 input.onchange = (e: any) => {
-                  const file = e.target?.files?.[0];
-                  if (file) handleDropGeoJson(file);
+                  if (e.target?.files && e.target.files.length > 0) {
+                    handleProcessGeoJsonFiles(e.target.files);
+                  }
                 };
                 input.click();
               }}
             >
               <UploadCloud className="w-6 h-6 mx-auto text-blue-500 mb-1.5" />
-              <span className="font-semibold text-foreground block">Mau Uji File GeoJSON Lain?</span>
-              <span className="text-[11px] text-muted-foreground">
-                Klik atau drag-and-drop file <code className="text-primary font-mono">.geojson</code> ke sini untuk langsung tampil di peta
+              <span className="font-semibold text-foreground block">Unggah Layer GeoJSON (Bisa Pilih Banyak File)</span>
+              <span className="text-[11px] text-muted-foreground block mb-2">
+                Pilih atau drag file <code className="text-primary font-mono font-semibold">existing.geojson</code>, <code className="text-amber-500 font-mono font-semibold">valve.geojson</code>, <code className="text-sky-500 font-mono font-semibold">airvalve.geojson</code> sekaligus. Sistem otomatis menggabungkan seluruh layer dan menyimpannya ke Neon Cloud!
               </span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-semibold hover:bg-primary/20 transition-colors">
+                <Plus className="w-3 h-3" /> Pilih File GeoJSON (Multi-Layer)
+              </div>
             </div>
+
+            {/* Tombol Bersihkan Layer Kustom jika pengguna ingin kembali ke server */}
+            {qgisSource.includes('Unggahan') && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                    Sedang menggunakan layer kustom tersimpan lokal
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearCustomLayers}
+                  className="h-7 text-[10px] border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 gap-1 rounded-lg"
+                >
+                  <Trash2 className="w-3 h-3 text-rose-500" />
+                  <span>Reset Layer Kustom</span>
+                </Button>
+              </div>
+            )}
 
             {/* 3 Step Guide */}
             <div className="p-3.5 rounded-xl border border-border bg-muted/30 space-y-2">

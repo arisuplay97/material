@@ -28,52 +28,97 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'Tidak ada features dalam GeoJSON yang diunggah.' });
       }
 
-      // Truncate tabel existing sebelum mengisi ulang data baru
-      try {
-        await sql.query('TRUNCATE TABLE existing');
-      } catch {}
-
       let savedPipes = 0;
+      let savedValves = 0;
 
-      // Filter fitur LineString / MultiLineString
+      // Filter fitur LineString / MultiLineString (Jalur Pipa)
       const lines = features.filter((f: any) => {
         const t = f?.geometry?.type;
         return t === 'LineString' || t === 'MultiLineString';
       });
 
-      // Batch insert dalam kelipatan 50 baris
-      for (let i = 0; i < lines.length; i += 50) {
-        const chunk = lines.slice(i, i + 50);
-        const valueClauses: string[] = [];
-        const params: any[] = [];
-        let pIdx = 1;
+      // Filter fitur Point (Katup Valve, Air Valve, Aksesoris)
+      const points = features.filter((f: any) => f?.geometry?.type === 'Point');
 
-        for (const item of chunk) {
-          const props = item.properties || {};
-          const geomStr = JSON.stringify(item.geometry);
-          const nama = String(props.nama || props.nama_jalur || props.name || `Pipa ${savedPipes + 1}`).slice(0, 255);
-          const diameter = String(props.diameter || props.diameter_mm || props.dia || '100').slice(0, 50);
-          const jns_pipa = String(props.jns_pipa || props.kategori || 'Distribusi').slice(0, 50);
-          const materipipa = String(props.materipipa || props.material || 'PVC').slice(0, 50);
-          const panjang = Number(props.panjang || props.panjang_m) || 0;
+      // 1. Batch insert garis pipa ke tabel 'existing'
+      if (lines.length > 0) {
+        try {
+          await sql.query('TRUNCATE TABLE existing');
+        } catch {}
 
-          valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, ST_SetSRID(ST_GeomFromGeoJSON($${pIdx++}), 4326))`);
-          params.push(nama, diameter, jns_pipa, materipipa, panjang, geomStr);
-          savedPipes++;
+        for (let i = 0; i < lines.length; i += 50) {
+          const chunk = lines.slice(i, i + 50);
+          const valueClauses: string[] = [];
+          const params: any[] = [];
+          let pIdx = 1;
+
+          for (const item of chunk) {
+            const props = item.properties || {};
+            const geomStr = JSON.stringify(item.geometry);
+            const nama = String(props.nama || props.nama_jalur || props.name || `Pipa ${savedPipes + 1}`).slice(0, 255);
+            const diameter = String(props.diameter || props.diameter_mm || props.dia || '100').slice(0, 50);
+            const jns_pipa = String(props.jns_pipa || props.kategori || 'Distribusi').slice(0, 50);
+            const materipipa = String(props.materipipa || props.material || 'PVC').slice(0, 50);
+            const panjang = Number(props.panjang || props.panjang_m) || 0;
+
+            valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, ST_SetSRID(ST_GeomFromGeoJSON($${pIdx++}), 4326))`);
+            params.push(nama, diameter, jns_pipa, materipipa, panjang, geomStr);
+            savedPipes++;
+          }
+
+          if (valueClauses.length > 0) {
+            await sql.query(
+              `INSERT INTO existing (nama, diameter, jns_pipa, materipipa, panjang, geom) VALUES ${valueClauses.join(', ')}`,
+              params
+            );
+          }
         }
+      }
 
-        if (valueClauses.length > 0) {
-          await sql.query(
-            `INSERT INTO existing (nama, diameter, jns_pipa, materipipa, panjang, geom) VALUES ${valueClauses.join(', ')}`,
-            params
-          );
+      // 2. Batch insert titik aksesoris ke tabel 'valve'
+      if (points.length > 0) {
+        try {
+          await sql.query('TRUNCATE TABLE valve');
+        } catch {}
+
+        for (let i = 0; i < points.length; i += 50) {
+          const chunk = points.slice(i, i + 50);
+          const valueClauses: string[] = [];
+          const params: any[] = [];
+          let pIdx = 1;
+
+          for (const item of chunk) {
+            const props = item.properties || {};
+            const geomStr = JSON.stringify(item.geometry);
+            const jns_valve = String(props.jns_valve || props.jenis || props.nama || props.nama_aksesoris || 'Gate Valve').slice(0, 255);
+            const rawDiam = String(props.diameter || props.diameter_mm || props.dimensi || props.dimensi_av || props.dia || props.dn || '100').replace(/[^\d.]/g, '');
+            let diameter = Number(rawDiam) || 100;
+            if (diameter > 0 && diameter <= 24 && (String(props.diameter || '').includes('"') || String(props.dimensi || '').includes('"') || diameter <= 12)) {
+              diameter = Math.round(diameter * 25.4);
+            }
+            const fungsi = String(props.fungsi || props.tipe || 'Distribusi').slice(0, 255);
+            const kondisi = String(props.kondisi || 'Baik').slice(0, 50);
+
+            valueClauses.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, ST_SetSRID(ST_GeomFromGeoJSON($${pIdx++}), 4326))`);
+            params.push(jns_valve, diameter, fungsi, kondisi, geomStr);
+            savedValves++;
+          }
+
+          if (valueClauses.length > 0) {
+            await sql.query(
+              `INSERT INTO valve (jns_valve, diameter, fungsi, kondisi, geom) VALUES ${valueClauses.join(', ')}`,
+              params
+            );
+          }
         }
       }
 
       return res.status(200).json({
         ok: true,
-        savedCount: savedPipes,
-        message: `Berhasil mengunggah ${savedPipes} pipa ke database Neon!`,
+        savedPipes,
+        savedValves,
+        savedCount: savedPipes + savedValves,
+        message: `Berhasil mengunggah ${savedPipes} pipa dan ${savedValves} aksesoris ke Neon Cloud!`,
       });
     } catch (postErr: any) {
       console.error('Error saving uploaded GeoJSON to Neon:', postErr);
@@ -191,7 +236,7 @@ export default async function handler(req: any, res: any) {
           'valve' as kategori,
           COALESCE(fungsi, 'Distribusi') as tipe,
           COALESCE(kondisi, 'Baik') as kondisi,
-          diameter as diameter_mm,
+          COALESCE(NULLIF(regexp_replace(diameter::text, '[^0-9.]', '', 'g'), '')::numeric, 100) as diameter_mm,
           ST_AsGeoJSON(geom)::json as geometry
         FROM valve WHERE geom IS NOT NULL
       `);
@@ -206,7 +251,7 @@ export default async function handler(req: any, res: any) {
           'airvalve' as kategori,
           COALESCE(fungsi, 'Pelepas Udara') as tipe,
           COALESCE(kondisi, 'Baik') as kondisi,
-          dimensi_av as diameter_mm,
+          COALESCE(NULLIF(regexp_replace(dimensi_av::text, '[^0-9.]', '', 'g'), '')::numeric, 50) as diameter_mm,
           ST_AsGeoJSON(geom)::json as geometry
         FROM airvalve WHERE geom IS NOT NULL
       `);
