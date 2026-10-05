@@ -179,6 +179,7 @@ export default async function handler(req: any, res: any) {
             sumber_air: r.sumber_air,
             status: r.status,
             tahun_pasang: r.tahun_pasang,
+            layer_source: 'existing.geojson',
           },
         });
       }
@@ -219,6 +220,7 @@ export default async function handler(req: any, res: any) {
             tahun_pasang: r.tahun_pasang,
             zona_dma: r.zona_dma,
             sumber_air: r.sumber_air,
+            layer_source: 'gis_pipa.geojson',
           },
         });
       }
@@ -391,6 +393,7 @@ export default async function handler(req: any, res: any) {
             tipe: a.tipe,
             kondisi: a.kondisi,
             diameter_mm: a.diameter_mm,
+            layer_source: a.kategori ? `${a.kategori}.geojson` : 'valve.geojson',
           },
         });
       }

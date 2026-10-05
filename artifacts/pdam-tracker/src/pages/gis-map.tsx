@@ -24,6 +24,8 @@ import {
   Filter,
   Eye,
   EyeOff,
+  ChevronDown,
+  ChevronUp,
   AlertTriangle,
   Building2,
   AlertOctagon,
@@ -239,6 +241,16 @@ function MapLibreLayer({ active }: { active: boolean }) {
 interface QgisVectorLayerProps {
   active: boolean;
   data: any;
+  hiddenLayers?: Set<string>;
+}
+
+export interface QgisLayerItem {
+  id: string;
+  name: string;
+  category: string;
+  geomType: 'line' | 'point' | 'polygon';
+  count: number;
+  color: string;
 }
 
 // Helper cerdas pendeteksi alias nama kolom QGIS (misal: DIA, DIAMETER, DN, UKURAN, BAHAN, MATERIAL)
@@ -398,7 +410,46 @@ function getMarkerSize(diameterMm: number | null): { outerPx: number; innerPx: n
   return { outerPx: 18, innerPx: 7 };    // Transmisi besar >= 10" (250mm+)
 }
 
-function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
+// Helper cerdas penentu id/nama layer untuk setiap fitur spasial (agar bisa di-hide/show per file di legenda)
+export function getFeatureLayerKey(feature: any): string {
+  const props = feature?.properties || {};
+  const rawSource = props.layer_source || props.layer || props.file_source;
+  const geomType = feature?.geometry?.type;
+  const isLine = geomType === 'LineString' || geomType === 'MultiLineString';
+  const isPoint = geomType === 'Point';
+
+  if (rawSource) {
+    const srcStr = String(rawSource).trim();
+    const lower = srcStr.toLowerCase();
+    if (
+      lower.includes('existing') ||
+      lower.includes('pipa') ||
+      lower.includes('valve') ||
+      lower.includes('airvalve') ||
+      lower.includes('washout') ||
+      lower.includes('reservoir') ||
+      lower.includes('ipa')
+    ) {
+      return srcStr.endsWith('.geojson') || srcStr.endsWith('.json') ? srcStr : `${srcStr}.geojson`;
+    }
+    if (isLine) return srcStr.endsWith('.geojson') || srcStr.endsWith('.json') ? srcStr : `${srcStr}.geojson`;
+    if (isPoint) {
+      const meta = getAccessoryMeta(props);
+      return `${meta.category || 'valve'}.geojson`;
+    }
+    return srcStr;
+  }
+
+  // Fallback jika fitur tidak menyimpan layer_source
+  if (isLine) return 'existing.geojson';
+  if (isPoint) {
+    const meta = getAccessoryMeta(props);
+    return `${meta.category || 'valve'}.geojson`;
+  }
+  return 'area_dma.geojson';
+}
+
+function QgisVectorLayer({ active, data, hiddenLayers }: QgisVectorLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
 
@@ -427,6 +478,13 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
           const geomType = feature?.geometry?.type;
           if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
             return false;
+          }
+          // Filter layer yang disembunyikan (hide) oleh pengguna di Legenda
+          if (hiddenLayers && hiddenLayers.size > 0) {
+            const key = getFeatureLayerKey(feature);
+            if (hiddenLayers.has(key)) {
+              return false;
+            }
           }
           return true;
         },
@@ -606,7 +664,7 @@ function QgisVectorLayer({ active, data }: QgisVectorLayerProps) {
         layerRef.current = null;
       }
     };
-  }, [active, data, map]);
+  }, [active, data, map, hiddenLayers]);
 
   return null;
 }
@@ -851,6 +909,32 @@ export default function GisMap() {
   // Drawers & Panes
   const [showLegend, setShowLegend] = useState<boolean>(true);
   const [legendTab, setLegendTab] = useState<'pipa' | 'wilayah'>('pipa');
+  const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
+  const [showTechnicalSymbols, setShowTechnicalSymbols] = useState<boolean>(false);
+
+  // Toggle hide/show per layer GeoJSON
+  const toggleLayerVisibility = (layerId: string) => {
+    setHiddenLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(layerId)) {
+        next.delete(layerId);
+      } else {
+        next.add(layerId);
+      }
+      return next;
+    });
+  };
+
+  const showAllLayers = () => {
+    setHiddenLayers(new Set());
+  };
+
+  const hideAllLayers = () => {
+    if (uploadedLayers.length > 0) {
+      setHiddenLayers(new Set(uploadedLayers.map((l) => l.id)));
+    }
+  };
+
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -1019,17 +1103,19 @@ export default function GisMap() {
 
         // Jika file membawa garis pipa (misal: existing.geojson), perbarui layer pipa
         if (fileLines.length > 0) {
-          // Tandai metadata sumber layer
+          // Tandai metadata sumber layer dengan nama file persis
           fileLines.forEach((l: any) => {
             if (!l.properties) l.properties = {};
-            l.properties.layer_source = l.properties.layer_source || file.name;
+            l.properties.layer_source = file.name;
           });
 
-          // Bersihkan garis lama yang berasal dari sumber sama atau ganti semua pipa jika belum ada layer_source
+          // Bersihkan garis lama yang berasal dari sumber sama atau ganti pipa default
           currentFeatures = currentFeatures.filter((f: any) => {
             const t = f?.geometry?.type;
             if (t !== 'LineString' && t !== 'MultiLineString') return true;
-            return false; // Timpa set pipa agar tidak tumpang tindih duplikat
+            const src = String(f?.properties?.layer_source || '').toLowerCase();
+            if (!src) return false;
+            return src !== file.name.toLowerCase() && src !== layerTag;
           });
 
           currentFeatures.push(...fileLines);
@@ -1040,13 +1126,14 @@ export default function GisMap() {
         if (filePoints.length > 0) {
           filePoints.forEach((p: any) => {
             if (!p.properties) p.properties = {};
-            p.properties.layer_source = p.properties.layer_source || file.name;
+            p.properties.layer_source = file.name;
           });
 
           // Hapus titik lama dari layer_source yang sama agar tidak duplikat
           currentFeatures = currentFeatures.filter((f: any) => {
             if (f?.geometry?.type !== 'Point') return true;
             const src = String(f?.properties?.layer_source || '').toLowerCase();
+            if (!src) return false;
             return src !== file.name.toLowerCase() && src !== layerTag;
           });
 
@@ -1078,6 +1165,15 @@ export default function GisMap() {
 
       setQgisData(combinedCollection);
       setQgisLayerActive(true);
+      // Pastikan file yang baru diunggah langsung tampil (tidak ter-hide)
+      setHiddenLayers((prev) => {
+        const next = new Set(prev);
+        for (const fn of fileNames) {
+          next.delete(fn);
+        }
+        return next;
+      });
+
       const now = new Date();
       setQgisLastSyncTime(now.toLocaleTimeString('id-ID') + ` (${fileNames.join(', ')})`);
 
@@ -1120,6 +1216,7 @@ export default function GisMap() {
   const handleClearCustomLayers = () => {
     try {
       localStorage.removeItem('pdam_user_qgis_geojson');
+      setHiddenLayers(new Set());
       setQgisData(null);
       setQgisStats({ pipes: 0, valves: 0, dma: 0 });
       fetchQgisData(true);
@@ -1171,6 +1268,70 @@ export default function GisMap() {
     }
 
     return result;
+  }, [qgisData]);
+
+  // Ekstraksi layer-layer GeoJSON yang diunggah / aktif dari data QGIS untuk Legenda interaktif (hide/show)
+  const uploadedLayers = useMemo<QgisLayerItem[]>(() => {
+    if (!qgisData || !Array.isArray(qgisData.features) || qgisData.features.length === 0) {
+      return [];
+    }
+
+    const map = new Map<string, { count: number; geomType: 'line' | 'point' | 'polygon'; color: string; category: string }>();
+
+    for (const f of qgisData.features) {
+      const geomType = f?.geometry?.type;
+      if (geomType === 'Polygon' || geomType === 'MultiPolygon') continue;
+
+      const layerId = getFeatureLayerKey(f);
+      const isLine = geomType === 'LineString' || geomType === 'MultiLineString';
+      const isPoint = geomType === 'Point';
+
+      if (!map.has(layerId)) {
+        let color = '#2563EB';
+        let category = 'Jalur Pipa';
+        let type: 'line' | 'point' | 'polygon' = 'line';
+
+        if (isPoint) {
+          type = 'point';
+          const meta = getAccessoryMeta(f?.properties || {});
+          color = meta.color;
+          category = meta.label;
+        } else if (isLine) {
+          type = 'line';
+          const lowerId = layerId.toLowerCase();
+          if (lowerId.includes('transmisi')) {
+            color = '#E11D48';
+            category = 'Pipa Transmisi';
+          } else if (lowerId.includes('retikulasi')) {
+            color = '#0284C7';
+            category = 'Pipa Retikulasi';
+          } else {
+            color = '#2563EB';
+            category = 'Pipa Distribusi';
+          }
+        }
+
+        map.set(layerId, { count: 0, geomType: type, color, category });
+      }
+
+      const item = map.get(layerId)!;
+      item.count++;
+    }
+
+    return Array.from(map.entries())
+      .map(([id, info]) => ({
+        id,
+        name: id,
+        category: info.category,
+        geomType: info.geomType,
+        count: info.count,
+        color: info.color,
+      }))
+      .sort((a, b) => {
+        if (a.geomType === 'line' && b.geomType !== 'line') return -1;
+        if (a.geomType !== 'line' && b.geomType === 'line') return 1;
+        return a.name.localeCompare(b.name);
+      });
   }, [qgisData]);
 
   // Wilayah Map lookup
@@ -2107,7 +2268,7 @@ export default function GisMap() {
 
       {/* ── Interactive GIS Legend Card (Pipelines & Wilayah) ── */}
       {showLegend && !selectedCustomer && (
-        <Card className="absolute bottom-5 right-3 z-[450] w-72 max-h-[380px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+        <Card className="absolute bottom-5 right-3 z-[450] w-80 max-h-[460px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
           {/* Header with Tab Switcher */}
           <div className="p-2 border-b border-border flex items-center justify-between bg-muted/40 gap-1">
             <span className="font-heading font-semibold text-xs text-foreground shrink-0 pl-1">
@@ -2142,161 +2303,233 @@ export default function GisMap() {
           {/* TAB 1: Jaringan Pipa & Aksesoris (QGIS) */}
           {legendTab === 'pipa' && (
             <>
-              <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
-                <span>Simbol Jaringan QGIS</span>
-                <span className="text-blue-600 font-semibold font-sans">
-                  {qgisStats.pipes + qgisStats.valves > 0
-                    ? `${qgisStats.pipes} Pipa • ${qgisStats.valves} Aksesoris`
-                    : 'PostGIS Realtime'}
-                </span>
+              {/* Layer Summary & Global Action */}
+              <div className="p-2 border-b border-border/50 bg-muted/20 flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Layers className="w-3.5 h-3.5 text-primary" />
+                  <span>Layer File GeoJSON</span>
+                  <Badge variant="secondary" className="font-mono text-[9px] px-1.5 py-0 h-4 font-semibold">
+                    {uploadedLayers.length - hiddenLayers.size}/{uploadedLayers.length} Aktif
+                  </Badge>
+                </div>
+                {uploadedLayers.length > 0 && (
+                  hiddenLayers.size > 0 ? (
+                    <button
+                      type="button"
+                      onClick={showAllLayers}
+                      className="text-primary hover:underline text-[10px] font-semibold cursor-pointer"
+                    >
+                      Tampilkan Semua
+                    </button>
+                  ) : uploadedLayers.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={hideAllLayers}
+                      className="text-muted-foreground hover:text-foreground text-[10px] cursor-pointer"
+                    >
+                      Sembunyikan Semua
+                    </button>
+                  ) : null
+                )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 text-xs">
-                {/* Section Header: Jaringan Pipa */}
-                <div className="text-[9.5px] font-mono uppercase text-muted-foreground font-bold px-1 pt-0.5">
-                  Jalur Pipa Air
-                </div>
-
-                {/* Transmisi */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-1.5 rounded-full bg-[#E11D48] shrink-0 shadow-xs" style={{ height: '4px' }} />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Transmisi Utama</span>
-                      <span className="text-[9px] text-muted-foreground">Diameter ≥ 200 mm (HDPE/DI)</span>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
+                {/* 1. DAFTAR FILE GEOJSON YANG DIUNGGAH / AKTIF (Dapat di hide/show per layer) */}
+                <div className="space-y-1.5">
+                  {uploadedLayers.length === 0 ? (
+                    <div className="p-3 text-center rounded-xl bg-muted/30 border border-dashed border-border/60">
+                      <p className="text-[11px] text-muted-foreground">Belum ada file GeoJSON yang dimuat.</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowQgisModal(true)}
+                        className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-[10px] font-medium shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" /> Unggah File GeoJSON
+                      </button>
                     </div>
-                  </div>
-                  {qgisBreakdown.transmisi > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-rose-300 text-rose-600">
-                      {qgisBreakdown.transmisi}
-                    </Badge>
+                  ) : (
+                    uploadedLayers.map((layer) => {
+                      const isHidden = hiddenLayers.has(layer.id);
+                      return (
+                        <div
+                          key={layer.id}
+                          className={`group flex items-center justify-between p-1.5 px-2 rounded-xl border transition-all ${
+                            isHidden
+                              ? 'bg-muted/30 border-dashed border-border/60 opacity-60'
+                              : 'bg-card hover:bg-muted/40 border-border/70 shadow-xs'
+                          }`}
+                        >
+                          {/* Indicator & File Details */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {layer.geomType === 'line' ? (
+                              <div
+                                className="w-4 h-1.5 rounded-full shrink-0 shadow-xs transition-transform group-hover:scale-110"
+                                style={{ backgroundColor: layer.color, height: '4px' }}
+                              />
+                            ) : (
+                              <div
+                                className="w-3.5 h-3.5 rounded-full border border-white shrink-0 shadow-xs transition-transform group-hover:scale-110 flex items-center justify-center"
+                                style={{ backgroundColor: layer.color }}
+                              >
+                                <div className="w-1 h-1 rounded-full bg-white/90" />
+                              </div>
+                            )}
+
+                            <div className="flex flex-col min-w-0 flex-1 pr-1">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`font-mono text-[11px] font-semibold truncate ${
+                                    isHidden ? 'line-through text-muted-foreground' : 'text-foreground'
+                                  }`}
+                                  title={layer.name}
+                                >
+                                  {layer.name}
+                                </span>
+                              </div>
+                              <span className="text-[9px] text-muted-foreground truncate">
+                                {layer.category} • <strong className="font-mono text-foreground/80">{layer.count.toLocaleString('id-ID')}</strong> {layer.geomType === 'line' ? 'jalur' : 'titik'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Interactive Hide/Show Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => toggleLayerVisibility(layer.id)}
+                            className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer shrink-0 ${
+                              isHidden
+                                ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-xs'
+                            }`}
+                            title={isHidden ? `Tampilkan layer ${layer.name} di peta` : `Sembunyikan layer ${layer.name} dari peta`}
+                          >
+                            {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
 
-                {/* Distribusi Primer */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-1 rounded-full bg-[#2563EB] shrink-0 shadow-xs" style={{ height: '3px' }} />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Distribusi Primer</span>
-                      <span className="text-[9px] text-muted-foreground">Diameter 100 - 160 mm (PVC/GI)</span>
+                {/* Tombol Tambah Layer & Toggle Simbol Teknis */}
+                <div className="pt-1 flex items-center justify-between border-t border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setShowQgisModal(true)}
+                    className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline font-medium cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" /> Tambah / Kelola File
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTechnicalSymbols(!showTechnicalSymbols)}
+                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground font-medium cursor-pointer"
+                  >
+                    <span>{showTechnicalSymbols ? 'Tutup Simbol' : 'Panduan Simbol'}</span>
+                    {showTechnicalSymbols ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+
+                {/* 2. PANDUAN SIMBOL TEKNIS (Collapsible) */}
+                {showTechnicalSymbols && (
+                  <div className="pt-2 border-t border-border/50 space-y-2 animate-in fade-in">
+                    <div className="text-[9.5px] font-mono uppercase text-muted-foreground font-bold px-0.5">
+                      Spesifikasi Simbol QGIS
                     </div>
-                  </div>
-                  {qgisBreakdown.distribusi > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-blue-300 text-blue-600">
-                      {qgisBreakdown.distribusi}
-                    </Badge>
-                  )}
-                </div>
 
-                {/* Retikulasi */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-0.5 rounded-full bg-[#0284C7] shrink-0 shadow-xs" style={{ height: '2px' }} />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Pipa Retikulasi</span>
-                      <span className="text-[9px] text-muted-foreground">Diameter ≤ 90 mm (Pipa Lingkungan)</span>
+                    {/* Transmisi */}
+                    <div className="flex items-center justify-between p-1 rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-1.5 rounded-full bg-[#E11D48] shrink-0" style={{ height: '4px' }} />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground text-[10.5px]">Pipa Transmisi</span>
+                          <span className="text-[8.5px] text-muted-foreground">Diameter ≥ 200 mm</span>
+                        </div>
+                      </div>
+                      {qgisBreakdown.transmisi > 0 && (
+                        <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-rose-300 text-rose-600">
+                          {qgisBreakdown.transmisi}
+                        </Badge>
+                      )}
                     </div>
-                  </div>
-                  {qgisBreakdown.retikulasi > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-sky-300 text-sky-600">
-                      {qgisBreakdown.retikulasi}
-                    </Badge>
-                  )}
-                </div>
 
-                {/* Section Header: Katup & Aksesoris */}
-                <div className="text-[9.5px] font-mono uppercase text-muted-foreground font-bold px-1 pt-2 border-t border-border/40">
-                  Katup & Aksesoris
-                </div>
-
-                {/* Katup Valve */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#D97706] border border-white shadow-xs shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Katup Valve (Gate / PRV)</span>
-                      <span className="text-[9px] text-muted-foreground">Pengatur Debit & Tekanan</span>
+                    {/* Distribusi Primer */}
+                    <div className="flex items-center justify-between p-1 rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-1 rounded-full bg-[#2563EB] shrink-0" style={{ height: '3px' }} />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground text-[10.5px]">Distribusi Primer</span>
+                          <span className="text-[8.5px] text-muted-foreground">Diameter 100 - 160 mm</span>
+                        </div>
+                      </div>
+                      {qgisBreakdown.distribusi > 0 && (
+                        <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-blue-300 text-blue-600">
+                          {qgisBreakdown.distribusi}
+                        </Badge>
+                      )}
                     </div>
-                  </div>
-                  {qgisBreakdown.valves > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-amber-300 text-amber-600 font-bold">
-                      {qgisBreakdown.valves}
-                    </Badge>
-                  )}
-                </div>
 
-                {/* Air Valve */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#0284C7] border border-white shadow-xs shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Air Valve</span>
-                      <span className="text-[9px] text-muted-foreground">Pelepas Udara Otomatis</span>
+                    {/* Retikulasi */}
+                    <div className="flex items-center justify-between p-1 rounded-lg bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 rounded-full bg-[#0284C7] shrink-0" style={{ height: '2px' }} />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground text-[10.5px]">Pipa Retikulasi</span>
+                          <span className="text-[8.5px] text-muted-foreground">Diameter ≤ 90 mm</span>
+                        </div>
+                      </div>
+                      {qgisBreakdown.retikulasi > 0 && (
+                        <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-sky-300 text-sky-600">
+                          {qgisBreakdown.retikulasi}
+                        </Badge>
+                      )}
                     </div>
-                  </div>
-                  {qgisBreakdown.airvalves > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-sky-300 text-sky-600">
-                      {qgisBreakdown.airvalves}
-                    </Badge>
-                  )}
-                </div>
 
-                {/* Washout */}
-                <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#7C3AED] border border-white shadow-xs shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-foreground text-[11px] leading-snug">Washout</span>
-                      <span className="text-[9px] text-muted-foreground">Katup Penguras Lumpur</span>
-                    </div>
-                  </div>
-                  {qgisBreakdown.washouts > 0 && (
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-purple-300 text-purple-600">
-                      {qgisBreakdown.washouts}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Reservoir / IPA */}
-                {(qgisBreakdown.reservoirs > 0 || qgisBreakdown.ipas > 0) && (
-                  <div className="flex items-center justify-between p-1 rounded-lg hover:bg-muted/40 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-[#059669] border border-white shadow-xs shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-foreground text-[11px] leading-snug">Reservoir / IPA</span>
-                        <span className="text-[9px] text-muted-foreground">Penampungan & Pengolahan</span>
+                    {/* Valve Types Swatch */}
+                    <div className="grid grid-cols-2 gap-1 pt-1">
+                      <div className="flex items-center gap-1.5 p-1 rounded bg-muted/20 text-[10px]">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#D97706] border border-white shrink-0" />
+                        <span className="truncate">Gate Valve</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 p-1 rounded bg-muted/20 text-[10px]">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#0284C7] border border-white shrink-0" />
+                        <span className="truncate">Air Valve</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 p-1 rounded bg-muted/20 text-[10px]">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#7C3AED] border border-white shrink-0" />
+                        <span className="truncate">Washout</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 p-1 rounded bg-muted/20 text-[10px]">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#059669] border border-white shrink-0" />
+                        <span className="truncate">Reservoir/IPA</span>
                       </div>
                     </div>
-                    <Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 border-emerald-300 text-emerald-600">
-                      {qgisBreakdown.reservoirs + qgisBreakdown.ipas}
-                    </Badge>
+
+                    {/* Skala Ukuran Titik Valve */}
+                    <div className="p-2 rounded-xl bg-muted/40 border border-border/60 space-y-1">
+                      <div className="text-[8.5px] font-mono text-muted-foreground font-semibold flex items-center justify-between">
+                        <span>Skala Titik Valve:</span>
+                        <span className="text-primary font-sans">Proporsional</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-0.5 px-0.5">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded-full bg-amber-500 border border-white shadow-xs" />
+                          <span className="text-[8.5px] font-mono text-muted-foreground">≤50mm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-xs" />
+                          <span className="text-[8.5px] font-mono text-muted-foreground">100mm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white shadow-xs flex items-center justify-center">
+                            <div className="w-1 h-1 rounded-full bg-white" />
+                          </div>
+                          <span className="text-[8.5px] font-mono text-muted-foreground">≥200mm</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                {/* Visual Scale Indicator for Valve Diameters */}
-                <div className="p-2 rounded-xl bg-muted/40 border border-border/60 mt-1 space-y-1">
-                  <div className="text-[9px] font-mono text-muted-foreground font-semibold flex items-center justify-between">
-                    <span>Skala Ukuran Titik Valve:</span>
-                    <span className="text-[8.5px] text-primary">Proporsional</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-0.5 px-1">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-amber-500 border border-white shadow-xs" />
-                      <span className="text-[9px] font-mono text-muted-foreground">≤Ø50mm</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-amber-500 border border-white shadow-xs" />
-                      <span className="text-[9px] font-mono text-muted-foreground">Ø100mm</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-4 h-4 rounded-full bg-amber-500 border border-white shadow-xs flex items-center justify-center">
-                        <div className="w-1 h-1 rounded-full bg-white" />
-                      </div>
-                      <span className="text-[9px] font-mono text-muted-foreground">≥Ø200mm</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </>
           )}
@@ -2424,6 +2657,7 @@ export default function GisMap() {
         <QgisVectorLayer
           active={qgisLayerActive}
           data={qgisData}
+          hiddenLayers={hiddenLayers}
         />
 
         {showCustomerPoints && (
