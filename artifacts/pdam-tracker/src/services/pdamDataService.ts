@@ -730,7 +730,10 @@ class PdamDataService {
    */
   public async syncFromCloud(force = false): Promise<{ ok: boolean; count: number; message?: string }> {
     try {
-      const res = await fetch(`/api/pelanggan?t=${Date.now()}`);
+      let res = await fetch(`/api/gis/pelanggan?t=${Date.now()}`);
+      if (!res.ok) {
+        res = await fetch(`/api/pelanggan?t=${Date.now()}`);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -795,11 +798,18 @@ class PdamDataService {
    */
   public async pushToCloud(customers: Pelanggan[], mode: 'replace' | 'update' = 'replace'): Promise<{ ok: boolean; count?: number; error?: string }> {
     try {
-      const res = await fetch('/api/pelanggan', {
+      let res = await fetch('/api/gis/pelanggan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customers, mode }),
       });
+      if (!res.ok) {
+        res = await fetch('/api/pelanggan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customers, mode }),
+        });
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return data;
