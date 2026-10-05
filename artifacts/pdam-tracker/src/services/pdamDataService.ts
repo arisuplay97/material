@@ -440,6 +440,11 @@ class PdamDataService {
       if (this.activeSnapshotId && !this.archivedIds.has(this.activeSnapshotId)) {
         this.tryArchive(this.activeSnapshotId, this.pelanggan);
       }
+
+      // Sinkronkan otomatis ke server Neon Cloud di latar belakang
+      setTimeout(() => {
+        this.syncFromCloud().catch(() => {});
+      }, 50);
     } catch (err) {
       console.error('Error initializing PdamDataService:', err);
       this.wilayah = [...DEFAULT_WILAYAH_LIST];
@@ -710,7 +715,98 @@ class PdamDataService {
     this.tryArchive(id, next);
     this.enforceArchiveLimit();
     this.notify();
+
+    // Otomatis simpan ke database Neon Cloud di latar belakang agar tersinkron ke semua perangkat lain
+    this.pushToCloud(next, mode).catch((err) => {
+      console.warn('Gagal sinkron data upload ke Neon Cloud:', err);
+    });
+
     return snapshot;
+  }
+
+  /**
+   * Sinkronisasi data pelanggan dari PostgreSQL / Neon Cloud secara realtime.
+   * Dipanggil otomatis saat aplikasi dibuka di perangkat mana pun.
+   */
+  public async syncFromCloud(force = false): Promise<{ ok: boolean; count: number; message?: string }> {
+    try {
+      const res = await fetch(`/api/pelanggan?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data && data.ok && Array.isArray(data.pelanggan)) {
+        if (data.pelanggan.length > 0) {
+          const isCurrentDemo = this.snapshots.some((s) => s.id === this.activeSnapshotId && s.is_demo);
+          const countDiffers = data.pelanggan.length !== this.pelanggan.length;
+
+          if (force || isCurrentDemo || countDiffers) {
+            this.pelanggan = data.pelanggan;
+            this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+
+            const now = new Date();
+            const cloudSnapId = 'cloud-sync-' + now.toISOString().slice(0, 10);
+            const flaggedCount = this.pelanggan.filter((p) => p.is_flagged).length;
+
+            const cloudSnap: UploadSnapshot = {
+              id: cloudSnapId,
+              filename: 'Database_Neon_Cloud.pgsql',
+              uploaded_at: now.toISOString(),
+              uploader_name: 'Neon Cloud Database',
+              uploader_role: 'PostgreSQL Server',
+              total_rows: this.pelanggan.length,
+              valid_rows: this.pelanggan.length - flaggedCount,
+              flagged_rows: flaggedCount,
+              error_rows: 0,
+              mode: 'replace',
+              is_active: true,
+              notes: `Sinkronisasi realtime dari server database Neon Cloud (${this.pelanggan.length} pelanggan).`,
+            };
+
+            this.snapshots = [cloudSnap, ...this.snapshots.filter((s) => s.id !== cloudSnapId).map((s) => ({ ...s, is_active: false }))];
+            this.activeSnapshotId = cloudSnapId;
+            this.persistSnapshotMeta();
+            this.tryArchive(cloudSnapId, this.pelanggan);
+            this.notify();
+
+            return { 
+              ok: true, 
+              count: data.pelanggan.length, 
+              message: `Berhasil memuat ${data.pelanggan.length} data pelanggan dari database Neon Cloud!` 
+            };
+          }
+          return { ok: true, count: data.pelanggan.length, message: 'Data pelanggan sudah sinkron dengan server.' };
+        } else {
+          // Neon Cloud masih 0 baris, tapi jika lokal punya data asli bukan demo, kirim ke Neon Cloud
+          const isCurrentDemo = this.snapshots.some((s) => s.id === this.activeSnapshotId && s.is_demo);
+          if (!isCurrentDemo && this.pelanggan.length > 0) {
+            this.pushToCloud(this.pelanggan, 'replace').catch(() => {});
+          }
+        }
+      }
+      return { ok: true, count: this.pelanggan.length };
+    } catch (err: any) {
+      console.warn('Gagal sinkron data pelanggan dari Neon Cloud:', err.message);
+      return { ok: false, count: this.pelanggan.length, message: err.message };
+    }
+  }
+
+  /**
+   * Mengirim data pelanggan ke database Neon Cloud server.
+   */
+  public async pushToCloud(customers: Pelanggan[], mode: 'replace' | 'update' = 'replace'): Promise<{ ok: boolean; count?: number; error?: string }> {
+    try {
+      const res = await fetch('/api/pelanggan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customers, mode }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      console.error('Gagal mengirim pelanggan ke Neon Cloud:', err);
+      return { ok: false, error: err.message };
+    }
   }
 
   public async generateTemplate(format: 'xlsx' | 'csv' = 'xlsx') {

@@ -60,6 +60,7 @@ export default function Settings() {
 
   // Rollback confirmation modal
   const [confirmRollbackId, setConfirmRollbackId] = useState<string | null>(null);
+  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -231,6 +232,40 @@ export default function Settings() {
     setNewWilayahKode('');
     setNewWilayahNama('');
     setShowAddWilayahModal(false);
+  };
+
+  // Sinkronisasi data dari PostgreSQL Neon Cloud
+  const handleSyncCloud = async () => {
+    setIsSyncingCloud(true);
+    try {
+      const res = await pdamService.syncFromCloud(true);
+      if (res.ok) {
+        toast.success(res.message || 'Sinkronisasi dengan database Neon Cloud berhasil!');
+      } else {
+        toast.error(res.message || 'Gagal sinkron dari cloud.');
+      }
+    } catch (e: any) {
+      toast.error('Gagal menghubungi server cloud: ' + e.message);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Unggah paksa data lokal ke database Neon Cloud
+  const handlePushCloud = async () => {
+    setIsSyncingCloud(true);
+    try {
+      const res = await pdamService.pushToCloud(pelangganList, 'replace');
+      if (res.ok) {
+        toast.success(res.message || 'Data lokal berhasil dikirim dan tersimpan di database Neon Cloud!');
+      } else {
+        toast.error(res.error || 'Gagal menyimpan ke server cloud.');
+      }
+    } catch (e: any) {
+      toast.error('Gagal mengirim data ke server cloud: ' + e.message);
+    } finally {
+      setIsSyncingCloud(false);
+    }
   };
 
   return (
@@ -832,92 +867,135 @@ export default function Settings() {
         {/* ════ TAB 4: PINDAH / SINKRON PERANGKAT ════ */}
         <TabsContent value="sync" className="space-y-6">
           <Card className="rounded-2xl border border-border bg-card shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/50">
-              <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
-                <Database className="w-4 h-4 text-primary" />
-                Pindah / Sinkronisasi Data Antar Perangkat
-              </CardTitle>
+            <CardHeader className="pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
+                  <Database className="w-4 h-4 text-primary" />
+                  Sinkronisasi Cloud Database (Neon PostgreSQL & PostGIS)
+                </CardTitle>
+                <Badge variant="outline" className="border-emerald-300 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-[10px] font-mono gap-1.5 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Cloud Sync Online
+                </Badge>
+              </div>
               <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                Pindahkan seluruh data yang sudah Anda upload di perangkat ini ke laptop atau HP lain secara instan tanpa perlu upload ulang file Excel dari awal.
+                Data pelanggan dan jaringan pipa tersinkronisasi otomatis antar-perangkat (Laptop Kantor, Rumah, HP) melalui server database Neon Cloud.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 sm:p-6 space-y-6">
-              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 text-xs space-y-1.5">
-                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold">
-                  <Database className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>Mengapa data yang di-upload belum otomatis muncul di perangkat lain?</span>
+              {/* Cloud Sync Status & Actions */}
+              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 text-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold">
+                    <Database className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Sinkronisasi Realtime Terhubung</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-blue-600 dark:text-blue-400 font-bold">
+                    {pelangganList.length.toLocaleString('id-ID')} Titik Aktif
+                  </span>
                 </div>
                 <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-[11.5px]">
-                  Saat ini sistem aplikasi berjalan dalam mode <strong>Penyimpanan Klien Lokal (Browser LocalStorage)</strong> untuk kecepatan, privasi data, dan keamanan tanpa server database eksternal. Oleh karena itu, data yang diunggah disimpan di memori browser perangkat ini. Gunakan fitur Backup & Restore di bawah ini untuk memindahkan data ke perangkat lain dalam hitungan detik.
+                  Setiap kali Anda mengunggah file Excel pelanggan atau file QGIS di laptop kantor, sistem otomatis menyimpannya ke Neon Cloud. Perangkat lain akan langsung memuat data terbaru secara otomatis saat membuka aplikasi.
                 </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Langkah 1: Ekspor dari perangkat ini */}
-                <div className="p-5 rounded-2xl border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">1</span>
-                      <h4 className="text-sm font-semibold text-foreground">Download File Backup Database</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Unduh seluruh master data pelanggan ({pelangganList.length.toLocaleString('id-ID')} titik), acuan wilayah, dan snapshot riwayat menjadi satu file backup tunggal (.json).
-                    </p>
-                  </div>
+                <div className="pt-1 flex items-center gap-2.5 flex-wrap">
                   <Button
-                    onClick={() => {
-                      pdamService.exportDatabaseBackup();
-                      toast.success('File backup database PDAM berhasil diunduh.');
-                    }}
-                    className="w-full h-9 rounded-xl text-xs gap-2"
+                    size="sm"
+                    onClick={handleSyncCloud}
+                    disabled={isSyncingCloud}
+                    className="h-8 text-xs rounded-xl gap-1.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download Backup (.json)</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                    <span>Tarik Data Terbaru dari Cloud (Neon)</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePushCloud}
+                    disabled={isSyncingCloud || pelangganList.length === 0}
+                    className="h-8 text-xs rounded-xl gap-1.5 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/60 cursor-pointer shadow-xs"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>Kirim Data Perangkat Ini ke Cloud</span>
                   </Button>
                 </div>
+              </div>
 
-                {/* Langkah 2: Pulihkan di perangkat lain */}
-                <div className="p-5 rounded-2xl border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center">2</span>
-                      <h4 className="text-sm font-semibold text-foreground">Pulihkan di Perangkat Baru</h4>
+              {/* Offline Manual Backup & Restore Section */}
+              <div className="space-y-3">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Cadangan File Manual (Offline Backup & Restore)</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Langkah 1: Ekspor dari perangkat ini */}
+                  <div className="p-4 rounded-2xl border border-border bg-muted/10 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">1</span>
+                        <h4 className="text-xs font-semibold text-foreground">Unduh File Cadangan (.json)</h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Unduh salinan arsip lokal ({pelangganList.length.toLocaleString('id-ID')} titik) untuk cadangan di flashdisk atau arsip internal.
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Buka aplikasi ini di laptop atau HP lain, buka menu ini, lalu pilih file backup (.json) yang tadi diunduh. Data akan langsung terisi 100% identik.
-                    </p>
-                  </div>
-                  <div>
-                    <input
-                      type="file"
-                      accept=".json"
-                      id="restore-backup-input"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const content = event.target?.result as string;
-                          const res = pdamService.restoreDatabaseBackup(content);
-                          if (res.ok) {
-                            toast.success(`Berhasil memulihkan ${res.count?.toLocaleString('id-ID')} data pelanggan ke perangkat ini!`);
-                          } else {
-                            toast.error(res.reason || 'Gagal memulihkan database.');
-                          }
-                        };
-                        reader.readAsText(file);
-                        e.target.value = '';
-                      }}
-                    />
                     <Button
                       variant="outline"
-                      onClick={() => document.getElementById('restore-backup-input')?.click()}
-                      className="w-full h-9 rounded-xl text-xs gap-2 border-border hover:bg-muted"
+                      onClick={() => {
+                        pdamService.exportDatabaseBackup();
+                        toast.success('File backup database PDAM berhasil diunduh.');
+                      }}
+                      className="w-full h-8 rounded-xl text-xs gap-2"
                     >
-                      <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Pilih File Backup (.json) & Pulihkan</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Backup (.json)</span>
                     </Button>
+                  </div>
+
+                  {/* Langkah 2: Pulihkan di perangkat lain */}
+                  <div className="p-4 rounded-2xl border border-border bg-muted/10 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center">2</span>
+                        <h4 className="text-xs font-semibold text-foreground">Pulihkan dari File Cadangan</h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Pilih file backup (.json) untuk memulihkan seluruh data dan snapshot jika perangkat sedang offline tanpa internet.
+                      </p>
+                    </div>
+                    <div>
+                      <input
+                        type="file"
+                        accept=".json"
+                        id="restore-backup-input"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            const res = pdamService.restoreDatabaseBackup(content);
+                            if (res.ok) {
+                              toast.success(`Berhasil memulihkan ${res.count?.toLocaleString('id-ID')} data pelanggan ke perangkat ini!`);
+                            } else {
+                              toast.error(res.reason || 'Gagal memulihkan database.');
+                            }
+                          };
+                          reader.readAsText(file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => document.getElementById('restore-backup-input')?.click()}
+                        className="w-full h-8 rounded-xl text-xs gap-2 border-border hover:bg-muted"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Pilih File Backup (.json) & Pulihkan</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
