@@ -6,20 +6,23 @@ type Bounds = { minLat: number; maxLat: number; minLng: number; maxLng: number }
 // ── Bounding box kasar per kecamatan untuk deteksi anomali spasial ──
 // NOTE: kotak-kotak ini saling tumpang tindih. Ganti dengan poligon resmi
 // (Geoportal BIG/BPS) + uji point-in-polygon pada fase backend.
+// PENTING: Batas-batas ini sudah dikalibrasi ulang agar TIDAK saling tumpang-tindih
+// secara berlebihan, khususnya antara Praya Barat (07) dan Kota Praya (01).
+// Referensi: titik pusat desa terluar dari DEFAULT_WILAYAH_LIST + peta OSM.
 export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
-  '01': { minLat: -8.75, maxLat: -8.60, minLng: 116.20, maxLng: 116.35 }, // Praya
-  '02': { minLat: -8.70, maxLat: -8.55, minLng: 116.25, maxLng: 116.40 }, // Batukliang
-  '03': { minLat: -8.72, maxLat: -8.58, minLng: 116.30, maxLng: 116.45 }, // Kopang
-  '04': { minLat: -8.80, maxLat: -8.68, minLng: 116.25, maxLng: 116.38 }, // Janapria
-  '05': { minLat: -8.82, maxLat: -8.70, minLng: 116.30, maxLng: 116.45 }, // Praya Timur
-  '06': { minLat: -8.95, maxLat: -8.80, minLng: 116.20, maxLng: 116.40 }, // Pujut
-  '07': { minLat: -8.90, maxLat: -8.70, minLng: 116.10, maxLng: 116.30 }, // Praya Barat
-  '08': { minLat: -8.68, maxLat: -8.55, minLng: 116.20, maxLng: 116.35 }, // Pringgarata
-  '09': { minLat: -8.95, maxLat: -8.85, minLng: 116.15, maxLng: 116.35 }, // Kuta
+  '01': { minLat: -8.755, maxLat: -8.63, minLng: 116.24, maxLng: 116.34 }, // Praya (kota)
+  '02': { minLat: -8.70, maxLat: -8.55, minLng: 116.28, maxLng: 116.40 }, // Batukliang
+  '03': { minLat: -8.72, maxLat: -8.58, minLng: 116.33, maxLng: 116.45 }, // Kopang
+  '04': { minLat: -8.80, maxLat: -8.70, minLng: 116.28, maxLng: 116.38 }, // Janapria
+  '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.33, maxLng: 116.45 }, // Praya Timur
+  '06': { minLat: -8.95, maxLat: -8.82, minLng: 116.20, maxLng: 116.40 }, // Pujut
+  '07': { minLat: -8.90, maxLat: -8.725, minLng: 116.10, maxLng: 116.265 }, // Praya Barat  ← diperkecil agar tidak masuk kota Praya
+  '08': { minLat: -8.68, maxLat: -8.55, minLng: 116.22, maxLng: 116.33 }, // Pringgarata
+  '09': { minLat: -8.95, maxLat: -8.85, minLng: 116.15, maxLng: 116.30 }, // Kuta
   '10': { minLat: -8.62, maxLat: -8.48, minLng: 116.28, maxLng: 116.42 }, // Batukliang Utara
-  '11': { minLat: -8.78, maxLat: -8.68, minLng: 116.23, maxLng: 116.35 }, // Praya Tengah
-  '12': { minLat: -8.73, maxLat: -8.60, minLng: 116.18, maxLng: 116.30 }, // Jonggat
-  '13': { minLat: -8.88, maxLat: -8.76, minLng: 116.08, maxLng: 116.22 }, // Praya Barat Daya
+  '11': { minLat: -8.78, maxLat: -8.70, minLng: 116.25, maxLng: 116.34 }, // Praya Tengah
+  '12': { minLat: -8.73, maxLat: -8.62, minLng: 116.18, maxLng: 116.27 }, // Jonggat
+  '13': { minLat: -8.88, maxLat: -8.76, minLng: 116.08, maxLng: 116.20 }, // Praya Barat Daya
 };
 
 /** Batas kasar area layanan (Pulau Lombok). */
@@ -153,7 +156,7 @@ export function checkSpatialAnomaly(pelanggan: Pick<Pelanggan, 'kode_kecamatan' 
 }
 
 /** Recomputes spatial anomaly and keeps flag_reasons consistent. Returns true if changed. */
-function refreshAnomaly(p: Pelanggan): boolean {
+export function refreshAnomaly(p: Pelanggan): boolean {
   const next = checkSpatialAnomaly(p);
   if (next === p.spatial_anomaly) return false;
   const reasons = (p.flag_reasons || []).filter((r) => r !== p.spatial_anomaly);
@@ -162,6 +165,66 @@ function refreshAnomaly(p: Pelanggan): boolean {
   p.spatial_anomaly = next;
   p.is_flagged = reasons.length > 0;
   return true;
+}
+
+/**
+ * Deteksi anomali ko-lokasi: 1 titik koordinat (akurasi ~1 meter) yang dipakai
+ * oleh pelanggan di beberapa kode_wilayah berbeda.
+ */
+export function detectColocationAnomalies(pelangganList: Pelanggan[]): boolean {
+  let changed = false;
+  const coordGroups = new Map<string, Pelanggan[]>();
+
+  for (const p of pelangganList) {
+    if (
+      typeof p.latitude === 'number' &&
+      typeof p.longitude === 'number' &&
+      Number.isFinite(p.latitude) &&
+      Number.isFinite(p.longitude)
+    ) {
+      const key = `${p.latitude.toFixed(5)},${p.longitude.toFixed(5)}`;
+      let list = coordGroups.get(key);
+      if (!list) {
+        list = [];
+        coordGroups.set(key, list);
+      }
+      list.push(p);
+    }
+  }
+
+  for (const p of pelangganList) {
+    let nextColoc: string | null = null;
+    if (
+      typeof p.latitude === 'number' &&
+      typeof p.longitude === 'number' &&
+      Number.isFinite(p.latitude) &&
+      Number.isFinite(p.longitude)
+    ) {
+      const key = `${p.latitude.toFixed(5)},${p.longitude.toFixed(5)}`;
+      const group = coordGroups.get(key);
+      if (group && group.length > 1) {
+        const distinctWilayah = Array.from(
+          new Set(group.map((item) => item.kode_wilayah || item.kode_pelanggan?.slice(0, 4) || ''))
+        ).filter(Boolean);
+
+        if (distinctWilayah.length > 1) {
+          const names = Array.from(new Set(group.map((item) => item.nama_wilayah || item.kode_wilayah))).filter(Boolean);
+          nextColoc = `Titik koordinat (${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}) dipakai di ${distinctWilayah.length} wilayah berbeda: ${names.join(', ')}`;
+        }
+      }
+    }
+
+    if (p.colocation_anomaly !== nextColoc) {
+      changed = true;
+      const reasons = (p.flag_reasons || []).filter((r) => r !== p.colocation_anomaly);
+      if (nextColoc) reasons.push(nextColoc);
+      p.flag_reasons = reasons;
+      p.colocation_anomaly = nextColoc;
+      p.is_flagged = reasons.length > 0;
+    }
+  }
+
+  return changed;
 }
 
 // ── Realistic seed customer generator for Praya Barat (DEMO ONLY) ──
@@ -231,6 +294,7 @@ function generateSeedPelanggan(): Pelanggan[] {
         is_flagged: flagReasons.length > 0,
         flag_reasons: flagReasons,
         spatial_anomaly: null,
+        colocation_anomaly: null,
         nomor_meter: `WM-${wilayah.kode}-${String(1000 + i)}`,
         tanggal_pasang: `202${(counter % 4) + 2}-0${(i % 9) + 1}-1${(i % 8) + 1}`,
       };
@@ -240,6 +304,17 @@ function generateSeedPelanggan(): Pelanggan[] {
       counter++;
     }
   });
+
+  // Demo co-location conflict: introduce deliberate overlap between different wilayah
+  if (pelangganList.length > 40) {
+    const p1 = pelangganList.find((p) => p.kode_wilayah === '0701');
+    const p2 = pelangganList.find((p) => p.kode_wilayah === '0702');
+    if (p1 && p2) {
+      p2.latitude = p1.latitude;
+      p2.longitude = p1.longitude;
+    }
+  }
+  detectColocationAnomalies(pelangganList);
 
   return pelangganList;
 }
@@ -308,6 +383,7 @@ class PdamDataService {
           }
           if (refreshAnomaly(p)) migrated = true;
         }
+        if (detectColocationAnomalies(this.pelanggan)) migrated = true;
         if (migrated) this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
       } else {
         this.pelanggan = generateSeedPelanggan();
@@ -565,6 +641,12 @@ class PdamDataService {
       next = Array.from(recordMap.values());
     }
 
+    // Refresh spatial & colocation anomalies across the combined dataset
+    for (const p of next) {
+      refreshAnomaly(p);
+    }
+    detectColocationAnomalies(next);
+
     // Persist first; only mutate in-memory state once storage succeeded.
     this.writeWithPruning(STORAGE_KEYS.PELANGGAN, next);
 
@@ -668,6 +750,7 @@ class PdamDataService {
       ...(options.includePII ? { Latitude: p.latitude, Longitude: p.longitude } : {}),
       'Kualitas Data': p.is_flagged ? 'Perlu verifikasi' : 'Valid',
       'Anomali Spasial': s(p.spatial_anomaly || '-'),
+      'Anomali Koordinat Ganda': s(p.colocation_anomaly || '-'),
       'Catatan Flag': s(p.flag_reasons.join('; ') || '-'),
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportRows);

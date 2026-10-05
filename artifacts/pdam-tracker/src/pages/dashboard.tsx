@@ -311,16 +311,24 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
-            {stats.anomaly > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60">
-                {stats.anomaly} Anomali Spasial
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-                0 Anomali
-              </span>
-            )}
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs flex-wrap gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {stats.anomaly > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60">
+                  {stats.anomaly} Anomali Batas
+                </span>
+              )}
+              {stats.colocation > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60">
+                  {stats.colocation} Titik Dobel
+                </span>
+              )}
+              {stats.anomaly === 0 && stats.colocation === 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                  0 Anomali
+                </span>
+              )}
+            </div>
             <span className="text-[11px] text-neutral-400 font-medium">
               {stats.total ? ((stats.flagged / stats.total) * 100).toFixed(1) : 0}% total
             </span>
@@ -366,6 +374,52 @@ export default function Dashboard() {
               size="sm"
               onClick={() => setLocation('/gis?kual=anomaly')}
               className="h-8 px-3 text-xs rounded-xl bg-[#111827] hover:bg-[#1f2937] text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 gap-1.5 shadow-2xs"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Tinjau di Peta</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Co-location Anomaly Notice (1 Titik Sama Beda Wilayah) ── */}
+      {stats.colocation > 0 && (
+        <div className="rounded-2xl border border-purple-200/80 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-950/20 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0 mt-0.5 border border-purple-200/50">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-neutral-900 dark:text-white text-xs sm:text-sm">
+                  Terdeteksi {stats.colocation} Pelanggan dengan Titik Koordinat Sama tetapi Wilayah Berbeda
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/70 dark:text-purple-200">
+                  Titik Dobel Beda Wilayah
+                </span>
+              </div>
+              <p className="text-[11.5px] text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+                Beberapa pelanggan tercatat menggunakan koordinat GPS yang identik padahal kode wilayah administrasinya berbeda. Cek kemungkinan duplikasi meteran atau kesalahan input koordinat surveyor.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                update({ quality: 'colocation' });
+                setCurrentPage(1);
+              }}
+              className="h-8 px-3 text-xs rounded-xl bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 shadow-2xs"
+            >
+              Filter Titik Dobel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setLocation('/gis?kual=colocation')}
+              className="h-8 px-3 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-2xs"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Tinjau di Peta</span>
@@ -532,6 +586,9 @@ export default function Dashboard() {
                   <SelectItem value="anomaly" className="text-xs">
                     Anomali Batas
                   </SelectItem>
+                  <SelectItem value="colocation" className="text-xs">
+                    Titik Dobel Beda Wilayah
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -630,9 +687,14 @@ export default function Dashboard() {
                       </td>
                       <td className="py-3 px-4">
                         {item.spatial_anomaly ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60" title={item.spatial_anomaly}>
                             <AlertOctagon className="w-2.5 h-2.5" />
-                            Anomali
+                            Anomali Batas
+                          </span>
+                        ) : item.colocation_anomaly ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60" title={item.colocation_anomaly}>
+                            <MapPin className="w-2.5 h-2.5" />
+                            Titik Dobel
                           </span>
                         ) : item.is_flagged ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60">
@@ -899,6 +961,17 @@ export default function Dashboard() {
                       <span>Anomali Spasial Terdeteksi</span>
                     </div>
                     <p className="text-[11px] leading-relaxed">{selectedDetail.spatial_anomaly}</p>
+                  </div>
+                )}
+
+                {/* Co-location Anomaly Notice */}
+                {selectedDetail.colocation_anomaly && (
+                  <div className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span>Titik Koordinat Ganda (Multi-Wilayah)</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">{selectedDetail.colocation_anomaly}</p>
                   </div>
                 )}
 

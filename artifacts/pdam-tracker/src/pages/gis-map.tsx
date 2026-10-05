@@ -508,21 +508,32 @@ function CustomerClusterLayer({
       customers.forEach((c) => {
         const wilayah = wilayahMap.get(c.kode_wilayah);
         const color = safeColor(wilayah?.warna, '#3B6EA8');
-        const isAnomaly = Boolean(c.spatial_anomaly);
+        const isSpatialAnomaly = Boolean(c.spatial_anomaly);
+        const isColocationAnomaly = Boolean(c.colocation_anomaly);
+        const isAnomaly = isSpatialAnomaly || isColocationAnomaly;
+
+        const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : '#FFFFFF';
+        const ringHtml = isSpatialAnomaly
+          ? '<div class="gis-anomaly-ring"></div>'
+          : isColocationAnomaly
+          ? '<div class="gis-colocation-ring"></div>'
+          : '';
+
+        const badgeHtml = isSpatialAnomaly
+          ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background-color: #EF4444; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 800; font-family: monospace;">!</div>'
+          : isColocationAnomaly
+          ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background-color: #A855F7; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 800; font-family: monospace;" title="Titik Dobel Beda Wilayah">⇄</div>'
+          : c.is_flagged
+          ? '<div style="position: absolute; top: -2px; right: -2px; width: 6px; height: 6px; border-radius: 50%; background-color: #F59E0B; border: 1px solid white;"></div>'
+          : '';
 
         const customIcon = L.divIcon({
           className: 'gis-point-marker',
           html: `
             <div style="position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
-              ${isAnomaly ? '<div class="gis-anomaly-ring"></div>' : ''}
-              <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${color}; border: 2.5px solid ${isAnomaly ? '#EF4444' : '#FFFFFF'}; box-shadow: 0 1px 5px rgba(0,0,0,0.35);"></div>
-              ${
-                isAnomaly
-                  ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background-color: #EF4444; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 800; font-family: monospace;">!</div>'
-                  : c.is_flagged
-                  ? '<div style="position: absolute; top: -2px; right: -2px; width: 6px; height: 6px; border-radius: 50%; background-color: #F59E0B; border: 1px solid white;"></div>'
-                  : ''
-              }
+              ${ringHtml}
+              <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${color}; border: 2.5px solid ${borderColor}; box-shadow: 0 1px 5px rgba(0,0,0,0.35);"></div>
+              ${badgeHtml}
             </div>
           `,
           iconSize: [22, 22],
@@ -539,6 +550,7 @@ function CustomerClusterLayer({
         const safeWilayah = escapeHtml(c.nama_wilayah);
         const safeStatus = escapeHtml(c.status_sambungan);
         const safeAnomaly = c.spatial_anomaly ? escapeHtml(c.spatial_anomaly) : '';
+        const safeColocation = c.colocation_anomaly ? escapeHtml(c.colocation_anomaly) : '';
 
         const popupHtml = `
           <div style="width: 250px; font-family: 'Inter', sans-serif; padding: 10px; line-height: 1.4;">
@@ -554,10 +566,19 @@ function CustomerClusterLayer({
             <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.3;">${safeAlamat}</div>
 
             ${
-              isAnomaly
+              isSpatialAnomaly
                 ? `
               <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #b91c1c;">
                 <strong>⚠️ Anomali Batas:</strong> ${safeAnomaly}
+              </div>
+            `
+                : ''
+            }
+            ${
+              isColocationAnomaly
+                ? `
+              <div style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #7e22ce;">
+                <strong>📍 Titik Dobel Beda Wilayah:</strong> ${safeColocation}
               </div>
             `
                 : ''
@@ -814,17 +835,30 @@ export default function GisMap() {
     triggerPulse(customer.latitude, customer.longitude);
   }, [triggerPulse]);
 
-  // Synchronize URL search params (e.g. redirected from Dashboard "Lihat di Peta")
+  // Synchronize URL search params (e.g. redirected from Dashboard "Lihat di Peta" or "Tinjau di Peta")
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codeParam = params.get('search');
+    const anomaliParam = params.get('anomali');
+    const kualParam = params.get('kual') || params.get('quality');
+
     if (codeParam && pelangganList.length > 0) {
       const match = pelangganList.find((p: Pelanggan) => p.kode_pelanggan === codeParam);
       if (match) {
         handleSelectCustomer(match);
       }
     }
-  }, [pelangganList, handleSelectCustomer]);
+
+    if (anomaliParam === '1') {
+      setOnlyAnomaly(true);
+    }
+
+    if (kualParam === 'colocation') {
+      update({ quality: 'colocation' });
+    } else if (kualParam === 'anomaly') {
+      update({ quality: 'anomaly' });
+    }
+  }, [pelangganList, handleSelectCustomer, update]);
 
   // Fullscreen listener
   useEffect(() => {
@@ -853,9 +887,13 @@ export default function GisMap() {
     return pelangganList.filter((p: Pelanggan) => p.kode_kecamatan === selectedKecamatan);
   }, [pelangganList, selectedKecamatan]);
 
-  // Anomaly count in active kecamatan
+  // Anomaly & colocation counts in active kecamatan
   const anomalyCount = useMemo(() => {
     return kecamatanCustomers.filter((p: Pelanggan) => Boolean(p.spatial_anomaly)).length;
+  }, [kecamatanCustomers]);
+
+  const colocationCount = useMemo(() => {
+    return kecamatanCustomers.filter((p: Pelanggan) => Boolean(p.colocation_anomaly)).length;
   }, [kecamatanCustomers]);
 
   // Filter pipeline
@@ -876,7 +914,10 @@ export default function GisMap() {
       if (filters.quality === 'valid' && item.is_flagged) {
         return false;
       }
-      if ((filters.quality === 'anomaly' || onlyAnomaly) && !item.spatial_anomaly) {
+      if ((filters.quality === 'anomaly' || onlyAnomaly) && !item.spatial_anomaly && !item.colocation_anomaly) {
+        return false;
+      }
+      if (filters.quality === 'colocation' && !item.colocation_anomaly) {
         return false;
       }
       return true;
@@ -1005,6 +1046,11 @@ export default function GisMap() {
                               Anomali
                             </span>
                           )}
+                          {item.colocation_anomaly && (
+                            <span className="text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1 py-0.2 rounded font-semibold border border-purple-500/20">
+                              Titik Dobel
+                            </span>
+                          )}
                         </div>
                         <span className="text-[11px] text-muted-foreground truncate">
                           {displayName(item.nama_pelanggan, user?.role)} ({item.nama_wilayah})
@@ -1048,7 +1094,7 @@ export default function GisMap() {
           </div>
         </div>
 
-        {/* Row 2: Action Pills (Filter, Anomaly, Basemap) */}
+        {/* Row 2: Action Pills (Filter, Anomaly, Colocation, Basemap) */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {/* Anomaly Quick Filter Pill */}
           {anomalyCount > 0 && (
@@ -1064,9 +1110,30 @@ export default function GisMap() {
               title="Filter hanya pelanggan dengan anomali batas wilayah"
             >
               <AlertOctagon className="w-3.5 h-3.5 text-rose-500" />
-              <span>Anomali</span>
+              <span>Anomali Batas</span>
               <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-mono font-semibold">
                 {anomalyCount}
+              </span>
+            </Button>
+          )}
+
+          {/* Colocation Anomaly Quick Filter Pill */}
+          {colocationCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
+              className={`h-8 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+                filters.quality === 'colocation'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold'
+                  : 'border-border text-foreground hover:bg-muted'
+              }`}
+              title="Filter pelanggan dengan koordinat sama di wilayah berbeda"
+            >
+              <MapPin className="w-3.5 h-3.5 text-purple-500" />
+              <span>Titik Dobel</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-mono font-semibold">
+                {colocationCount}
               </span>
             </Button>
           )}
@@ -1283,6 +1350,22 @@ export default function GisMap() {
               </div>
 
               <div className="flex items-center justify-between">
+                <span className="text-xs text-foreground">Titik Dobel Beda Wilayah</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
+                  className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                    filters.quality === 'colocation'
+                      ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 font-semibold'
+                      : 'text-muted-foreground border-border'
+                  }`}
+                >
+                  {filters.quality === 'colocation' ? 'Aktif' : 'Semua'}
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between">
                 <span className="text-xs text-foreground">Data Perlu Verifikasi (Flag)</span>
                 <Button
                   variant="outline"
@@ -1421,8 +1504,24 @@ export default function GisMap() {
               </div>
             )}
 
+            {/* Co-location Anomaly Notice */}
+            {selectedCustomer.colocation_anomaly && (
+              <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/80 dark:bg-purple-950/40 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300 font-semibold">
+                  <MapPin className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span>Titik Dobel Multi-Wilayah</span>
+                </div>
+                <p className="text-purple-800 dark:text-purple-200 leading-relaxed text-[11px]">
+                  {selectedCustomer.colocation_anomaly}
+                </p>
+                <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                  Rekomendasi: Koordinat ini digunakan oleh lebih dari 1 wilayah berbeda. Verifikasi meteran fisik atau koreksi titik GPS di lapangan.
+                </div>
+              </div>
+            )}
+
             {/* General Flag Notice */}
-            {!selectedCustomer.spatial_anomaly && selectedCustomer.is_flagged && (
+            {!selectedCustomer.spatial_anomaly && !selectedCustomer.colocation_anomaly && selectedCustomer.is_flagged && (
               <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/40 text-xs text-amber-800 dark:text-amber-200 space-y-1">
                 <div className="flex items-center gap-1.5 font-semibold">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -1796,7 +1895,19 @@ export default function GisMap() {
           >
             <AlertOctagon className="w-3 h-3 text-rose-600 dark:text-rose-400" />
             <span className="text-rose-800 dark:text-rose-200 font-semibold">
-              {anomalyCount} Anomali
+              {anomalyCount} Anomali Batas
+            </span>
+          </div>
+        )}
+
+        {colocationCount > 0 && (
+          <div
+            onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
+            className="px-2.5 py-1.5 rounded-xl bg-purple-50/90 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-md hover:bg-purple-100 transition-colors"
+          >
+            <MapPin className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+            <span className="text-purple-800 dark:text-purple-200 font-semibold">
+              {colocationCount} Titik Dobel
             </span>
           </div>
         )}

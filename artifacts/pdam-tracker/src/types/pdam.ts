@@ -38,6 +38,7 @@ export interface Pelanggan {
   is_flagged: boolean;
   flag_reasons: string[];
   spatial_anomaly: string | null; // populated when coordinates fall outside kecamatan bounds
+  colocation_anomaly: string | null; // populated when identical coordinates are used by different wilayah codes
   nomor_meter?: string;
   tanggal_pasang?: string;
   created_at?: string;

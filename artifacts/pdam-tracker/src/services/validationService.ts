@@ -78,6 +78,8 @@ export class ValidationService {
       };
     }
 
+    const recordRowMap = new Map<string, number>();
+
     rows.forEach((row, index) => {
       const rowNum = index + 2; // header is row 1
       let rowHasFatalError = false;
@@ -199,6 +201,7 @@ export class ValidationService {
         is_flagged: false,
         flag_reasons: flagReasons,
         spatial_anomaly: null,
+        colocation_anomaly: null,
         nomor_meter: str(r.nomor_meter) || `WM-${kodeWilayah}-${kodePelanggan.slice(4)}`,
         tanggal_pasang: str(r.tanggal_pasang) || undefined,
       };
@@ -210,7 +213,46 @@ export class ValidationService {
       }
       record.is_flagged = record.flag_reasons.length > 0;
       parsedRecords.push(record);
+      recordRowMap.set(kodePelanggan, rowNum);
     });
+
+    // ── Post-pass: Deteksi 1 titik koordinat sama tapi wilayah/kecamatan berbeda ──
+    const coordMap = new Map<string, Pelanggan[]>();
+    for (const record of parsedRecords) {
+      if (Number.isFinite(record.latitude) && Number.isFinite(record.longitude)) {
+        const coordKey = `${record.latitude.toFixed(5)},${record.longitude.toFixed(5)}`;
+        let list = coordMap.get(coordKey);
+        if (!list) {
+          list = [];
+          coordMap.set(coordKey, list);
+        }
+        list.push(record);
+      }
+    }
+
+    for (const [, group] of coordMap) {
+      if (group.length > 1) {
+        const distinctWilayah = Array.from(new Set(group.map((g) => g.kode_wilayah))).filter(Boolean);
+        if (distinctWilayah.length > 1) {
+          const wilayahNames = Array.from(new Set(group.map((g) => g.nama_wilayah || g.kode_wilayah))).filter(Boolean);
+          const warnMsg = `Titik koordinat (${group[0].latitude.toFixed(5)}, ${group[0].longitude.toFixed(5)}) dipakai di ${distinctWilayah.length} wilayah berbeda: ${wilayahNames.join(', ')}`;
+          for (const item of group) {
+            item.colocation_anomaly = warnMsg;
+            if (!item.flag_reasons.includes(warnMsg)) {
+              item.flag_reasons.push(warnMsg);
+            }
+            item.is_flagged = true;
+            warnings.push({
+              rowNumber: recordRowMap.get(item.kode_pelanggan) || 0,
+              field: 'koordinat',
+              value: `${item.latitude}, ${item.longitude}`,
+              message: `Pelanggan ${item.kode_pelanggan}: ${warnMsg}`,
+              severity: 'warning',
+            });
+          }
+        }
+      }
+    }
 
     return {
       summary: {

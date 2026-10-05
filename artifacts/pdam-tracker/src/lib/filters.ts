@@ -30,7 +30,7 @@ const QUERY_KEYS: Record<keyof FilterState, string> = {
   q: 'q',
 };
 
-const QUALITY_VALUES: QualityFilter[] = ['all', 'valid', 'flagged', 'anomaly'];
+const QUALITY_VALUES: QualityFilter[] = ['all', 'valid', 'flagged', 'anomaly', 'colocation'];
 
 function readFiltersFromUrl(): FilterState {
   const params = new URLSearchParams(window.location.search);
@@ -113,7 +113,8 @@ export function filterPelanggan(
     if (f.status !== 'all' && p.status_sambungan !== f.status) return false;
     if (f.quality === 'valid' && p.is_flagged) return false;
     if (f.quality === 'flagged' && !p.is_flagged) return false;
-    if (f.quality === 'anomaly' && !p.spatial_anomaly) return false;
+    if (f.quality === 'anomaly' && !p.spatial_anomaly && !p.colocation_anomaly) return false;
+    if (f.quality === 'colocation' && !p.colocation_anomaly) return false;
     if (q) {
       const hit =
         p.kode_pelanggan.includes(q) ||
@@ -132,6 +133,7 @@ export interface PelangganStats {
   putus: number;
   flagged: number;
   anomaly: number;
+  colocation: number;
   valid: number;
   validityPct: number;
   golongan: Record<string, number>;
@@ -150,6 +152,7 @@ export function computeStats(list: Pelanggan[]): PelangganStats {
   const flagReasons = new Map<string, number>();
   let flagged = 0;
   let anomaly = 0;
+  let colocation = 0;
 
   for (const p of list) {
     const g = p.golongan || 'Lainnya';
@@ -168,11 +171,17 @@ export function computeStats(list: Pelanggan[]): PelangganStats {
       w.flagged++;
       for (const reason of p.flag_reasons) {
         // Group the long dynamic anomaly messages under one bucket.
-        const key = reason === p.spatial_anomaly ? 'Koordinat di luar batas kecamatan' : reason;
+        const key =
+          reason === p.spatial_anomaly
+            ? 'Koordinat di luar batas kecamatan'
+            : reason === p.colocation_anomaly
+            ? 'Koordinat sama beda wilayah'
+            : reason;
         flagReasons.set(key, (flagReasons.get(key) || 0) + 1);
       }
     }
     if (p.spatial_anomaly) anomaly++;
+    if (p.colocation_anomaly) colocation++;
     perWilayah.set(p.kode_wilayah, w);
   }
 
@@ -184,6 +193,7 @@ export function computeStats(list: Pelanggan[]): PelangganStats {
     putus: status.Putus,
     flagged,
     anomaly,
+    colocation,
     valid: total - flagged,
     validityPct: total ? ((total - flagged) / total) * 100 : 100,
     golongan,

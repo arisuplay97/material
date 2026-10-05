@@ -35,13 +35,14 @@ export const STATUS_CONNECTION_META: Record<StatusSambungan, { color: string; ba
   Putus: { color: '#C53030', badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400' },
 };
 
-export type QualityFilter = 'all' | 'valid' | 'flagged' | 'anomaly';
+export type QualityFilter = 'all' | 'valid' | 'flagged' | 'anomaly' | 'colocation';
 
 export const QUALITY_LABEL: Record<QualityFilter, string> = {
   all: 'Semua',
   valid: 'Valid',
   flagged: 'Perlu verifikasi',
   anomaly: 'Anomali batas',
+  colocation: 'Titik sama beda wilayah',
 };
 
 /** PRD §3 target persentase data lolos validasi. */
