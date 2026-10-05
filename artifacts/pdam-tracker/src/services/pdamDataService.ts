@@ -796,7 +796,7 @@ class PdamDataService {
   /**
    * Mengirim data pelanggan ke database Neon Cloud server.
    */
-  public async pushToCloud(customers: Pelanggan[], mode: 'replace' | 'update' = 'replace'): Promise<{ ok: boolean; count?: number; error?: string }> {
+  public async pushToCloud(customers: Pelanggan[], mode: 'replace' | 'update' = 'replace'): Promise<{ ok: boolean; count?: number; message?: string; error?: string }> {
     try {
       let res = await fetch('/api/gis/pelanggan', {
         method: 'POST',
