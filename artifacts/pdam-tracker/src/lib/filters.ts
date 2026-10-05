@@ -113,7 +113,7 @@ export function filterPelanggan(
     if (f.status !== 'all' && p.status_sambungan !== f.status) return false;
     if (f.quality === 'valid' && p.is_flagged) return false;
     if (f.quality === 'flagged' && !p.is_flagged) return false;
-    if (f.quality === 'anomaly' && !p.spatial_anomaly && !p.colocation_anomaly) return false;
+    if (f.quality === 'anomaly' && !p.spatial_anomaly) return false;
     if (f.quality === 'colocation' && !p.colocation_anomaly) return false;
     if (q) {
       const hit =

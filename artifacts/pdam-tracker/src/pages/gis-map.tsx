@@ -914,7 +914,7 @@ export default function GisMap() {
       if (filters.quality === 'valid' && item.is_flagged) {
         return false;
       }
-      if ((filters.quality === 'anomaly' || onlyAnomaly) && !item.spatial_anomaly && !item.colocation_anomaly) {
+      if ((filters.quality === 'anomaly' || onlyAnomaly) && !item.spatial_anomaly) {
         return false;
       }
       if (filters.quality === 'colocation' && !item.colocation_anomaly) {
@@ -1101,7 +1101,13 @@ export default function GisMap() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setOnlyAnomaly(!onlyAnomaly)}
+              onClick={() => {
+                const next = !onlyAnomaly;
+                setOnlyAnomaly(next);
+                if (next && filters.quality === 'colocation') {
+                  update({ quality: 'all' });
+                }
+              }}
               className={`h-8 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
                 onlyAnomaly
                   ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold'
@@ -1122,7 +1128,10 @@ export default function GisMap() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
+              onClick={() => {
+                setOnlyAnomaly(false);
+                update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
+              }}
               className={`h-8 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
                 filters.quality === 'colocation'
                   ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold'
@@ -1890,7 +1899,13 @@ export default function GisMap() {
 
         {anomalyCount > 0 && (
           <div
-            onClick={() => setOnlyAnomaly(!onlyAnomaly)}
+            onClick={() => {
+              const next = !onlyAnomaly;
+              setOnlyAnomaly(next);
+              if (next && filters.quality === 'colocation') {
+                update({ quality: 'all' });
+              }
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-rose-50/90 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-md hover:bg-rose-100 transition-colors"
           >
             <AlertOctagon className="w-3 h-3 text-rose-600 dark:text-rose-400" />
@@ -1902,7 +1917,10 @@ export default function GisMap() {
 
         {colocationCount > 0 && (
           <div
-            onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
+            onClick={() => {
+              setOnlyAnomaly(false);
+              update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-purple-50/90 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-md hover:bg-purple-100 transition-colors"
           >
             <MapPin className="w-3 h-3 text-purple-600 dark:text-purple-400" />

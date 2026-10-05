@@ -777,6 +777,197 @@ class PdamDataService {
     const dateStr = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(workbook, `${filenamePrefix}_${dateStr}.xlsx`);
   }
+
+  /**
+   * Ekspor Laporan Audit Mutu Data & Anomali Multi-Sheet (.xlsx)
+   * Menyajikan Ringkasan Eksekutif, Daftar Anomali Temuan (diprioritaskan di awal),
+   * dan Semua Data Pelanggan.
+   */
+  public async exportAuditReport(
+    data: Pelanggan[],
+    kecamatanFilter: string,
+    options: { includePII: boolean } = { includePII: false },
+  ) {
+    const XLSX = await import('xlsx');
+    const s = sanitizeSpreadsheetCell;
+
+    const kecNama = kecamatanFilter === 'all' ? 'Semua Kecamatan' : kecamatanName(kecamatanFilter);
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    // Filter anomali vs valid
+    const anomalyRecords = data.filter((p) => p.is_flagged || p.spatial_anomaly || p.colocation_anomaly);
+    const validRecords = data.filter((p) => !p.is_flagged && !p.spatial_anomaly && !p.colocation_anomaly);
+
+    const spatialCount = data.filter((p) => Boolean(p.spatial_anomaly)).length;
+    const colocationCount = data.filter((p) => Boolean(p.colocation_anomaly)).length;
+    const bothCount = data.filter((p) => Boolean(p.spatial_anomaly && p.colocation_anomaly)).length;
+    const otherFlagCount = anomalyRecords.length - (spatialCount + colocationCount - bothCount);
+
+    // Urutkan anomali: Anomali Batas Spasial paling atas, lalu Titik Dobel, lalu lainnya
+    const sortedAnomalies = [...anomalyRecords].sort((a, b) => {
+      const score = (p: Pelanggan) => (p.spatial_anomaly ? 3 : p.colocation_anomaly ? 2 : 1);
+      return score(b) - score(a);
+    });
+
+    // ── SHEET 1: RINGKASAN AUDIT ──
+    const summaryRows = [
+      { Parameter: 'JUDUL LAPORAN', Keterangan: 'LAPORAN AUDIT MUTU DATA & ANOMALI SPASIAL PELANGGAN' },
+      { Parameter: 'INSTANSI', Keterangan: 'PDAM TIRTA ARDHIA RINJANI (KAB. LOMBOK TENGAH)' },
+      { Parameter: 'Waktu Cetak Dokumen', Keterangan: `${dateStr} pukul ${timeStr} WITA` },
+      { Parameter: 'Cakupan Wilayah / Kecamatan', Keterangan: kecNama },
+      { Parameter: 'Total Pelanggan Terdaftar', Keterangan: `${data.length} pelanggan` },
+      { Parameter: 'Data Bersih & Valid', Keterangan: `${validRecords.length} pelanggan (${data.length ? ((validRecords.length / data.length) * 100).toFixed(1) : 0}%)` },
+      { Parameter: 'Total Data Bermasalah / Perlu Verifikasi', Keterangan: `${anomalyRecords.length} pelanggan (${data.length ? ((anomalyRecords.length / data.length) * 100).toFixed(1) : 0}%)` },
+      { Parameter: '--- RINCIAN TEMUAN ANOMALI ---', Keterangan: '---------------------------------------------------' },
+      { Parameter: '1. Anomali Batas Spasial (Lintas Kecamatan)', Keterangan: `${spatialCount} pelanggan` },
+      { Parameter: '2. Titik Dobel Beda Wilayah (Multi-Wilayah)', Keterangan: `${colocationCount} pelanggan` },
+      { Parameter: '3. Data Bertanda / Perlu Verifikasi Lainnya', Keterangan: `${Math.max(0, otherFlagCount)} pelanggan` },
+      { Parameter: '--- DISTRIBUSI SAMBUNGAN ---', Keterangan: '---------------------------------------------------' },
+      { Parameter: 'Sambungan Aktif', Keterangan: `${data.filter((p) => p.status_sambungan === 'Aktif').length} pelanggan` },
+      { Parameter: 'Sambungan Nonaktif', Keterangan: `${data.filter((p) => p.status_sambungan === 'Nonaktif').length} pelanggan` },
+      { Parameter: 'Sambungan Putus / Cabut', Keterangan: `${data.filter((p) => p.status_sambungan === 'Putus').length} pelanggan` },
+    ];
+
+    // ── SHEET 2: DAFTAR ANOMALI & TEMUAN (PRIORITAS AUDITOR / HUBLANG) ──
+    const anomalyRows = sortedAnomalies.map((p, idx) => {
+      let jenisAnomali = 'Perlu Verifikasi';
+      let rekomendasi = 'Verifikasi berkas fisik dan konfirmasi data pelanggan.';
+      if (p.spatial_anomaly && p.colocation_anomaly) {
+        jenisAnomali = 'Batas Spasial & Titik Dobel';
+        rekomendasi = 'Koreksi kode kecamatan ke unit terdekat dan cek nomor meter ganda di lapangan.';
+      } else if (p.spatial_anomaly) {
+        jenisAnomali = 'Anomali Batas Spasial (Lintas Kecamatan)';
+        rekomendasi = 'Koreksi kode kecamatan pelanggan ke unit cabang terdekat dengan koordinat fisik GPS.';
+      } else if (p.colocation_anomaly) {
+        jenisAnomali = 'Titik Koordinat Ganda (Multi-Wilayah)';
+        rekomendasi = 'Cek meteran fisik ganda di lokasi atau lakukan re-tagging koordinat GPS surveyor.';
+      }
+
+      return {
+        'No.': idx + 1,
+        'Kode Pelanggan': p.kode_pelanggan,
+        ...(options.includePII ? { 'Nama Pelanggan': s(p.nama_pelanggan), Alamat: s(p.alamat) } : {}),
+        'Kode Kecamatan': p.kode_kecamatan,
+        'Kode Wilayah': p.kode_wilayah,
+        'Nama Wilayah': s(p.nama_wilayah),
+        Golongan: p.golongan,
+        'Status Sambungan': p.status_sambungan,
+        ...(options.includePII ? { Latitude: p.latitude, Longitude: p.longitude } : {}),
+        'Kategori Anomali': jenisAnomali,
+        'Temuan Anomali Batas': s(p.spatial_anomaly || '-'),
+        'Temuan Titik Dobel': s(p.colocation_anomaly || '-'),
+        'Rekomendasi Tindak Lanjut': rekomendasi,
+      };
+    });
+
+    // ── SHEET 3: SEMUA DATA PELANGGAN ──
+    const allRows = data.map((p, idx) => ({
+      'No.': idx + 1,
+      'Kode Pelanggan': p.kode_pelanggan,
+      ...(options.includePII ? { 'Nama Pelanggan': s(p.nama_pelanggan), Alamat: s(p.alamat) } : {}),
+      'Kode Kecamatan': p.kode_kecamatan,
+      'Kode Wilayah': p.kode_wilayah,
+      'Nama Wilayah': s(p.nama_wilayah),
+      Golongan: p.golongan,
+      'Status Sambungan': p.status_sambungan,
+      ...(options.includePII ? { Latitude: p.latitude, Longitude: p.longitude } : {}),
+      'Status Mutu': p.spatial_anomaly ? 'Anomali Batas' : p.colocation_anomaly ? 'Titik Dobel' : p.is_flagged ? 'Perlu Verifikasi' : 'Valid',
+      'Anomali Spasial': s(p.spatial_anomaly || '-'),
+      'Titik Dobel': s(p.colocation_anomaly || '-'),
+      'Catatan': s(p.flag_reasons.join('; ') || '-'),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(workbook, wsSummary, 'Ringkasan_Audit');
+
+    const wsAnomalies = XLSX.utils.json_to_sheet(
+      anomalyRows.length > 0 ? anomalyRows : [{ 'Keterangan': 'Tidak ada anomali atau data bertanda pada filter ini.' }]
+    );
+    // Format cell Kode Pelanggan ke teks agar angka 0 di depan (07...) tidak hilang
+    anomalyRows.forEach((_, i) => {
+      const cell = wsAnomalies[XLSX.utils.encode_cell({ r: i + 1, c: 1 })];
+      if (cell) cell.t = 's';
+    });
+    XLSX.utils.book_append_sheet(workbook, wsAnomalies, 'Daftar_Anomali_Temuan');
+
+    const wsAll = XLSX.utils.json_to_sheet(allRows);
+    allRows.forEach((_, i) => {
+      const cell = wsAll[XLSX.utils.encode_cell({ r: i + 1, c: 1 })];
+      if (cell) cell.t = 's';
+    });
+    XLSX.utils.book_append_sheet(workbook, wsAll, 'Semua_Data_Pelanggan');
+
+    const filePrefix = `Laporan_Audit_PDAM_${kecNama.replace(/\s+/g, '_')}_${now.toISOString().slice(0, 10)}`;
+    XLSX.writeFile(workbook, `${filePrefix}.xlsx`);
+  }
+
+  /**
+   * Ekspor seluruh database lokal (Wilayah, Pelanggan, Snapshots) ke file JSON
+   * untuk sinkronisasi / backup antar perangkat.
+   */
+  public exportDatabaseBackup(): void {
+    const backupData = {
+      app: 'PDAM Tirta Ardhia Rinjani Tracker',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      wilayah: this.wilayah,
+      pelanggan: this.pelanggan,
+      snapshots: this.snapshots,
+      activeSnapshotId: this.activeSnapshotId,
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Backup_Database_PDAM_Tiara_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Pulihkan database lokal dari file JSON backup.
+   */
+  public restoreDatabaseBackup(jsonString: string): { ok: boolean; count?: number; reason?: string } {
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || !Array.isArray(data.pelanggan)) {
+        return { ok: false, reason: 'Format file backup tidak valid (properti pelanggan tidak ditemukan).' };
+      }
+
+      this.pelanggan = data.pelanggan;
+      if (Array.isArray(data.wilayah) && data.wilayah.length > 0) {
+        this.wilayah = data.wilayah;
+        this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+      }
+      if (Array.isArray(data.snapshots)) {
+        this.snapshots = data.snapshots;
+        this.persistSnapshotMeta();
+      }
+      if (data.activeSnapshotId) {
+        this.activeSnapshotId = data.activeSnapshotId;
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_SNAPSHOT_ID, data.activeSnapshotId);
+      }
+
+      // Recompute anomalies across imported data
+      for (const p of this.pelanggan) {
+        refreshAnomaly(p);
+      }
+      detectColocationAnomalies(this.pelanggan);
+
+      this.writeWithPruning(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+      this.notify();
+      return { ok: true, count: this.pelanggan.length };
+    } catch (err: any) {
+      return { ok: false, reason: err.message || 'Gagal membaca file JSON backup.' };
+    }
+  }
 }
 
 export const pdamService = new PdamDataService();

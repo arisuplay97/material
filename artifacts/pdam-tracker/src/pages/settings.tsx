@@ -42,7 +42,7 @@ import { Label } from '@/components/ui/label';
 
 export default function Settings() {
   const { user, logout } = useAuth();
-  const { wilayah: wilayahList, snapshots, activeSnapshot } = usePdamData();
+  const { wilayah: wilayahList, snapshots, activeSnapshot, pelanggan: pelangganList } = usePdamData();
 
   // Upload States
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -288,6 +288,10 @@ export default function Settings() {
           <TabsTrigger value="history" className="rounded-lg text-xs font-medium gap-2">
             <History className="w-3.5 h-3.5" />
             <span>Riwayat Snapshot & Rollback</span>
+          </TabsTrigger>
+          <TabsTrigger value="sync" className="rounded-lg text-xs font-medium gap-2">
+            <Database className="w-3.5 h-3.5" />
+            <span>Pindah / Sinkron Perangkat</span>
           </TabsTrigger>
         </TabsList>
 
@@ -823,6 +827,102 @@ export default function Settings() {
               </div>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ════ TAB 4: PINDAH / SINKRON PERANGKAT ════ */}
+        <TabsContent value="sync" className="space-y-6">
+          <Card className="rounded-2xl border border-border bg-card shadow-sm">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
+                <Database className="w-4 h-4 text-primary" />
+                Pindah / Sinkronisasi Data Antar Perangkat
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                Pindahkan seluruh data yang sudah Anda upload di perangkat ini ke laptop atau HP lain secara instan tanpa perlu upload ulang file Excel dari awal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 sm:p-6 space-y-6">
+              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold">
+                  <Database className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Mengapa data yang di-upload belum otomatis muncul di perangkat lain?</span>
+                </div>
+                <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-[11.5px]">
+                  Saat ini sistem aplikasi berjalan dalam mode <strong>Penyimpanan Klien Lokal (Browser LocalStorage)</strong> untuk kecepatan, privasi data, dan keamanan tanpa server database eksternal. Oleh karena itu, data yang diunggah disimpan di memori browser perangkat ini. Gunakan fitur Backup & Restore di bawah ini untuk memindahkan data ke perangkat lain dalam hitungan detik.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Langkah 1: Ekspor dari perangkat ini */}
+                <div className="p-5 rounded-2xl border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">1</span>
+                      <h4 className="text-sm font-semibold text-foreground">Download File Backup Database</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Unduh seluruh master data pelanggan ({pelangganList.length.toLocaleString('id-ID')} titik), acuan wilayah, dan snapshot riwayat menjadi satu file backup tunggal (.json).
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      pdamService.exportDatabaseBackup();
+                      toast.success('File backup database PDAM berhasil diunduh.');
+                    }}
+                    className="w-full h-9 rounded-xl text-xs gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Backup (.json)</span>
+                  </Button>
+                </div>
+
+                {/* Langkah 2: Pulihkan di perangkat lain */}
+                <div className="p-5 rounded-2xl border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center">2</span>
+                      <h4 className="text-sm font-semibold text-foreground">Pulihkan di Perangkat Baru</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Buka aplikasi ini di laptop atau HP lain, buka menu ini, lalu pilih file backup (.json) yang tadi diunduh. Data akan langsung terisi 100% identik.
+                    </p>
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      id="restore-backup-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const content = event.target?.result as string;
+                          const res = pdamService.restoreDatabaseBackup(content);
+                          if (res.ok) {
+                            toast.success(`Berhasil memulihkan ${res.count?.toLocaleString('id-ID')} data pelanggan ke perangkat ini!`);
+                          } else {
+                            toast.error(res.reason || 'Gagal memulihkan database.');
+                          }
+                        };
+                        reader.readAsText(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById('restore-backup-input')?.click()}
+                      className="w-full h-9 rounded-xl text-xs gap-2 border-border hover:bg-muted"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Pilih File Backup (.json) & Pulihkan</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

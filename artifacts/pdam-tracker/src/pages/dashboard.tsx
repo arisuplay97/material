@@ -45,6 +45,7 @@ import {
   formatDate,
 } from '@/lib/constants';
 import { canSeePII, canExport, displayName } from '@/lib/privacy';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -135,14 +136,32 @@ export default function Dashboard() {
     return filteredList.slice(start, start + pageSize);
   }, [filteredList, currentPage, totalPages, pageSize]);
 
-  // Export handler
-  const handleExport = async () => {
-    const kecNama = filters.kecamatan === 'all' ? 'Semua_Kecamatan' : kecamatanName(filters.kecamatan);
-    await pdamService.exportPelanggan(
-      filteredList,
-      `Data_Pelanggan_${kecNama.replace(/\s+/g, '_')}`,
-      { includePII: canSeePII(user?.role) },
-    );
+  // Export handlers
+  const handleExportAudit = async () => {
+    try {
+      await pdamService.exportAuditReport(
+        filteredList,
+        filters.kecamatan,
+        { includePII: canSeePII(user?.role) },
+      );
+      toast.success('Laporan audit & anomali pelanggan berhasil diunduh (Excel Multi-Sheet).');
+    } catch (e: any) {
+      toast.error(e.message || 'Gagal mengekspor laporan audit.');
+    }
+  };
+
+  const handleExportRaw = async () => {
+    try {
+      const kecNama = filters.kecamatan === 'all' ? 'Semua_Kecamatan' : kecamatanName(filters.kecamatan);
+      await pdamService.exportPelanggan(
+        filteredList,
+        `Data_Pelanggan_${kecNama.replace(/\s+/g, '_')}`,
+        { includePII: canSeePII(user?.role) },
+      );
+      toast.success('Data pelanggan mentah berhasil diekspor ke Excel.');
+    } catch (e: any) {
+      toast.error(e.message || 'Gagal mengekspor data.');
+    }
   };
 
   const handleOpenGis = (kodePelanggan?: string) => {
@@ -186,15 +205,29 @@ export default function Dashboard() {
           </Button>
 
           {canExport(user?.role) && (
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              disabled={filteredList.length === 0}
-              className="h-9 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 shadow-2xs cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Ekspor Excel</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleExportAudit}
+                disabled={filteredList.length === 0}
+                className="h-9 px-3.5 rounded-xl text-xs font-semibold gap-1.5 bg-rose-50/70 hover:bg-rose-100/80 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 border border-rose-200/80 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 shadow-2xs cursor-pointer"
+                title="Unduh laporan audit lengkap dengan rincian anomali di sheet terdepan"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span>Laporan Audit Anomali (.xlsx)</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleExportRaw}
+                disabled={filteredList.length === 0}
+                className="h-9 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 shadow-2xs cursor-pointer"
+                title="Unduh data pelanggan mentah"
+              >
+                <Download className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Ekspor Semua Data</span>
+              </Button>
+            </div>
           )}
         </div>
       </div>
