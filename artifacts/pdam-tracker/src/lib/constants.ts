@@ -1,15 +1,27 @@
 import type { GolonganTarif, StatusSambungan } from '@/types/pdam';
 
-export const GOLONGAN_LIST: GolonganTarif[] = ['R1', 'R2', 'B1', 'S', 'I'];
+export const GOLONGAN_LIST: string[] = ['2B', '2A', '3A', '1A', 'R1', 'R2', 'B1', 'S', 'I'];
 export const STATUS_LIST: StatusSambungan[] = ['Aktif', 'Nonaktif', 'Putus'];
 
-export const GOLONGAN_META: Record<GolonganTarif, { label: string; color: string }> = {
+export const GOLONGAN_META: Record<string, { label: string; color: string }> = {
+  '2B': { label: 'Rumah Tangga A', color: '#3B6EA8' },
+  '2A': { label: 'Rumah Tangga B', color: '#5B8FC7' },
+  '2C': { label: 'Rumah Tangga C', color: '#4F46E5' },
+  '3A': { label: 'Niaga Kecil', color: '#8AAFD6' },
+  '3B': { label: 'Niaga Besar', color: '#0EA5E9' },
+  '1A': { label: 'Sosial Umum', color: '#6B8E7F' },
+  '1B': { label: 'Sosial Khusus', color: '#10B981' },
+  '4A': { label: 'Instansi / Industri', color: '#A3A3A3' },
   R1: { label: 'Rumah Tangga 1', color: '#3B6EA8' },
   R2: { label: 'Rumah Tangga 2', color: '#5B8FC7' },
   B1: { label: 'Niaga', color: '#8AAFD6' },
   S: { label: 'Sosial', color: '#6B8E7F' },
   I: { label: 'Instansi', color: '#A3A3A3' },
 };
+
+export const DEFAULT_GOLONGAN_COLORS = [
+  '#3B6EA8', '#5B8FC7', '#8AAFD6', '#6B8E7F', '#D97706', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
+];
 
 export const STATUS_META: Record<StatusSambungan, { color: string; tone: 'success' | 'warning' | 'danger' }> = {
   Aktif: { color: '#2F855A', tone: 'success' },

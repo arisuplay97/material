@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GolonganTarif, Pelanggan, StatusSambungan } from '@/types/pdam';
-import { DEFAULT_KECAMATAN, GOLONGAN_LIST, type QualityFilter } from '@/lib/constants';
+import { DEFAULT_KECAMATAN, GOLONGAN_LIST, GOLONGAN_META, type QualityFilter } from '@/lib/constants';
 
 export interface FilterState {
   kecamatan: string;
@@ -134,7 +134,8 @@ export interface PelangganStats {
   anomaly: number;
   valid: number;
   validityPct: number;
-  golongan: Record<GolonganTarif, number>;
+  golongan: Record<string, number>;
+  golonganLabels: Record<string, string>;
   status: Record<StatusSambungan, number>;
   perWilayah: Map<string, { total: number; flagged: number }>;
   flagReasons: Map<string, number>;
@@ -142,7 +143,8 @@ export interface PelangganStats {
 
 /** Single pass over the data (previously six separate filter() calls). */
 export function computeStats(list: Pelanggan[]): PelangganStats {
-  const golongan = Object.fromEntries(GOLONGAN_LIST.map((g) => [g, 0])) as Record<GolonganTarif, number>;
+  const golongan: Record<string, number> = {};
+  const golonganLabels: Record<string, string> = {};
   const status: Record<StatusSambungan, number> = { Aktif: 0, Nonaktif: 0, Putus: 0 };
   const perWilayah = new Map<string, { total: number; flagged: number }>();
   const flagReasons = new Map<string, number>();
@@ -150,7 +152,14 @@ export function computeStats(list: Pelanggan[]): PelangganStats {
   let anomaly = 0;
 
   for (const p of list) {
-    if (p.golongan in golongan) golongan[p.golongan]++;
+    const g = p.golongan || 'Lainnya';
+    golongan[g] = (golongan[g] || 0) + 1;
+    if (p.uraian_golongan && !golonganLabels[g]) {
+      golonganLabels[g] = p.uraian_golongan;
+    } else if (!golonganLabels[g] && GOLONGAN_META[g]?.label) {
+      golonganLabels[g] = GOLONGAN_META[g].label;
+    }
+
     if (p.status_sambungan in status) status[p.status_sambungan]++;
     const w = perWilayah.get(p.kode_wilayah) || { total: 0, flagged: 0 };
     w.total++;
@@ -178,6 +187,7 @@ export function computeStats(list: Pelanggan[]): PelangganStats {
     valid: total - flagged,
     validityPct: total ? ((total - flagged) / total) * 100 : 100,
     golongan,
+    golonganLabels,
     status,
     perWilayah,
     flagReasons,

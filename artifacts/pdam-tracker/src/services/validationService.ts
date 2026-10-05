@@ -1,6 +1,6 @@
 import { Pelanggan, WilayahAcuan, ValidationErrorItem, ValidationSummary, GolonganTarif, StatusSambungan } from '@/types/pdam';
 import { checkSpatialAnomaly, isInBounds, SERVICE_AREA_BOUNDS } from './pdamDataService';
-import { GOLONGAN_LIST, MAX_UPLOAD_BYTES } from '@/lib/constants';
+import { GOLONGAN_LIST, GOLONGAN_META, MAX_UPLOAD_BYTES } from '@/lib/constants';
 import type { SpreadsheetWorkerResponse } from './spreadsheet.worker';
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -167,22 +167,13 @@ export class ValidationService {
         warn('koordinat', `${lat}, ${lng}`, `Titik (${lat.toFixed(5)}, ${lng.toFixed(5)}) di luar area layanan Pulau Lombok.`, 'Koordinat di luar area layanan');
       }
 
-      // ── 6. Golongan Tarif (dukung urjlw / urjlwp seperti 2B, Rumah Tangga A, dll) ──
-      const rawGolongan = str(r.golongan ?? r.gol ?? r.tarif ?? r.urjlw ?? r.urjlwp).toUpperCase();
-      let golongan: GolonganTarif = 'R1';
-      if ((GOLONGAN_LIST as string[]).includes(rawGolongan)) {
-        golongan = rawGolongan as GolonganTarif;
-      } else if (rawGolongan.includes('2B') || rawGolongan.includes('RUMAH TANGGA B') || rawGolongan.includes('R2')) {
-        golongan = 'R2';
-      } else if (rawGolongan.includes('2A') || rawGolongan.includes('2') || rawGolongan.includes('RUMAH TANGGA') || rawGolongan.includes('R1')) {
-        golongan = 'R1';
-      } else if (rawGolongan.startsWith('3') || rawGolongan.includes('NIAGA') || rawGolongan.includes('BISNIS') || rawGolongan.includes('B1')) {
-        golongan = 'B1';
-      } else if (rawGolongan.startsWith('1') || rawGolongan.includes('SOSIAL') || rawGolongan.includes('S')) {
-        golongan = 'S';
-      } else if (rawGolongan.startsWith('4') || rawGolongan.includes('INDUSTRI') || rawGolongan.includes('INSTANSI') || rawGolongan.includes('PEMERINTAH') || rawGolongan.includes('I')) {
-        golongan = 'I';
-      }
+      // ── 6. Golongan Tarif (prioritaskan kode urjlw & uraian urjlwp dari Excel) ──
+      const rawKodeGol = str(r.urjlw ?? r.golongan ?? r.gol ?? r.tarif).toUpperCase();
+      const rawUraianGol = str(r.urjlwp ?? r.uraian_golongan ?? r.kategori_tarif);
+
+      // Gunakan kode golongan asli Excel (misal 2B, 2A, 3A, R1, dll.)
+      const golongan: GolonganTarif = rawKodeGol || (rawUraianGol ? rawUraianGol : '2B');
+      const uraianGolongan = rawUraianGol || (GOLONGAN_META[golongan]?.label || '');
 
       // ── 7. Status sambungan (dukung urstat_smb seperti Aktif, Tutup, Segel, Putus) ──
       const rawStatus = str(r.status_sambungan ?? r.status ?? r.urstat_smb ?? r.stat_smb ?? r.status_smb);
@@ -201,6 +192,7 @@ export class ValidationService {
         kode_wilayah: kodeWilayah,
         nama_wilayah: wilayahMatch?.nama || `Wilayah ${kodeWilayah}`,
         golongan,
+        uraian_golongan: uraianGolongan,
         status_sambungan: status,
         latitude: lat,
         longitude: lng,

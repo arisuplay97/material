@@ -13,7 +13,7 @@ import { usePdamData } from '@/hooks/usePdamData';
 import { useFilters } from '@/lib/filters';
 import { escapeHtml, safeColor } from '@/lib/escape';
 import { displayName, displayAddress, displayCoordinates, canSeePII } from '@/lib/privacy';
-import { STATUS_CONNECTION_META } from '@/lib/constants';
+import { GOLONGAN_LIST, GOLONGAN_META, STATUS_CONNECTION_META } from '@/lib/constants';
 import { toast } from 'sonner';
 import {
   Search,
@@ -619,6 +619,26 @@ export default function GisMap() {
   const { pelanggan: pelangganList, wilayah: wilayahList } = usePdamData();
   const { filters, update, reset } = useFilters();
 
+  // Dynamic Golongan list from data + constants
+  const availableGolongan = useMemo(() => {
+    const set = new Set<string>();
+    pelangganList.forEach((p) => {
+      if (p.golongan) set.add(p.golongan);
+    });
+    GOLONGAN_LIST.forEach((g) => set.add(g));
+    return Array.from(set).filter(Boolean);
+  }, [pelangganList]);
+
+  const golonganLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    pelangganList.forEach((p) => {
+      if (p.golongan && p.uraian_golongan && !map[p.golongan]) {
+        map[p.golongan] = p.uraian_golongan;
+      }
+    });
+    return map;
+  }, [pelangganList]);
+
   // Basemap state
   const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('cerah');
 
@@ -1211,11 +1231,14 @@ export default function GisMap() {
                   </SelectTrigger>
                   <SelectContent className="border-border bg-card">
                     <SelectItem value="all">Semua Golongan</SelectItem>
-                    <SelectItem value="R1">R1 (Rumah Tangga A)</SelectItem>
-                    <SelectItem value="R2">R2 (Rumah Tangga B)</SelectItem>
-                    <SelectItem value="B1">B1 (Bisnis / Niaga)</SelectItem>
-                    <SelectItem value="S">S (Sosial / Ibadah)</SelectItem>
-                    <SelectItem value="I">I (Instansi Pemerintah)</SelectItem>
+                    {availableGolongan.map((g) => {
+                      const label = golonganLabelMap[g] || GOLONGAN_META[g]?.label || '';
+                      return (
+                        <SelectItem key={g} value={g}>
+                          {g} {label && label !== g ? `(${label})` : ''}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

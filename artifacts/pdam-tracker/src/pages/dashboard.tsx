@@ -38,6 +38,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import {
   GOLONGAN_LIST,
   GOLONGAN_META,
+  DEFAULT_GOLONGAN_COLORS,
   STATUS_META,
   VALIDITY_TARGET,
   formatNumber,
@@ -77,6 +78,26 @@ export default function Dashboard() {
     wilayah.forEach((w) => map.set(w.kode, w.warna));
     return map;
   }, [wilayah]);
+
+  // Dynamic Golongan list for filter dropdown
+  const availableGolongan = useMemo(() => {
+    const set = new Set<string>();
+    pelanggan.forEach((p) => {
+      if (p.golongan) set.add(p.golongan);
+    });
+    GOLONGAN_LIST.forEach((g) => set.add(g));
+    return Array.from(set).filter(Boolean);
+  }, [pelanggan]);
+
+  const golonganLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    pelanggan.forEach((p) => {
+      if (p.golongan && p.uraian_golongan && !map[p.golongan]) {
+        map[p.golongan] = p.uraian_golongan;
+      }
+    });
+    return map;
+  }, [pelanggan]);
 
   // Wilayah filtered for current kecamatan
   const currentKecamatanWilayah = useMemo(() => {
@@ -445,11 +466,14 @@ export default function Dashboard() {
                   <SelectItem value="all" className="text-xs">
                     Semua Golongan
                   </SelectItem>
-                  {GOLONGAN_LIST.map((g) => (
-                    <SelectItem key={g} value={g} className="text-xs">
-                      {g} — {GOLONGAN_META[g]?.label || g}
-                    </SelectItem>
-                  ))}
+                  {availableGolongan.map((g) => {
+                    const label = golonganLabelMap[g] || GOLONGAN_META[g]?.label || '';
+                    return (
+                      <SelectItem key={g} value={g} className="text-xs">
+                        {g} {label && label !== g ? `— ${label}` : ''}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -783,23 +807,32 @@ export default function Dashboard() {
                   Golongan Tarif
                 </span>
                 <div className="space-y-1.5">
-                  {GOLONGAN_LIST.map((g) => {
-                    const val = stats.golongan[g] || 0;
-                    const pct = stats.total ? ((val / stats.total) * 100).toFixed(1) : '0';
-                    return (
-                      <div key={g} className="flex items-center justify-between text-xs p-2 rounded-xl bg-neutral-50/70 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800">
-                        <div className="flex items-center gap-2 truncate">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: GOLONGAN_META[g]?.color }} />
-                          <span className="font-semibold text-neutral-900 dark:text-white font-mono">{g}</span>
-                          <span className="text-[11px] text-neutral-400 truncate">{GOLONGAN_META[g]?.label}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-mono text-[11px] tabular">
-                          <span className="font-semibold text-neutral-900 dark:text-white">{val}</span>
-                          <span className="text-[10px] text-neutral-400">({pct}%)</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {Object.entries(stats.golongan).length === 0 ? (
+                    <div className="text-xs text-neutral-400 p-2">Tidak ada data golongan</div>
+                  ) : (
+                    Object.entries(stats.golongan)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([g, val], idx) => {
+                        const pct = stats.total ? ((val / stats.total) * 100).toFixed(1) : '0';
+                        const label = stats.golonganLabels?.[g] || GOLONGAN_META[g]?.label || '';
+                        const color = GOLONGAN_META[g]?.color || DEFAULT_GOLONGAN_COLORS[idx % DEFAULT_GOLONGAN_COLORS.length];
+                        return (
+                          <div key={g} className="flex items-center justify-between text-xs p-2 rounded-xl bg-neutral-50/70 dark:bg-neutral-800/40 border border-neutral-100 dark:border-neutral-800">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                              <span className="font-semibold text-neutral-900 dark:text-white font-mono">{g}</span>
+                              {label && label !== g && (
+                                <span className="text-[11px] text-neutral-400 truncate">{label}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 font-mono text-[11px] tabular">
+                              <span className="font-semibold text-neutral-900 dark:text-white">{val}</span>
+                              <span className="text-[10px] text-neutral-400">({pct}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
                 </div>
               </div>
 

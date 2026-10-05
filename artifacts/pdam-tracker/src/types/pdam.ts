@@ -1,4 +1,4 @@
-export type GolonganTarif = 'R1' | 'R2' | 'B1' | 'S' | 'I';
+export type GolonganTarif = string;
 export type StatusSambungan = 'Aktif' | 'Nonaktif' | 'Putus';
 
 export type UserRole = 'admin' | 'verifikator' | 'pimpinan';
@@ -31,6 +31,7 @@ export interface Pelanggan {
   kode_wilayah: string; // 4 digits: "0701"
   nama_wilayah: string;
   golongan: GolonganTarif;
+  uraian_golongan?: string; // e.g. "RUMAH TANGGA A" from urjlwp in Excel
   status_sambungan: StatusSambungan;
   latitude: number;
   longitude: number;
