@@ -1212,7 +1212,7 @@ export default function GisMap() {
     }
   };
 
-  // Reset / Hapus Layer Kustom dari browser
+  // Reset / Hapus Seluruh Layer Kustom dari browser
   const handleClearCustomLayers = () => {
     try {
       localStorage.removeItem('pdam_user_qgis_geojson');
@@ -1220,8 +1220,58 @@ export default function GisMap() {
       setQgisData(null);
       setQgisStats({ pipes: 0, valves: 0, dma: 0 });
       fetchQgisData(true);
-      toast.info('Layer kustom telah dibersihkan. Memuat ulang dari server.');
+      toast.info('Seluruh layer kustom telah dibersihkan. Memuat ulang dari server.');
     } catch {}
+  };
+
+  // Hapus satu file layer GeoJSON tertentu secara spesifik
+  const handleDeleteLayer = (layerId: string, layerName: string) => {
+    if (!qgisData || !Array.isArray(qgisData.features)) return;
+
+    const remainingFeatures = qgisData.features.filter((f: any) => {
+      const key = getFeatureLayerKey(f);
+      return key !== layerId && key.toLowerCase() !== layerId.toLowerCase();
+    });
+
+    const updatedCollection = {
+      ...qgisData,
+      features: remainingFeatures,
+    };
+
+    try {
+      if (remainingFeatures.length === 0) {
+        localStorage.removeItem('pdam_user_qgis_geojson');
+      } else {
+        localStorage.setItem('pdam_user_qgis_geojson', JSON.stringify(updatedCollection));
+      }
+    } catch {}
+
+    setQgisData(updatedCollection);
+
+    // Hitung ulang statistik
+    let pipes = 0;
+    let valves = 0;
+    let dma = 0;
+    remainingFeatures.forEach((f: any) => {
+      const type = f.geometry?.type;
+      if (type === 'LineString' || type === 'MultiLineString') pipes++;
+      else if (type === 'Point') valves++;
+      else if (type === 'Polygon' || type === 'MultiPolygon') dma++;
+    });
+    setQgisStats({ pipes, valves, dma });
+
+    setHiddenLayers((prev) => {
+      const next = new Set(prev);
+      next.delete(layerId);
+      return next;
+    });
+
+    toast.success(`Layer "${layerName}" berhasil dihapus dari peta.`);
+
+    // Jika seluruh layer habis, muat ulang dari server fallback
+    if (remainingFeatures.length === 0) {
+      fetchQgisData(true);
+    }
   };
 
   // Kalkulasi statistik rincian layer QGIS untuk Legenda Dinamis
@@ -2392,19 +2442,35 @@ export default function GisMap() {
                             </div>
                           </div>
 
-                          {/* Interactive Hide/Show Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => toggleLayerVisibility(layer.id)}
-                            className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer shrink-0 ${
-                              isHidden
-                                ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                                : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-xs'
-                            }`}
-                            title={isHidden ? `Tampilkan layer ${layer.name} di peta` : `Sembunyikan layer ${layer.name} dari peta`}
-                          >
-                            {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
+                          {/* Action Buttons: Hide/Show Toggle + Delete Layer */}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleLayerVisibility(layer.id)}
+                              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                isHidden
+                                  ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                  : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-xs'
+                              }`}
+                              title={isHidden ? `Tampilkan layer ${layer.name} di peta` : `Sembunyikan layer ${layer.name} dari peta`}
+                            >
+                              {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Hapus file layer "${layer.name}" dari peta?`)) {
+                                  handleDeleteLayer(layer.id, layer.name);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-xs text-muted-foreground/50 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title={`Hapus file layer ${layer.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })
@@ -2778,23 +2844,63 @@ export default function GisMap() {
               </div>
             </div>
 
-            {/* Tombol Bersihkan Layer Kustom jika pengguna ingin kembali ke server */}
-            {qgisSource.includes('Unggahan') && (
-              <div className="flex items-center justify-between p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-amber-800 dark:text-amber-300">
-                    Sedang menggunakan layer kustom tersimpan lokal
+            {/* Daftar File Layer Aktif & Opsi Hapus per File */}
+            {uploadedLayers.length > 0 && (
+              <div className="p-3 rounded-xl border border-border bg-card space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground flex items-center gap-1.5 text-xs">
+                    <Layers className="w-3.5 h-3.5 text-primary" />
+                    File Layer Aktif ({uploadedLayers.length})
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (window.confirm('Bersihkan semua layer kustom dan muat ulang dari server?')) {
+                        handleClearCustomLayers();
+                      }
+                    }}
+                    className="h-6 text-[10px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 gap-1 px-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Reset Semua Layer</span>
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearCustomLayers}
-                  className="h-7 text-[10px] border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 gap-1 rounded-lg"
-                >
-                  <Trash2 className="w-3 h-3 text-rose-500" />
-                  <span>Reset Layer Kustom</span>
-                </Button>
+
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {uploadedLayers.map((l) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/60 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {l.geomType === 'line' ? (
+                          <div className="w-3.5 h-1 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                        ) : (
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0 border border-white" style={{ backgroundColor: l.color }} />
+                        )}
+                        <span className="font-mono text-[11px] font-semibold truncate text-foreground">
+                          {l.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          • {l.count} fitur ({l.category})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Hapus file "${l.name}" dari peta?`)) {
+                            handleDeleteLayer(l.id, l.name);
+                          }
+                        }}
+                        className="p-1 rounded text-muted-foreground/50 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0"
+                        title={`Hapus file layer ${l.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
