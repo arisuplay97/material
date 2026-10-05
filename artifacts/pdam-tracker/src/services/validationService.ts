@@ -101,15 +101,25 @@ export class ValidationService {
       }
 
       // ── 1. Kode Pelanggan (wajib, 9 digit KKWWxxxxx) ──
-      let kodePelanggan = str(r.kode_pelanggan ?? r.id_pelanggan ?? r.kode ?? r.no_pelanggan).replace(/\s+/g, '');
+      let kodePelanggan = str(
+        r.kode_pelanggan ??
+        r.id_pelanggan ??
+        r.kode ??
+        r.no_pelanggan ??
+        r.no_pelan ??
+        r.no_pel ??
+        r.nosamb ??
+        r.no_sambungan
+      ).replace(/\s+/g, '');
+
       if (/^\d{8}$/.test(kodePelanggan)) {
-        // Excel stripped the leading zero from a numeric cell.
+        // Excel stripped the leading zero from a numeric cell (e.g. 70100861 -> 070100861).
         kodePelanggan = `0${kodePelanggan}`;
-        warn('kode_pelanggan', kodePelanggan, 'Angka nol di depan hilang (sel Excel bertipe angka), dipulihkan otomatis. Simpan kolom sebagai teks.');
+        warn('kode_pelanggan', kodePelanggan, 'Angka 0 di depan dipulihkan otomatis (terpotong oleh format angka Excel).');
       }
 
       if (!kodePelanggan) {
-        fail('kode_pelanggan', kodePelanggan, 'Kode pelanggan wajib diisi.');
+        fail('kode_pelanggan', kodePelanggan, 'Kode pelanggan wajib diisi (kolom NO_PELAN / KODE_PELANGGAN).');
       } else if (!/^\d{9}$/.test(kodePelanggan)) {
         fail('kode_pelanggan', kodePelanggan, `Kode pelanggan harus 9 digit angka (KKWWxxxxx). Ditemukan "${kodePelanggan}" (${kodePelanggan.length} karakter).`);
       } else if (seenIds.has(kodePelanggan)) {
@@ -157,18 +167,28 @@ export class ValidationService {
         warn('koordinat', `${lat}, ${lng}`, `Titik (${lat.toFixed(5)}, ${lng.toFixed(5)}) di luar area layanan Pulau Lombok.`, 'Koordinat di luar area layanan');
       }
 
-      // ── 6. Golongan ──
-      const rawGolongan = str(r.golongan ?? r.gol ?? r.tarif).toUpperCase();
-      const golongan: GolonganTarif = (GOLONGAN_LIST as string[]).includes(rawGolongan) ? (rawGolongan as GolonganTarif) : 'R1';
-      if (rawGolongan && golongan !== rawGolongan) {
-        warn('golongan', rawGolongan, `Golongan "${rawGolongan}" tidak baku, disesuaikan ke R1.`, `Golongan '${rawGolongan}' tidak baku`);
+      // ── 6. Golongan Tarif (dukung urjlw / urjlwp seperti 2B, Rumah Tangga A, dll) ──
+      const rawGolongan = str(r.golongan ?? r.gol ?? r.tarif ?? r.urjlw ?? r.urjlwp).toUpperCase();
+      let golongan: GolonganTarif = 'R1';
+      if ((GOLONGAN_LIST as string[]).includes(rawGolongan)) {
+        golongan = rawGolongan as GolonganTarif;
+      } else if (rawGolongan.includes('2B') || rawGolongan.includes('RUMAH TANGGA B') || rawGolongan.includes('R2')) {
+        golongan = 'R2';
+      } else if (rawGolongan.includes('2A') || rawGolongan.includes('2') || rawGolongan.includes('RUMAH TANGGA') || rawGolongan.includes('R1')) {
+        golongan = 'R1';
+      } else if (rawGolongan.startsWith('3') || rawGolongan.includes('NIAGA') || rawGolongan.includes('BISNIS') || rawGolongan.includes('B1')) {
+        golongan = 'B1';
+      } else if (rawGolongan.startsWith('1') || rawGolongan.includes('SOSIAL') || rawGolongan.includes('S')) {
+        golongan = 'S';
+      } else if (rawGolongan.startsWith('4') || rawGolongan.includes('INDUSTRI') || rawGolongan.includes('INSTANSI') || rawGolongan.includes('PEMERINTAH') || rawGolongan.includes('I')) {
+        golongan = 'I';
       }
 
-      // ── 7. Status sambungan ──
-      const rawStatus = str(r.status_sambungan ?? r.status);
+      // ── 7. Status sambungan (dukung urstat_smb seperti Aktif, Tutup, Segel, Putus) ──
+      const rawStatus = str(r.status_sambungan ?? r.status ?? r.urstat_smb ?? r.stat_smb ?? r.status_smb);
       let status: StatusSambungan = 'Aktif';
       if (/non|tutup|segel/i.test(rawStatus)) status = 'Nonaktif';
-      else if (/putus|bongkar/i.test(rawStatus)) status = 'Putus';
+      else if (/putus|cabut|bongkar/i.test(rawStatus)) status = 'Putus';
 
       if (rowHasFatalError) return;
 

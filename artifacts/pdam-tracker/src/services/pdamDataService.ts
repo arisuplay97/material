@@ -604,12 +604,39 @@ class PdamDataService {
   public async generateTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
     const XLSX = await import('xlsx');
     const templateRows = [
-      { kode_pelanggan: '070100001', nama_pelanggan: 'Ahmad Zulkifli', alamat: 'Dusun Karang Anyar RT 01 RW 01, Ds. Karang Dalam', golongan: 'R1', status_sambungan: 'Aktif', latitude: -8.789254, longitude: 116.219812 },
-      { kode_pelanggan: '070200002', nama_pelanggan: 'Baiq Nurul Aini', alamat: 'Dusun Dasan Baru RT 02 RW 01, Ds. Kateng', golongan: 'R2', status_sambungan: 'Aktif', latitude: -8.825120, longitude: 116.195230 },
-      { kode_pelanggan: '070400003', nama_pelanggan: 'Lalu Muhammad Ridwan', alamat: 'Dusun Reak RT 03 RW 02, Ds. Bonder', golongan: 'B1', status_sambungan: 'Nonaktif', latitude: -8.775310, longitude: 116.205140 },
+      {
+        NO_PELAN: '070100861',
+        NAMA: 'ISMAIL',
+        ALAMAT: 'KR DALAM BT',
+        urjlw: '2B',
+        urjlwp: 'RUMAH TANGGA A',
+        urstat_smb: 'Aktif',
+        longitude: 116.2406,
+        latitude: -8.75218,
+      },
+      {
+        NO_PELAN: '070100863',
+        NAMA: 'MQ WIRANTAKE',
+        ALAMAT: 'KR DALAM BT',
+        urjlw: '2B',
+        urjlwp: 'RUMAH TANGGA A',
+        urstat_smb: 'Aktif',
+        longitude: 116.2406,
+        latitude: -8.75218,
+      },
+      {
+        NO_PELAN: '070400003',
+        NAMA: 'LALU MUHAMMAD RIDWAN',
+        ALAMAT: 'BONDER',
+        urjlw: '3A',
+        urjlwp: 'NIAGA KECIL',
+        urstat_smb: 'Aktif',
+        longitude: 116.20514,
+        latitude: -8.77531,
+      },
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateRows);
-    // Keep kode_pelanggan as text so leading zeros survive (PRD §1A).
+    // Keep NO_PELAN as text format so leading zero (0) is preserved
     templateRows.forEach((_, i) => {
       const cell = worksheet[XLSX.utils.encode_cell({ r: i + 1, c: 0 })];
       if (cell) cell.t = 's';
