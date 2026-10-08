@@ -78,9 +78,9 @@ const MAX_ZOOM = 18;
 // Basemap Providers
 const BASEMAPS = {
   positron: {
-    name: 'Positron (OpenFreeMap GL)',
-    url: '',
-    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+    name: 'Positron (Terang Bersih)',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO / OpenFreeMap',
   },
   cerah: {
     name: 'Peta Cerah (Humaniter)',
@@ -857,18 +857,9 @@ function CustomerClusterLayer({
         validCustomers.forEach((c) => {
           const wilayah = wilayahMap.get(c.kode_wilayah);
           const color = safeColor(wilayah?.warna, '#3B6EA8');
-          const isSpatialAnomaly = Boolean(c.spatial_anomaly);
-          const isColocationAnomaly = Boolean(c.colocation_anomaly);
-
-          const strokeColor = isSpatialAnomaly
-            ? '#EF4444'
-            : isColocationAnomaly
-            ? '#A855F7'
-            : c.is_flagged
-            ? '#F59E0B'
-            : '#FFFFFF';
-
-          const strokeWidth = isSpatialAnomaly || isColocationAnomaly ? 1.5 : 0.6;
+          // Clean dot border without red/purple anomaly stroke (as requested)
+          const strokeColor = '#FFFFFF';
+          const strokeWidth = 0.5;
 
           const circle = L.circleMarker([c.latitude, c.longitude], {
             renderer: canvasRenderer,
@@ -932,9 +923,8 @@ function CustomerClusterLayer({
         validCustomers.forEach((c) => {
           const wilayah = wilayahMap.get(c.kode_wilayah);
           const color = safeColor(wilayah?.warna, '#3B6EA8');
-          const isSpatialAnomaly = Boolean(c.spatial_anomaly);
-          const isColocationAnomaly = Boolean(c.colocation_anomaly);
-          const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : 'rgba(255, 255, 255, 0.95)';
+          // Clean dot border without red/purple anomaly stroke (as requested)
+          const borderColor = 'rgba(255, 255, 255, 0.95)';
 
           const customIcon = L.divIcon({
             className: 'gis-point-marker',
@@ -1027,6 +1017,9 @@ export default function GisMap() {
 
   // Customer marker mode: false = Sebaran Titik HTML (Canvas 60FPS), true = Mode Klaster
   const [useCluster, setUseCluster] = useState<boolean>(false);
+
+  // 3D Camera Tilt (Kamera Miring seperti di HTML)
+  const [isTilted, setIsTilted] = useState<boolean>(false);
 
   // Local Kecamatan selector (default 07 Praya Barat)
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07');
@@ -1928,6 +1921,22 @@ export default function GisMap() {
             <span>{useCluster ? 'Klaster' : 'Titik Sebaran'}</span>
           </Button>
 
+          {/* Kamera Miring 3D Toggle (seperti di HTML) */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsTilted(!isTilted)}
+            className={`h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md transition-all ${
+              isTilted
+                ? 'border-sky-500 bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-semibold shadow-sm'
+                : 'text-foreground hover:bg-muted'
+            }`}
+            title={isTilted ? 'Kembalikan ke kamera datar 2D' : 'Aktifkan kamera miring 3D (seperti di HTML)'}
+          >
+            <Compass className={`w-3.5 h-3.5 transition-transform duration-500 ${isTilted ? 'rotate-45 text-sky-600 dark:text-sky-400' : 'text-muted-foreground'}`} />
+            <span>Kamera Miring</span>
+          </Button>
+
           {/* Basemap Switcher */}
           <Select value={basemapKey} onValueChange={(val: any) => setBasemapKey(val)}>
             <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-36">
@@ -1935,7 +1944,7 @@ export default function GisMap() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-border bg-card">
-              <SelectItem value="positron">Positron (OpenFreeMap GL)</SelectItem>
+              <SelectItem value="positron">Positron (Terang Bersih)</SelectItem>
               <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
               <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
@@ -2937,23 +2946,21 @@ export default function GisMap() {
         maxBounds={LOMBOK_BOUNDS}
         maxBoundsViscosity={1.0}
         scrollWheelZoom={true}
-        className="w-full h-full"
+        className={`w-full h-full ${isTilted ? 'gis-tilt-3d' : ''}`}
         zoomControl={false}
       >
-        {basemapKey !== 'vektor' && basemapKey !== 'positron' && (
+        {basemapKey !== 'vektor' && (
           <TileLayer
             key={basemapKey}
-            attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
-            url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
+            attribution={(BASEMAPS[basemapKey] || BASEMAPS.positron).attribution}
+            url={(BASEMAPS[basemapKey] || BASEMAPS.positron).url}
+            subdomains={basemapKey === 'positron' ? 'abcd' : 'abc'}
             maxZoom={MAX_ZOOM}
-            bounds={LOMBOK_BOUNDS}
+            detectRetina={basemapKey === 'positron'}
           />
         )}
 
-        <MapLibreLayer
-          active={basemapKey === 'positron' || basemapKey === 'vektor'}
-          style={basemapKey === 'vektor' ? undefined : 'https://tiles.openfreemap.org/styles/positron'}
-        />
+        <MapLibreLayer active={basemapKey === 'vektor'} />
         <MapController targetPoint={targetPoint} />
         <PulseOverlay position={pulsePosition} active={pulseActive} />
 
