@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { pdamService } from '@/services/pdamDataService';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { pdamService, kecamatanName, KECAMATAN_BOUNDS, boundsCenter } from '@/services/pdamDataService';
 import { ValidationService, ValidationOutput } from '@/services/validationService';
 import { WilayahAcuan, UploadSnapshot } from '@/types/pdam';
 import { useAuth } from '@/contexts/AuthContext';
@@ -207,6 +207,52 @@ export default function Settings() {
     toast.success('Palet warna wilayah telah dikembalikan ke standar.');
   };
 
+  // Missing wilayah codes detected during validation
+  const missingWilayahCodes = useMemo(() => {
+    if (!validationResult) return [];
+    const codes = new Set<string>();
+    validationResult.summary.errors.forEach((err) => {
+      if (err.field === 'kode_wilayah' && err.value && /^\d{4}$/.test(String(err.value))) {
+        codes.add(String(err.value));
+      }
+    });
+    return Array.from(codes).sort();
+  }, [validationResult]);
+
+  // Auto-register missing wilayah codes and re-validate
+  const handleAutoRegisterMissingWilayah = () => {
+    if (missingWilayahCodes.length === 0) return;
+
+    const AUTO_COLORS = [
+      '#0284C7', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+      '#EC4899', '#14B8A6', '#F97316', '#06B6D4', '#84CC16'
+    ];
+
+    missingWilayahCodes.forEach((code, idx) => {
+      const kodeKec = code.slice(0, 2);
+      const namaKec = kecamatanName(kodeKec);
+      const bounds = KECAMATAN_BOUNDS[kodeKec];
+      const center = bounds ? boundsCenter(bounds) : [-8.7892, 116.2051];
+      const warna = AUTO_COLORS[idx % AUTO_COLORS.length];
+
+      pdamService.addWilayah({
+        kode: code,
+        nama: `Wilayah ${code} (${namaKec})`,
+        kodeKecamatan: kodeKec,
+        namaKecamatan: namaKec,
+        warna,
+        centerLat: Number(center[0].toFixed(5)),
+        centerLng: Number(center[1].toFixed(5)),
+      });
+    });
+
+    toast.success(`${missingWilayahCodes.length} kode wilayah baru (${missingWilayahCodes.join(', ')}) berhasil didaftarkan! Memvalidasi ulang...`);
+
+    if (selectedFile) {
+      processFile(selectedFile);
+    }
+  };
+
   // Add New Wilayah
   const handleAddNewWilayah = () => {
     if (!newWilayahKode || !newWilayahNama) {
@@ -214,21 +260,26 @@ export default function Settings() {
       return;
     }
     if (!/^\d{4}$/.test(newWilayahKode)) {
-      toast.error('Kode wilayah harus 4 digit angka (format KKWW, contoh: 0733).');
+      toast.error('Kode wilayah harus 4 digit angka (format KKWW, contoh: 1001 atau 0733).');
       return;
     }
+
+    const kodeKec = newWilayahKode.slice(0, 2);
+    const namaKec = kecamatanName(kodeKec);
+    const bounds = KECAMATAN_BOUNDS[kodeKec];
+    const center = bounds ? boundsCenter(bounds) : [-8.7892, 116.2051];
 
     pdamService.addWilayah({
       kode: newWilayahKode,
       nama: newWilayahNama,
-      kodeKecamatan: newWilayahKode.slice(0, 2),
-      namaKecamatan: 'Praya Barat',
+      kodeKecamatan: kodeKec,
+      namaKecamatan: namaKec,
       warna: safeColor(newWilayahWarna, '#3B6EA8'),
-      centerLat: -8.7892,
-      centerLng: 116.2051,
+      centerLat: Number(center[0].toFixed(5)),
+      centerLng: Number(center[1].toFixed(5)),
     });
 
-    toast.success(`Wilayah ${newWilayahKode} - ${newWilayahNama} berhasil ditambahkan.`);
+    toast.success(`Wilayah ${newWilayahKode} - ${newWilayahNama} (Kec. ${namaKec}) berhasil ditambahkan.`);
     setNewWilayahKode('');
     setNewWilayahNama('');
     setShowAddWilayahModal(false);
@@ -499,6 +550,31 @@ export default function Settings() {
                       </div>
                     )}
 
+                    {/* Helper: Auto-Register Missing Wilayah Banner */}
+                    {missingWilayahCodes.length > 0 && (
+                      <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-xs space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                            <span className="font-semibold text-foreground">
+                              Ditemukan {missingWilayahCodes.length} Kode Wilayah Baru Belum Terdaftar: {missingWilayahCodes.join(', ')}
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleAutoRegisterMissingWilayah}
+                            className="h-8 px-3 rounded-xl text-xs gap-1.5 font-semibold shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Daftarkan Otomatis & Validasi Ulang</span>
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Kode ini belum ada di tabel acuan wilayah: {missingWilayahCodes.map((k) => `${k} (Kec. ${kecamatanName(k.slice(0, 2))})`).join(', ')}. Klik tombol di atas untuk mendaftarkannya otomatis ke sistem agar data pelanggan Anda langsung lolos validasi.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Detailed Errors Table */}
                     <div className="border border-border rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                       <table className="w-full text-left text-xs border-collapse font-sans">
@@ -666,15 +742,28 @@ export default function Settings() {
               <div className="space-y-3.5 text-xs">
                 <div>
                   <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Kode Wilayah (4 Digit Angka, misal: 0733)
+                    Kode Wilayah (4 Digit Angka, misal: 1001 atau 0733)
                   </label>
                   <Input
-                    placeholder="0733"
+                    placeholder="Contoh: 1001"
                     value={newWilayahKode}
                     maxLength={4}
                     onChange={(e) => setNewWilayahKode(e.target.value)}
                     className="h-9 rounded-xl text-xs font-mono"
                   />
+                  {newWilayahKode.length >= 2 && (
+                    <div className="mt-1.5 p-2 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-foreground flex items-center gap-1.5 flex-wrap">
+                      <span className="text-muted-foreground">Kecamatan:</span>
+                      <strong className="text-primary font-semibold">{kecamatanName(newWilayahKode.slice(0, 2))}</strong>
+                      <span className="text-muted-foreground font-mono">({newWilayahKode.slice(0, 2)})</span>
+                      {newWilayahKode.length === 4 && (
+                        <>
+                          <span className="text-muted-foreground ml-1.5">• Sub-wilayah:</span>
+                          <strong className="font-mono">{newWilayahKode.slice(2, 4)}</strong>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-mono text-muted-foreground block mb-1">

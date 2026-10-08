@@ -177,8 +177,8 @@ export class ValidationService {
       const golongan: GolonganTarif = rawKodeGol || (rawUraianGol ? rawUraianGol : '2B');
       const uraianGolongan = rawUraianGol || (GOLONGAN_META[golongan]?.label || '');
 
-      // ── 7. Status sambungan (dukung urstat_smb seperti Aktif, Tutup, Segel, Putus) ──
-      const rawStatus = str(r.status_sambungan ?? r.status ?? r.urstat_smb ?? r.stat_smb ?? r.status_smb);
+      // ── 7. Status sambungan (dukung urstat_sm / urstat_smb seperti Aktif, Tutup, Segel, Putus) ──
+      const rawStatus = str(r.status_sambungan ?? r.status ?? r.urstat_sm ?? r.urstat_smb ?? r.stat_smb ?? r.status_smb);
       let status: StatusSambungan = 'Aktif';
       if (/non|tutup|segel/i.test(rawStatus)) status = 'Nonaktif';
       else if (/putus|cabut|bongkar/i.test(rawStatus)) status = 'Putus';

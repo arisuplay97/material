@@ -84,6 +84,9 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   { kode: '0729', nama: 'Montor', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#22C55E', centerLat: -8.7801, centerLng: 116.1812 },
   { kode: '0730', nama: 'Lolat', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#E11D48', centerLat: -8.8412, centerLng: 116.1895 },
   { kode: '0732', nama: 'Kentawang - SL Paok', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#7C3AED', centerLat: -8.8402, centerLng: 116.1685 },
+  // ── Acuan Wilayah Kecamatan 10 (Batukliang Utara) ──
+  { kode: '1001', nama: 'Teratak / Batukliang Utara 01', kodeKecamatan: '10', namaKecamatan: 'Batukliang Utara', warna: '#0284C7', centerLat: -8.5150, centerLng: 116.3300 },
+  { kode: '1002', nama: 'Lantan / Batukliang Utara 02', kodeKecamatan: '10', namaKecamatan: 'Batukliang Utara', warna: '#10B981', centerLat: -8.5250, centerLng: 116.3450 },
 ];
 
 const STORAGE_KEYS = {
@@ -385,7 +388,19 @@ class PdamDataService {
   private init() {
     try {
       const storedWilayah = localStorage.getItem(STORAGE_KEYS.WILAYAH);
-      this.wilayah = storedWilayah ? JSON.parse(storedWilayah) : [...DEFAULT_WILAYAH_LIST];
+      if (storedWilayah) {
+        const parsed: WilayahAcuan[] = JSON.parse(storedWilayah);
+        const existingCodes = new Set(parsed.map((w) => w.kode));
+        const missing = DEFAULT_WILAYAH_LIST.filter((w) => !existingCodes.has(w.kode));
+        if (missing.length > 0) {
+          this.wilayah = [...parsed, ...missing].sort((a, b) => a.kode.localeCompare(b.kode));
+          this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+        } else {
+          this.wilayah = parsed;
+        }
+      } else {
+        this.wilayah = [...DEFAULT_WILAYAH_LIST];
+      }
 
       let migrated = false;
       const storedPelanggan = localStorage.getItem(STORAGE_KEYS.PELANGGAN);
