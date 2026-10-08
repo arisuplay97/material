@@ -592,6 +592,15 @@ class PdamDataService {
     this.notify();
   }
 
+  public updateWilayahName(kode: string, nama: string) {
+    this.wilayah = this.wilayah.map((w) => (w.kode === kode ? { ...w, nama } : w));
+    // Also update nama_wilayah in loaded pelanggan
+    this.pelanggan = this.pelanggan.map((p) => (p.kode_wilayah === kode ? { ...p, nama_wilayah: nama } : p));
+    this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+    this.notify();
+  }
+
   public addWilayah(newWilayah: WilayahAcuan) {
     const existingIndex = this.wilayah.findIndex((w) => w.kode === newWilayah.kode);
     if (existingIndex >= 0) {

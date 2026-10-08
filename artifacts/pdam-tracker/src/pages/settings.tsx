@@ -31,6 +31,8 @@ import {
   Database,
   Layers,
   Sparkles,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +59,8 @@ export default function Settings() {
   const [newWilayahNama, setNewWilayahNama] = useState<string>('');
   const [newWilayahWarna, setNewWilayahWarna] = useState<string>('#3B6EA8');
   const [showAddWilayahModal, setShowAddWilayahModal] = useState<boolean>(false);
+  const [editingWilayahKode, setEditingWilayahKode] = useState<string | null>(null);
+  const [editingWilayahNama, setEditingWilayahNama] = useState<string>('');
 
   // Rollback confirmation modal
   const [confirmRollbackId, setConfirmRollbackId] = useState<string | null>(null);
@@ -199,6 +203,28 @@ export default function Settings() {
     const cleaned = safeColor(warna, '#3B6EA8');
     pdamService.updateWilayahColor(kode, cleaned);
     toast.success(`Warna wilayah ${kode} diperbarui.`);
+  };
+
+  // Handle Wilayah Name Edit
+  const handleStartEditWilayah = (w: WilayahAcuan) => {
+    setEditingWilayahKode(w.kode);
+    setEditingWilayahNama(w.nama);
+  };
+
+  const handleSaveEditWilayah = (kode: string) => {
+    const trimmed = editingWilayahNama.trim();
+    if (!trimmed) {
+      toast.error('Nama wilayah tidak boleh kosong.');
+      return;
+    }
+    pdamService.updateWilayahName(kode, trimmed);
+    toast.success(`Nama wilayah ${kode} berhasil diperbarui menjadi "${trimmed}".`);
+    setEditingWilayahKode(null);
+  };
+
+  const handleCancelEditWilayah = () => {
+    setEditingWilayahKode(null);
+    setEditingWilayahNama('');
   };
 
   // Reset Wilayah Colors
@@ -678,6 +704,7 @@ export default function Settings() {
                       <th className="py-3 px-4 font-semibold">Jumlah Pelanggan</th>
                       <th className="py-3 px-4 font-semibold">Warna Marker</th>
                       <th className="py-3 px-4 font-semibold">Kode HEX</th>
+                      <th className="py-3 px-4 font-semibold text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-sans">
@@ -687,7 +714,50 @@ export default function Settings() {
                           {w.kode}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {w.nama}
+                          {editingWilayahKode === w.kode ? (
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                value={editingWilayahNama}
+                                onChange={(e) => setEditingWilayahNama(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEditWilayah(w.kode);
+                                  if (e.key === 'Escape') handleCancelEditWilayah();
+                                }}
+                                autoFocus
+                                className="h-7 text-xs rounded-lg px-2 w-48 font-medium border-primary bg-background"
+                                placeholder="Nama wilayah..."
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEditWilayah(w.kode)}
+                                className="h-7 w-7 p-0 rounded-lg text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 shrink-0"
+                                title="Simpan Nama"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleCancelEditWilayah}
+                                className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:bg-muted shrink-0"
+                                title="Batal"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span className="font-medium">{w.nama}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditWilayah(w)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary cursor-pointer"
+                                title={`Ubah nama wilayah ${w.nama}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
                           {w.kodeKecamatan} ({w.namaKecamatan})
@@ -712,6 +782,38 @@ export default function Settings() {
                         </td>
                         <td className="py-3 px-4 font-mono text-xs uppercase text-muted-foreground">
                           {w.warna}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {editingWilayahKode === w.kode ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEditWilayah(w.kode)}
+                                className="h-7 px-2.5 rounded-lg text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Simpan</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleCancelEditWilayah}
+                                className="h-7 px-2 rounded-lg text-xs text-muted-foreground hover:bg-muted"
+                              >
+                                <span>Batal</span>
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartEditWilayah(w)}
+                              className="h-7 px-2.5 rounded-lg text-xs gap-1.5 border-border text-foreground hover:bg-muted font-normal"
+                            >
+                              <Pencil className="w-3 h-3 text-muted-foreground" />
+                              <span>Ubah Nama</span>
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))}
