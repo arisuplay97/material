@@ -77,6 +77,11 @@ const MAX_ZOOM = 18;
 
 // Basemap Providers
 const BASEMAPS = {
+  positron: {
+    name: 'Positron (Terang Minimalis)',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO / OpenFreeMap',
+  },
   cerah: {
     name: 'Peta Cerah (Humaniter)',
     url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
@@ -716,7 +721,8 @@ function CustomerClusterLayer({
         if (typeof (L as any).markerClusterGroup === 'function') {
           group = (L as any).markerClusterGroup({
             chunkedLoading: true,
-            maxClusterRadius: 42,
+            maxClusterRadius: 35,
+            disableClusteringAtZoom: 16,
             spiderfyOnMaxZoom: true,
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
@@ -729,7 +735,7 @@ function CustomerClusterLayer({
               return L.divIcon({
                 html: `<div><span>${count}</span></div>`,
                 className: `marker-cluster ${sizeClass}`,
-                iconSize: L.point(38, 38),
+                iconSize: L.point(34, 34),
               });
             },
           });
@@ -753,35 +759,34 @@ function CustomerClusterLayer({
         const color = safeColor(wilayah?.warna, '#3B6EA8');
         const isSpatialAnomaly = Boolean(c.spatial_anomaly);
         const isColocationAnomaly = Boolean(c.colocation_anomaly);
-        const isAnomaly = isSpatialAnomaly || isColocationAnomaly;
 
-        const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : '#FFFFFF';
+        const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : 'rgba(255, 255, 255, 0.95)';
         const ringHtml = isSpatialAnomaly
-          ? '<div class="gis-anomaly-ring"></div>'
+          ? '<div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 1.2px solid #EF4444; background: rgba(239, 68, 68, 0.18); animation: anomaly-beacon 2.4s infinite ease-in-out; pointer-events: none;"></div>'
           : isColocationAnomaly
-          ? '<div class="gis-colocation-ring"></div>'
+          ? '<div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 1.2px solid #A855F7; background: rgba(168, 85, 247, 0.18); animation: anomaly-beacon 2.4s infinite ease-in-out; pointer-events: none;"></div>'
           : '';
 
         const badgeHtml = isSpatialAnomaly
-          ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background-color: #EF4444; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 800; font-family: monospace;">!</div>'
+          ? '<div style="position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background-color: #EF4444; border: 1px solid white; display: flex; align-items: center; justify-content: center; font-size: 6px; color: white; font-weight: 800; font-family: monospace;">!</div>'
           : isColocationAnomaly
-          ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background-color: #A855F7; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 800; font-family: monospace;" title="Titik Dobel Beda Wilayah">⇄</div>'
+          ? '<div style="position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background-color: #A855F7; border: 1px solid white; display: flex; align-items: center; justify-content: center; font-size: 6px; color: white; font-weight: 800; font-family: monospace;" title="Titik Dobel Beda Wilayah">⇄</div>'
           : c.is_flagged
-          ? '<div style="position: absolute; top: -2px; right: -2px; width: 6px; height: 6px; border-radius: 50%; background-color: #F59E0B; border: 1px solid white;"></div>'
+          ? '<div style="position: absolute; top: -2px; right: -2px; width: 5px; height: 5px; border-radius: 50%; background-color: #F59E0B; border: 0.8px solid white;"></div>'
           : '';
 
         const customIcon = L.divIcon({
           className: 'gis-point-marker',
           html: `
-            <div style="position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+            <div style="position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
               ${ringHtml}
-              <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${color}; border: 2.5px solid ${borderColor}; box-shadow: 0 1px 5px rgba(0,0,0,0.35);"></div>
+              <div style="width: 7.5px; height: 7.5px; border-radius: 50%; background-color: ${color}; border: 0.6px solid ${borderColor}; box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.25); transition: transform 0.15s ease;"></div>
               ${badgeHtml}
             </div>
           `,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-          popupAnchor: [0, -12],
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+          popupAnchor: [0, -8],
         });
 
         const marker = L.marker([c.latitude, c.longitude], { icon: customIcon });
@@ -903,8 +908,8 @@ export default function GisMap() {
     return map;
   }, [pelangganList]);
 
-  // Basemap state
-  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('cerah');
+  // Basemap state (default Positron)
+  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('positron');
 
   // Local Kecamatan selector (default 07 Praya Barat)
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07');
@@ -1793,6 +1798,7 @@ export default function GisMap() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-border bg-card">
+              <SelectItem value="positron">Positron (Terang Minimalis)</SelectItem>
               <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
               <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
@@ -2800,8 +2806,9 @@ export default function GisMap() {
         {basemapKey !== 'vektor' && (
           <TileLayer
             key={basemapKey}
-            attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
-            url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
+            attribution={(BASEMAPS[basemapKey] || BASEMAPS.positron).attribution}
+            url={(BASEMAPS[basemapKey] || BASEMAPS.positron).url}
+            subdomains={basemapKey === 'positron' ? 'abcd' : 'abc'}
             maxZoom={MAX_ZOOM}
             bounds={LOMBOK_BOUNDS}
           />
