@@ -78,9 +78,9 @@ const MAX_ZOOM = 18;
 // Basemap Providers
 const BASEMAPS = {
   positron: {
-    name: 'Positron (Terang Minimalis)',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO / OpenFreeMap',
+    name: 'Positron (OpenFreeMap GL)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
   },
   cerah: {
     name: 'Peta Cerah (Humaniter)',
@@ -183,9 +183,16 @@ function PulseOverlay({ position, active }: { position: [number, number] | null;
 }
 
 // MapLibre Vector Tile Layer
-function MapLibreLayer({ active }: { active: boolean }) {
+function MapLibreLayer({
+  active,
+  style = 'https://tiles.openfreemap.org/styles/positron',
+}: {
+  active: boolean;
+  style?: string | object;
+}) {
   const map = useMap();
   const layerRef = useRef<L.Layer | null>(null);
+  const currentStyleRef = useRef<string | object | null>(null);
 
   useEffect(() => {
     if (!active) {
@@ -194,8 +201,23 @@ function MapLibreLayer({ active }: { active: boolean }) {
           map.removeLayer(layerRef.current);
         } catch {}
         layerRef.current = null;
+        currentStyleRef.current = null;
       }
       return;
+    }
+
+    // Skip recreate if style hasn't changed
+    if (layerRef.current && currentStyleRef.current === style) {
+      return;
+    }
+
+    // Remove old layer if switching style
+    if (layerRef.current) {
+      try {
+        map.removeLayer(layerRef.current);
+      } catch {}
+      layerRef.current = null;
+      currentStyleRef.current = null;
     }
 
     let cancelled = false;
@@ -203,25 +225,28 @@ function MapLibreLayer({ active }: { active: boolean }) {
     map.whenReady(() => {
       (async () => {
         try {
-          const [{ lombokTengahStyle }, maplibreLeafletMod] = await Promise.all([
-            import('@/lib/lombokTengahStyle'),
-            import('@maplibre/maplibre-gl-leaflet'),
-          ]);
-
+          const maplibreLeafletMod = await import('@maplibre/maplibre-gl-leaflet');
           await import('maplibre-gl/dist/maplibre-gl.css');
           if (cancelled) return;
+
+          let targetStyle = style;
+          if (!targetStyle) {
+            const { lombokTengahStyle } = await import('@/lib/lombokTengahStyle');
+            targetStyle = lombokTengahStyle;
+          }
 
           const maplibreGL = maplibreLeafletMod.maplibreGL || (maplibreLeafletMod as any).default;
           if (!maplibreGL) return;
 
           const glLayer = maplibreGL({
-            style: lombokTengahStyle as any,
+            style: targetStyle as any,
             pane: 'tilePane',
           } as any);
 
           if (cancelled) return;
           glLayer.addTo(map);
           layerRef.current = glLayer;
+          currentStyleRef.current = style;
         } catch (err) {
           console.warn('MapLibre GL basemap warning:', err);
         }
@@ -235,9 +260,10 @@ function MapLibreLayer({ active }: { active: boolean }) {
           map.removeLayer(layerRef.current);
         } catch {}
         layerRef.current = null;
+        currentStyleRef.current = null;
       }
     };
-  }, [active, map]);
+  }, [active, style, map]);
 
   return null;
 }
@@ -695,8 +721,9 @@ function QgisVectorLayer({ active, data, hiddenLayers, layerColors }: QgisVector
 interface CustomerClusterProps {
   customers: Pelanggan[];
   wilayahMap: Map<string, WilayahAcuan>;
-  userRole?: UserRole | null;
+  userRole?: UserRole;
   onSelectCustomer: (c: Pelanggan) => void;
+  useCluster?: boolean;
 }
 
 function CustomerClusterLayer({
@@ -704,30 +731,188 @@ function CustomerClusterLayer({
   wilayahMap,
   userRole,
   onSelectCustomer,
+  useCluster = false,
 }: CustomerClusterProps) {
   const map = useMap();
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const clusterGroupRef = useRef<any>(null);
 
-  // Keep a stable ref to callback to prevent marker rebuilding on callback change
+  // Stable callback ref
   const onSelectRef = useRef(onSelectCustomer);
   useEffect(() => {
     onSelectRef.current = onSelectCustomer;
   }, [onSelectCustomer]);
 
+  // Track map zoom for dynamic radius scaling (matches HTML interpolation)
+  const [currentZoom, setCurrentZoom] = useState(() => map.getZoom());
+
+  useEffect(() => {
+    const handleZoom = () => {
+      const z = map.getZoom();
+      setCurrentZoom(z);
+      // Fast in-place radius update on zoom without rebuilding layers
+      const newRadius = Math.min(Math.max(2.2, (z - 9) * 0.45 + 1.8), 5.2);
+      if (layerGroupRef.current) {
+        layerGroupRef.current.eachLayer((l: any) => {
+          if (typeof l.setRadius === 'function') {
+            l.setRadius(newRadius);
+          }
+        });
+      }
+    };
+    map.on('zoomend', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map]);
+
+  // Calculate dynamic radius: zoom 10 -> ~2.2px, zoom 13 -> ~3.6px, zoom 16+ -> ~5px
+  const dotRadius = useMemo(() => {
+    return Math.min(Math.max(2.2, (currentZoom - 9) * 0.45 + 1.8), 5.2);
+  }, [currentZoom]);
+
+  // Single HTML5 Canvas renderer for 60FPS fluid GPU rendering
+  const canvasRenderer = useMemo(() => {
+    return L.canvas({ padding: 0.5 });
+  }, []);
+
+  // Popup HTML generator function - evaluated lazily on click to save memory
+  const buildPopupHtml = useCallback(
+    (c: Pelanggan, color: string) => {
+      const safeCode = escapeHtml(c.kode_pelanggan);
+      const safeGol = escapeHtml(c.golongan);
+      const safeName = escapeHtml(displayName(c.nama_pelanggan, userRole));
+      const safeAlamat = escapeHtml(displayAddress(c.alamat, userRole));
+      const safeWilayah = escapeHtml(c.nama_wilayah);
+      const safeStatus = escapeHtml(c.status_sambungan);
+      const safeAnomaly = c.spatial_anomaly ? escapeHtml(c.spatial_anomaly) : '';
+      const safeColocation = c.colocation_anomaly ? escapeHtml(c.colocation_anomaly) : '';
+
+      return `
+        <div style="width: 250px; font-family: 'Inter', sans-serif; padding: 10px; line-height: 1.4;">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(148, 163, 184, 0.2); padding-bottom: 6px; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color};"></span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: #1e293b;">${safeCode}</span>
+            </div>
+            <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(59, 110, 168, 0.12); color: #3B6EA8;">${safeGol}</span>
+          </div>
+
+          <div style="font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 2px;">${safeName}</div>
+          <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.3;">${safeAlamat}</div>
+
+          ${
+            c.spatial_anomaly
+              ? `
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #b91c1c;">
+              <strong>⚠️ Anomali Batas:</strong> ${safeAnomaly}
+            </div>
+          `
+              : ''
+          }
+          ${
+            c.colocation_anomaly
+              ? `
+            <div style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #7e22ce;">
+              <strong>📍 Titik Dobel Beda Wilayah:</strong> ${safeColocation}
+            </div>
+          `
+              : ''
+          }
+
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 8px;">
+            <span>Status: <strong>${safeStatus}</strong></span>
+            <span>Wilayah: <strong>${safeWilayah}</strong></span>
+          </div>
+
+          <button id="btn-popup-${safeCode}" style="width: 100%; border: none; padding: 7px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #3B6EA8; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            Lihat Detail & Titik GIS
+          </button>
+        </div>
+      `;
+    },
+    [userRole]
+  );
+
+  // Main render effect
   useEffect(() => {
     try {
-      if (!clusterGroupRef.current) {
-        let group: any = null;
+      if (layerGroupRef.current) {
+        map.removeLayer(layerGroupRef.current);
+        layerGroupRef.current = null;
+      }
+      if (clusterGroupRef.current) {
+        map.removeLayer(clusterGroupRef.current);
+        clusterGroupRef.current = null;
+      }
+
+      const validCustomers = customers.filter(
+        (c) => typeof c.latitude === 'number' && !isNaN(c.latitude) && typeof c.longitude === 'number' && !isNaN(c.longitude)
+      );
+
+      if (!useCluster) {
+        // ── MODE SEBARAN TITIK (HTML STYLE / ZERO LAG CANVAS 60FPS) ──
+        const group = L.layerGroup([], { renderer: canvasRenderer } as any);
+
+        validCustomers.forEach((c) => {
+          const wilayah = wilayahMap.get(c.kode_wilayah);
+          const color = safeColor(wilayah?.warna, '#3B6EA8');
+          const isSpatialAnomaly = Boolean(c.spatial_anomaly);
+          const isColocationAnomaly = Boolean(c.colocation_anomaly);
+
+          const strokeColor = isSpatialAnomaly
+            ? '#EF4444'
+            : isColocationAnomaly
+            ? '#A855F7'
+            : c.is_flagged
+            ? '#F59E0B'
+            : '#FFFFFF';
+
+          const strokeWidth = isSpatialAnomaly || isColocationAnomaly ? 1.5 : 0.6;
+
+          const circle = L.circleMarker([c.latitude, c.longitude], {
+            renderer: canvasRenderer,
+            radius: dotRadius,
+            fillColor: color,
+            fillOpacity: 0.92,
+            color: strokeColor,
+            weight: strokeWidth,
+          });
+
+          circle.bindPopup(() => buildPopupHtml(c, color), { maxWidth: 280 });
+
+          circle.on('click', () => {
+            onSelectRef.current(c);
+          });
+
+          circle.on('popupopen', () => {
+            const btn = document.getElementById(`btn-popup-${c.kode_pelanggan}`);
+            if (btn) {
+              btn.onclick = () => {
+                onSelectRef.current(c);
+                circle.closePopup();
+              };
+            }
+          });
+
+          group.addLayer(circle);
+        });
+
+        layerGroupRef.current = group;
+        map.addLayer(group);
+      } else {
+        // ── MODE KLASTER (LEAFLET MARKERCLUSTER) ──
+        let cluster: any = null;
         if (typeof (L as any).markerClusterGroup === 'function') {
-          group = (L as any).markerClusterGroup({
+          cluster = (L as any).markerClusterGroup({
             chunkedLoading: true,
-            maxClusterRadius: 35,
+            maxClusterRadius: 42,
             disableClusteringAtZoom: 16,
             spiderfyOnMaxZoom: true,
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
-            iconCreateFunction: (cluster: any) => {
-              const count = cluster.getChildCount();
+            iconCreateFunction: (cl: any) => {
+              const count = cl.getChildCount();
               let sizeClass = 'marker-cluster-small';
               if (count > 50) sizeClass = 'marker-cluster-large';
               else if (count > 20) sizeClass = 'marker-cluster-medium';
@@ -739,146 +924,75 @@ function CustomerClusterLayer({
               });
             },
           });
+        } else {
+          cluster = L.layerGroup();
         }
 
-        if (!group) {
-          group = L.layerGroup();
+        const markers: L.Marker[] = [];
+        validCustomers.forEach((c) => {
+          const wilayah = wilayahMap.get(c.kode_wilayah);
+          const color = safeColor(wilayah?.warna, '#3B6EA8');
+          const isSpatialAnomaly = Boolean(c.spatial_anomaly);
+          const isColocationAnomaly = Boolean(c.colocation_anomaly);
+          const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : 'rgba(255, 255, 255, 0.95)';
+
+          const customIcon = L.divIcon({
+            className: 'gis-point-marker',
+            html: `
+              <div style="position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 7.5px; height: 7.5px; border-radius: 50%; background-color: ${color}; border: 0.6px solid ${borderColor}; box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.25);"></div>
+              </div>
+            `,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+            popupAnchor: [0, -8],
+          });
+
+          const marker = L.marker([c.latitude, c.longitude], { icon: customIcon });
+          marker.bindPopup(() => buildPopupHtml(c, color), { maxWidth: 280 });
+          marker.on('click', () => {
+            onSelectRef.current(c);
+          });
+          marker.on('popupopen', () => {
+            const btn = document.getElementById(`btn-popup-${c.kode_pelanggan}`);
+            if (btn) {
+              btn.onclick = () => {
+                onSelectRef.current(c);
+                marker.closePopup();
+              };
+            }
+          });
+          markers.push(marker);
+        });
+
+        if (typeof cluster.addLayers === 'function') {
+          cluster.addLayers(markers);
+        } else {
+          markers.forEach((m) => cluster.addLayer(m));
         }
 
-        clusterGroupRef.current = group;
-        map.addLayer(clusterGroupRef.current);
-      }
-
-      const clusterGroup = clusterGroupRef.current;
-      clusterGroup.clearLayers();
-
-      const markers: L.Marker[] = [];
-
-      customers.forEach((c) => {
-        const wilayah = wilayahMap.get(c.kode_wilayah);
-        const color = safeColor(wilayah?.warna, '#3B6EA8');
-        const isSpatialAnomaly = Boolean(c.spatial_anomaly);
-        const isColocationAnomaly = Boolean(c.colocation_anomaly);
-
-        const borderColor = isSpatialAnomaly ? '#EF4444' : isColocationAnomaly ? '#A855F7' : 'rgba(255, 255, 255, 0.95)';
-        const ringHtml = isSpatialAnomaly
-          ? '<div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 1.2px solid #EF4444; background: rgba(239, 68, 68, 0.18); animation: anomaly-beacon 2.4s infinite ease-in-out; pointer-events: none;"></div>'
-          : isColocationAnomaly
-          ? '<div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 1.2px solid #A855F7; background: rgba(168, 85, 247, 0.18); animation: anomaly-beacon 2.4s infinite ease-in-out; pointer-events: none;"></div>'
-          : '';
-
-        const badgeHtml = isSpatialAnomaly
-          ? '<div style="position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background-color: #EF4444; border: 1px solid white; display: flex; align-items: center; justify-content: center; font-size: 6px; color: white; font-weight: 800; font-family: monospace;">!</div>'
-          : isColocationAnomaly
-          ? '<div style="position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background-color: #A855F7; border: 1px solid white; display: flex; align-items: center; justify-content: center; font-size: 6px; color: white; font-weight: 800; font-family: monospace;" title="Titik Dobel Beda Wilayah">⇄</div>'
-          : c.is_flagged
-          ? '<div style="position: absolute; top: -2px; right: -2px; width: 5px; height: 5px; border-radius: 50%; background-color: #F59E0B; border: 0.8px solid white;"></div>'
-          : '';
-
-        const customIcon = L.divIcon({
-          className: 'gis-point-marker',
-          html: `
-            <div style="position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
-              ${ringHtml}
-              <div style="width: 7.5px; height: 7.5px; border-radius: 50%; background-color: ${color}; border: 0.6px solid ${borderColor}; box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.25); transition: transform 0.15s ease;"></div>
-              ${badgeHtml}
-            </div>
-          `,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-          popupAnchor: [0, -8],
-        });
-
-        const marker = L.marker([c.latitude, c.longitude], { icon: customIcon });
-
-        const safeCode = escapeHtml(c.kode_pelanggan);
-        const safeGol = escapeHtml(c.golongan);
-        const safeName = escapeHtml(displayName(c.nama_pelanggan, userRole));
-        const safeAlamat = escapeHtml(displayAddress(c.alamat, userRole));
-        const safeWilayah = escapeHtml(c.nama_wilayah);
-        const safeStatus = escapeHtml(c.status_sambungan);
-        const safeAnomaly = c.spatial_anomaly ? escapeHtml(c.spatial_anomaly) : '';
-        const safeColocation = c.colocation_anomaly ? escapeHtml(c.colocation_anomaly) : '';
-
-        const popupHtml = `
-          <div style="width: 250px; font-family: 'Inter', sans-serif; padding: 10px; line-height: 1.4;">
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(148, 163, 184, 0.2); padding-bottom: 6px; margin-bottom: 6px;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color};"></span>
-                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: #1e293b;">${safeCode}</span>
-              </div>
-              <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(59, 110, 168, 0.12); color: #3B6EA8;">${safeGol}</span>
-            </div>
-
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 2px;">${safeName}</div>
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 6px; line-height: 1.3;">${safeAlamat}</div>
-
-            ${
-              isSpatialAnomaly
-                ? `
-              <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #b91c1c;">
-                <strong>⚠️ Anomali Batas:</strong> ${safeAnomaly}
-              </div>
-            `
-                : ''
-            }
-            ${
-              isColocationAnomaly
-                ? `
-              <div style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 10px; color: #7e22ce;">
-                <strong>📍 Titik Dobel Beda Wilayah:</strong> ${safeColocation}
-              </div>
-            `
-                : ''
-            }
-
-            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 8px;">
-              <span>Status: <strong>${safeStatus}</strong></span>
-              <span>Wilayah: <strong>${safeWilayah}</strong></span>
-            </div>
-
-            <button id="btn-popup-${safeCode}" style="width: 100%; border: none; padding: 7px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #3B6EA8; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              Lihat Detail & Titik GIS
-            </button>
-          </div>
-        `;
-
-        marker.bindPopup(popupHtml, { maxWidth: 280 });
-
-        marker.on('click', () => {
-          onSelectRef.current(c);
-        });
-
-        marker.on('popupopen', () => {
-          const btn = document.getElementById(`btn-popup-${c.kode_pelanggan}`);
-          if (btn) {
-            btn.onclick = () => {
-              onSelectRef.current(c);
-              marker.closePopup();
-            };
-          }
-        });
-
-        markers.push(marker);
-      });
-
-      if (typeof (clusterGroup as any).addLayers === 'function') {
-        (clusterGroup as any).addLayers(markers);
-      } else {
-        markers.forEach((m) => clusterGroup.addLayer(m));
+        clusterGroupRef.current = cluster;
+        map.addLayer(cluster);
       }
     } catch (err) {
       console.warn('CustomerClusterLayer build warning:', err);
     }
 
     return () => {
+      if (layerGroupRef.current) {
+        try {
+          map.removeLayer(layerGroupRef.current);
+        } catch {}
+        layerGroupRef.current = null;
+      }
       if (clusterGroupRef.current) {
         try {
-          clusterGroupRef.current.clearLayers();
+          map.removeLayer(clusterGroupRef.current);
         } catch {}
+        clusterGroupRef.current = null;
       }
     };
-  }, [customers, wilayahMap, userRole, map]);
+  }, [customers, wilayahMap, dotRadius, useCluster, canvasRenderer, buildPopupHtml, map]);
 
   return null;
 }
@@ -908,8 +1022,11 @@ export default function GisMap() {
     return map;
   }, [pelangganList]);
 
-  // Basemap state (default Positron)
+  // Basemap state (default Positron OpenFreeMap GL)
   const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('positron');
+
+  // Customer marker mode: false = Sebaran Titik HTML (Canvas 60FPS), true = Mode Klaster
+  const [useCluster, setUseCluster] = useState<boolean>(false);
 
   // Local Kecamatan selector (default 07 Praya Barat)
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07');
@@ -1791,6 +1908,26 @@ export default function GisMap() {
             )}
           </Button>
 
+          {/* Mode Titik vs Klaster Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setUseCluster(!useCluster)}
+            className={`h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+              useCluster
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400 font-medium'
+            }`}
+            title={
+              useCluster
+                ? 'Mode Klaster aktif. Klik untuk beralih ke Mode Sebaran Titik (HTML - Cepat & Ringan)'
+                : 'Mode Sebaran Titik (HTML) aktif: Sangat cepat, 60 FPS, tanpa lag. Klik untuk beralih ke Mode Klaster'
+            }
+          >
+            <span className={`w-2 h-2 rounded-full ${useCluster ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+            <span>{useCluster ? 'Klaster' : 'Titik Sebaran'}</span>
+          </Button>
+
           {/* Basemap Switcher */}
           <Select value={basemapKey} onValueChange={(val: any) => setBasemapKey(val)}>
             <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-36">
@@ -1798,7 +1935,7 @@ export default function GisMap() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-border bg-card">
-              <SelectItem value="positron">Positron (Terang Minimalis)</SelectItem>
+              <SelectItem value="positron">Positron (OpenFreeMap GL)</SelectItem>
               <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
               <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
@@ -2803,18 +2940,20 @@ export default function GisMap() {
         className="w-full h-full"
         zoomControl={false}
       >
-        {basemapKey !== 'vektor' && (
+        {basemapKey !== 'vektor' && basemapKey !== 'positron' && (
           <TileLayer
             key={basemapKey}
-            attribution={(BASEMAPS[basemapKey] || BASEMAPS.positron).attribution}
-            url={(BASEMAPS[basemapKey] || BASEMAPS.positron).url}
-            subdomains={basemapKey === 'positron' ? 'abcd' : 'abc'}
+            attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
+            url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
             maxZoom={MAX_ZOOM}
             bounds={LOMBOK_BOUNDS}
           />
         )}
 
-        <MapLibreLayer active={basemapKey === 'vektor'} />
+        <MapLibreLayer
+          active={basemapKey === 'positron' || basemapKey === 'vektor'}
+          style={basemapKey === 'vektor' ? undefined : 'https://tiles.openfreemap.org/styles/positron'}
+        />
         <MapController targetPoint={targetPoint} />
         <PulseOverlay position={pulsePosition} active={pulseActive} />
 
@@ -2832,6 +2971,7 @@ export default function GisMap() {
             wilayahMap={wilayahMap}
             userRole={user?.role}
             onSelectCustomer={handleSelectCustomer}
+            useCluster={useCluster}
           />
         )}
       </MapContainer>
