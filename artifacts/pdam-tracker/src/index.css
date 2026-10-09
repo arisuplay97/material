@@ -331,16 +331,15 @@ svg.leaflet-zoom-animated {
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
 
 /* 3D Tilt Camera (Kamera Miring seperti di HTML) */
-.gis-tilt-3d {
-  perspective: 1100px;
-}
-.gis-tilt-3d .leaflet-map-pane {
-  transform: scale(1.15) rotateX(54deg) rotateZ(-14deg);
+.gis-3d-tilted {
+  transform: perspective(900px) rotateX(50deg) rotateZ(-12deg) scale(1.18);
   transform-origin: 50% 65%;
   transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 35px 70px rgba(0, 0, 0, 0.45);
 }
-.leaflet-container:not(.gis-tilt-3d) .leaflet-map-pane {
-  transform: scale(1) rotateX(0deg) rotateZ(0deg);
+.gis-2d-normal {
+  transform: perspective(900px) rotateX(0deg) rotateZ(0deg) scale(1);
+  transform-origin: 50% 65%;
   transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

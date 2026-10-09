@@ -78,9 +78,14 @@ const MAX_ZOOM = 18;
 // Basemap Providers
 const BASEMAPS = {
   positron: {
-    name: 'Positron (Terang Bersih)',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO / OpenFreeMap',
+    name: 'Positron (OpenFreeMap GL)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  },
+  light: {
+    name: 'Abu-Abu Terang (Esri Canvas)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
   },
   cerah: {
     name: 'Peta Cerah (Humaniter)',
@@ -1552,6 +1557,14 @@ export default function GisMap() {
     return new Map<string, WilayahAcuan>(wilayahList.map((w: WilayahAcuan) => [w.kode, w]));
   }, [wilayahList]);
 
+  // Filter Wilayah sesuai Kecamatan aktif (kecuali jika filter 'all' / Semua Kecamatan)
+  const displayedWilayahList = useMemo(() => {
+    if (selectedKecamatan === 'all') return wilayahList;
+    return wilayahList.filter(
+      (w: WilayahAcuan) => w.kodeKecamatan === selectedKecamatan || w.kode.startsWith(selectedKecamatan)
+    );
+  }, [wilayahList, selectedKecamatan]);
+
   // Trigger pulse helper
   const triggerPulse = useCallback((lat: number, lng: number) => {
     if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
@@ -1944,7 +1957,8 @@ export default function GisMap() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-border bg-card">
-              <SelectItem value="positron">Positron (Terang Bersih)</SelectItem>
+              <SelectItem value="positron">Positron (OpenFreeMap GL)</SelectItem>
+              <SelectItem value="light">Abu-Abu Terang (Esri Canvas)</SelectItem>
               <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
               <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
@@ -2039,7 +2053,7 @@ export default function GisMap() {
             {/* Filter Wilayah */}
             <div className="space-y-1">
               <label className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                Wilayah ({wilayahList.length})
+                Wilayah ({displayedWilayahList.length})
               </label>
               <Select
                 value={filters.wilayah}
@@ -2049,8 +2063,12 @@ export default function GisMap() {
                   <SelectValue placeholder="Semua Wilayah" />
                 </SelectTrigger>
                 <SelectContent className="max-h-56 border-border bg-card">
-                  <SelectItem value="all">Semua Wilayah ({wilayahList.length})</SelectItem>
-                  {wilayahList.map((w: WilayahAcuan) => (
+                  <SelectItem value="all">
+                    {selectedKecamatan === 'all'
+                      ? `Semua Wilayah (${displayedWilayahList.length})`
+                      : `Semua Wilayah Kec. ${selectedKecamatan} (${displayedWilayahList.length})`}
+                  </SelectItem>
+                  {displayedWilayahList.map((w: WilayahAcuan) => (
                     <SelectItem key={w.kode} value={w.kode}>
                       <div className="flex items-center gap-2">
                         <span
@@ -2848,19 +2866,19 @@ export default function GisMap() {
           {legendTab === 'wilayah' && (
             <>
               <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
-                <span>Klik untuk zoom wilayah:</span>
+                <span>{selectedKecamatan === 'all' ? 'Semua Wilayah' : `Wilayah Kec. ${selectedKecamatan}`}:</span>
                 <Badge variant="outline" className="font-mono text-[9px] py-0 px-1 h-4 bg-background">
-                  {filteredCustomers.length} Titik
+                  {displayedWilayahList.length} Wilayah
                 </Badge>
               </div>
 
               <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-                {wilayahList.length === 0 ? (
+                {displayedWilayahList.length === 0 ? (
                   <div className="p-4 text-center text-xs text-muted-foreground font-mono">
-                    Tidak ada data wilayah acuan.
+                    Tidak ada data wilayah untuk kecamatan ini.
                   </div>
                 ) : (
-                  wilayahList.map((w: WilayahAcuan) => {
+                  displayedWilayahList.map((w: WilayahAcuan) => {
                     const isSelected = filters.wilayah === w.kode;
                     const countInWilayah = pelangganList.filter((p: Pelanggan) => p.kode_wilayah === w.kode).length;
 
@@ -2937,51 +2955,60 @@ export default function GisMap() {
         )}
       </div>
 
-      {/* ── Leaflet Map Container ── */}
-      <MapContainer
-        center={CENTER_PRAYA_BARAT}
-        zoom={DEFAULT_ZOOM}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        maxBounds={LOMBOK_BOUNDS}
-        maxBoundsViscosity={1.0}
-        scrollWheelZoom={true}
-        className={`w-full h-full ${isTilted ? 'gis-tilt-3d' : ''}`}
-        zoomControl={false}
+      {/* ── 3D Viewport Wrapper for Kamera Miring (Persis seperti di HTML) ── */}
+      <div
+        className="w-full h-full overflow-hidden"
+        style={{ perspective: isTilted ? '1000px' : 'none' }}
       >
-        {basemapKey !== 'vektor' && (
-          <TileLayer
-            key={basemapKey}
-            attribution={(BASEMAPS[basemapKey] || BASEMAPS.positron).attribution}
-            url={(BASEMAPS[basemapKey] || BASEMAPS.positron).url}
-            subdomains={basemapKey === 'positron' ? 'abcd' : 'abc'}
+        <div className={`w-full h-full ${isTilted ? 'gis-3d-tilted' : 'gis-2d-normal'}`}>
+          <MapContainer
+            center={CENTER_PRAYA_BARAT}
+            zoom={DEFAULT_ZOOM}
+            minZoom={MIN_ZOOM}
             maxZoom={MAX_ZOOM}
-            detectRetina={basemapKey === 'positron'}
-          />
-        )}
+            maxBounds={LOMBOK_BOUNDS}
+            maxBoundsViscosity={1.0}
+            scrollWheelZoom={true}
+            className="w-full h-full"
+            zoomControl={false}
+          >
+            {basemapKey !== 'vektor' && basemapKey !== 'positron' && (
+              <TileLayer
+                key={basemapKey}
+                attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
+                url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
+                subdomains="abc"
+                maxZoom={MAX_ZOOM}
+              />
+            )}
 
-        <MapLibreLayer active={basemapKey === 'vektor'} />
-        <MapController targetPoint={targetPoint} />
-        <PulseOverlay position={pulsePosition} active={pulseActive} />
+            <MapLibreLayer
+              active={basemapKey === 'positron' || basemapKey === 'vektor'}
+              style={basemapKey === 'vektor' ? undefined : 'https://tiles.openfreemap.org/styles/positron'}
+            />
+            <MapController targetPoint={targetPoint} />
+            <PulseOverlay position={pulsePosition} active={pulseActive} />
 
-        {/* ── QGIS Realtime Pipeline & Accessories Layer ── */}
-        <QgisVectorLayer
-          active={qgisLayerActive}
-          data={qgisData}
-          hiddenLayers={hiddenLayers}
-          layerColors={layerColors}
-        />
+            {/* ── QGIS Realtime Pipeline & Accessories Layer ── */}
+            <QgisVectorLayer
+              active={qgisLayerActive}
+              data={qgisData}
+              hiddenLayers={hiddenLayers}
+              layerColors={layerColors}
+            />
 
-        {showCustomerPoints && (
-          <CustomerClusterLayer
-            customers={filteredCustomers}
-            wilayahMap={wilayahMap}
-            userRole={user?.role}
-            onSelectCustomer={handleSelectCustomer}
-            useCluster={useCluster}
-          />
-        )}
-      </MapContainer>
+            {showCustomerPoints && (
+              <CustomerClusterLayer
+                customers={filteredCustomers}
+                wilayahMap={wilayahMap}
+                userRole={user?.role}
+                onSelectCustomer={handleSelectCustomer}
+                useCluster={useCluster}
+              />
+            )}
+          </MapContainer>
+        </div>
+      </div>
 
       {/* ── Modal Dialog: QGIS Realtime Hub ── */}
       <Dialog open={showQgisModal} onOpenChange={setShowQgisModal}>
