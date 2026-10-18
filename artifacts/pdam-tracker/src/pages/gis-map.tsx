@@ -6,7 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
-import { KECAMATAN_LIST } from '@/services/pdamDataService';
+import { KECAMATAN_LIST, pdamService } from '@/services/pdamDataService';
 import { Pelanggan, WilayahAcuan, UserRole } from '@/types/pdam';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePdamData } from '@/hooks/usePdamData';
@@ -75,10 +75,30 @@ const DEFAULT_ZOOM = 12;
 const MIN_ZOOM = 10;
 const MAX_ZOOM = 18;
 
-// Basemap Providers
+// Basemap Providers (100% Free, No Watermark, No API Key Required)
 const BASEMAPS = {
+  futuristik_light: {
+    name: 'Modern Futuristik Terang (Aero White GL)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  },
+  futuristik: {
+    name: 'Modern Futuristik Gelap (Cyber Neon GL)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  },
+  vektor: {
+    name: 'Peta Vektor Mandiri (GL)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  },
+  dark: {
+    name: 'Mode Gelap Vektor (Bebas API Key)',
+    url: '',
+    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  },
   positron: {
-    name: 'Positron (OpenFreeMap GL)',
+    name: 'Positron Terang (OpenFreeMap GL)',
     url: '',
     attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
   },
@@ -101,16 +121,6 @@ const BASEMAPS = {
     name: 'Citra Satelit (Esri)',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar',
-  },
-  topo: {
-    name: 'Topografi & Relief',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap, SRTM | &copy; OpenTopoMap',
-  },
-  vektor: {
-    name: 'Peta Vektor Mandiri (GL)',
-    url: '',
-    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
   },
 };
 
@@ -234,8 +244,14 @@ function MapLibreLayer({
           await import('maplibre-gl/dist/maplibre-gl.css');
           if (cancelled) return;
 
-          let targetStyle = style;
-          if (!targetStyle) {
+          let targetStyle: any = style;
+          if (targetStyle === 'futuristik') {
+            const { futuristicMapStyle } = await import('@/lib/futuristicMapStyle');
+            targetStyle = futuristicMapStyle;
+          } else if (targetStyle === 'futuristik_light') {
+            const { futuristicLightMapStyle } = await import('@/lib/futuristicLightMapStyle');
+            targetStyle = futuristicLightMapStyle;
+          } else if (targetStyle === 'vektor' || !targetStyle) {
             const { lombokTengahStyle } = await import('@/lib/lombokTengahStyle');
             targetStyle = lombokTengahStyle;
           }
@@ -756,7 +772,7 @@ function CustomerClusterLayer({
       const z = map.getZoom();
       setCurrentZoom(z);
       // Fast in-place radius update on zoom without rebuilding layers
-      const newRadius = Math.min(Math.max(2.2, (z - 9) * 0.45 + 1.8), 5.2);
+      const newRadius = Math.min(Math.max(1.8, (z - 9) * 0.35 + 1.5), 4.2);
       if (layerGroupRef.current) {
         layerGroupRef.current.eachLayer((l: any) => {
           if (typeof l.setRadius === 'function') {
@@ -771,9 +787,9 @@ function CustomerClusterLayer({
     };
   }, [map]);
 
-  // Calculate dynamic radius: zoom 10 -> ~2.2px, zoom 13 -> ~3.6px, zoom 16+ -> ~5px
+  // Calculate dynamic radius: zoom 10 -> ~1.85px, zoom 13 -> ~2.9px, zoom 16+ -> ~4.2px
   const dotRadius = useMemo(() => {
-    return Math.min(Math.max(2.2, (currentZoom - 9) * 0.45 + 1.8), 5.2);
+    return Math.min(Math.max(1.8, (currentZoom - 9) * 0.35 + 1.5), 4.2);
   }, [currentZoom]);
 
   // Single HTML5 Canvas renderer for 60FPS fluid GPU rendering
@@ -862,15 +878,15 @@ function CustomerClusterLayer({
         validCustomers.forEach((c) => {
           const wilayah = wilayahMap.get(c.kode_wilayah);
           const color = safeColor(wilayah?.warna, '#3B6EA8');
-          // Clean dot border without red/purple anomaly stroke (as requested)
+          // Clean dot border with subtle halo
           const strokeColor = '#FFFFFF';
-          const strokeWidth = 0.5;
+          const strokeWidth = 0.6;
 
           const circle = L.circleMarker([c.latitude, c.longitude], {
             renderer: canvasRenderer,
             radius: dotRadius,
             fillColor: color,
-            fillOpacity: 0.92,
+            fillOpacity: 0.95,
             color: strokeColor,
             weight: strokeWidth,
           });
@@ -897,16 +913,22 @@ function CustomerClusterLayer({
         layerGroupRef.current = group;
         map.addLayer(group);
       } else {
-        // ── MODE KLASTER (LEAFLET MARKERCLUSTER) ──
+        // ── MODE KLASTER (LEAFLET MARKERCLUSTER OPTIMIZED ZERO-LAG) ──
         let cluster: any = null;
         if (typeof (L as any).markerClusterGroup === 'function') {
           cluster = (L as any).markerClusterGroup({
             chunkedLoading: true,
-            maxClusterRadius: 42,
-            disableClusteringAtZoom: 16,
+            chunkInterval: 150,
+            chunkDelay: 25,
+            maxClusterRadius: 50,
             spiderfyOnMaxZoom: true,
+            spiderfyDistanceMultiplier: 2.2,
+            spiderLegPolylineOptions: { weight: 1.5, color: '#334155', opacity: 0.65 },
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
+            animate: false, // critical: eliminates stutter and CPU freeze on zoom
+            animateAddingMarkers: false,
+            removeOutsideVisibleBounds: true,
             iconCreateFunction: (cl: any) => {
               const count = cl.getChildCount();
               let sizeClass = 'marker-cluster-small';
@@ -924,40 +946,61 @@ function CustomerClusterLayer({
           cluster = L.layerGroup();
         }
 
+        // Cache DivIcons by color with slightly larger dot matching sebaran titik
+        const iconCache = new Map<string, L.DivIcon>();
+        const getCustomIcon = (color: string) => {
+          let icon = iconCache.get(color);
+          if (!icon) {
+            icon = L.divIcon({
+              className: 'gis-point-marker',
+              html: `
+                <div style="position: relative; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 8.5px; height: 8.5px; border-radius: 50%; background-color: ${color}; border: 1.2px solid #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.45);"></div>
+                </div>
+              `,
+              iconSize: [16, 16],
+              iconAnchor: [8, 8],
+              popupAnchor: [0, -9],
+            });
+            iconCache.set(color, icon);
+          }
+          return icon;
+        };
+
         const markers: L.Marker[] = [];
         validCustomers.forEach((c) => {
           const wilayah = wilayahMap.get(c.kode_wilayah);
           const color = safeColor(wilayah?.warna, '#3B6EA8');
-          // Clean dot border without red/purple anomaly stroke (as requested)
-          const borderColor = 'rgba(255, 255, 255, 0.95)';
-
-          const customIcon = L.divIcon({
-            className: 'gis-point-marker',
-            html: `
-              <div style="position: relative; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
-                <div style="width: 7.5px; height: 7.5px; border-radius: 50%; background-color: ${color}; border: 0.6px solid ${borderColor}; box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.25);"></div>
-              </div>
-            `,
-            iconSize: [14, 14],
-            iconAnchor: [7, 7],
-            popupAnchor: [0, -8],
-          });
+          const customIcon = getCustomIcon(color);
 
           const marker = L.marker([c.latitude, c.longitude], { icon: customIcon });
-          marker.bindPopup(() => buildPopupHtml(c, color), { maxWidth: 280 });
-          marker.on('click', () => {
-            onSelectRef.current(c);
-          });
-          marker.on('popupopen', () => {
-            const btn = document.getElementById(`btn-popup-${c.kode_pelanggan}`);
+          (marker as any).customerData = c;
+          (marker as any).customerColor = color;
+          markers.push(marker);
+        });
+
+        // Delegate click & popup on cluster group level for maximum performance and zero lag
+        cluster.on('click', (e: any) => {
+          const marker = e.layer;
+          if (marker && marker.customerData) {
+            onSelectRef.current(marker.customerData);
+            if (!marker.getPopup()) {
+              marker.bindPopup(buildPopupHtml(marker.customerData, marker.customerColor), { maxWidth: 280 }).openPopup();
+            }
+          }
+        });
+
+        cluster.on('popupopen', (e: any) => {
+          const marker = e.layer;
+          if (marker && marker.customerData) {
+            const btn = document.getElementById(`btn-popup-${marker.customerData.kode_pelanggan}`);
             if (btn) {
               btn.onclick = () => {
-                onSelectRef.current(c);
+                onSelectRef.current(marker.customerData);
                 marker.closePopup();
               };
             }
-          });
-          markers.push(marker);
+          }
         });
 
         if (typeof cluster.addLayers === 'function') {
@@ -987,7 +1030,7 @@ function CustomerClusterLayer({
         clusterGroupRef.current = null;
       }
     };
-  }, [customers, wilayahMap, dotRadius, useCluster, canvasRenderer, buildPopupHtml, map]);
+  }, [customers, wilayahMap, useCluster, canvasRenderer, buildPopupHtml, map]);
 
   return null;
 }
@@ -1017,17 +1060,17 @@ export default function GisMap() {
     return map;
   }, [pelangganList]);
 
-  // Basemap state (default Positron OpenFreeMap GL)
-  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('positron');
+  // Basemap state (default Modern Futuristik Terang GL)
+  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('futuristik_light');
 
   // Customer marker mode: false = Sebaran Titik HTML (Canvas 60FPS), true = Mode Klaster
   const [useCluster, setUseCluster] = useState<boolean>(false);
 
-  // 3D Camera Tilt (Kamera Miring seperti di HTML)
+  // 3D Camera Tilt (Kamera Miring 3D)
   const [isTilted, setIsTilted] = useState<boolean>(false);
 
-  // Local Kecamatan selector (default 07 Praya Barat)
-  const [selectedKecamatan, setSelectedKecamatan] = useState<string>('07');
+  // Local Kecamatan selector (default 'all' to show all uploaded data across all regions)
+  const [selectedKecamatan, setSelectedKecamatan] = useState<string>('all');
 
   // Search & Navigation
   const [searchQuery, setSearchQuery] = useState<string>(filters.q || '');
@@ -1160,6 +1203,13 @@ export default function GisMap() {
       if (!json && localGeoJson && Array.isArray(localGeoJson.features) && localGeoJson.features.length > 0) {
         json = localGeoJson;
         activeSource = 'File QGIS Unggahan Anda (Tersimpan Lokal)';
+        if (isDbConnected) {
+          fetch('/api/gis/pipa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(localGeoJson),
+          }).catch(() => {});
+        }
       }
 
       // Fallback ke folder public hanya jika tidak ada data sama sekali
@@ -1728,16 +1778,12 @@ export default function GisMap() {
     setTimeout(() => setCopiedCoords(false), 2000);
   };
 
-  // Legend click toggles filter for that wilayah
+  // Legend click toggles filter for that wilayah without auto zooming
   const handleLegendClick = (kodeWilayah: string) => {
     if (filters.wilayah === kodeWilayah) {
       update({ wilayah: 'all' });
     } else {
       update({ wilayah: kodeWilayah });
-      const w = wilayahMap.get(kodeWilayah);
-      if (w) {
-        setTargetPoint([w.centerLat, w.centerLng]);
-      }
     }
   };
 
@@ -1752,7 +1798,12 @@ export default function GisMap() {
       }`}
     >
       {/* ── Top Left Control Cluster (Search, Kecamatan, Quick Filters) ── */}
-      <div className="absolute top-3 left-3 z-[450] flex flex-col gap-2" style={{ maxWidth: 'calc(100% - 75px)' }}>
+      <div
+        className="absolute top-3 left-3 z-[1000] flex flex-col gap-2"
+        style={{ maxWidth: 'calc(100% - 75px)' }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
         {/* Row 1: Search Bar + Kecamatan Dropdown */}
         <div className="flex items-center gap-2">
           {/* Search Box */}
@@ -1934,7 +1985,7 @@ export default function GisMap() {
             <span>{useCluster ? 'Klaster' : 'Titik Sebaran'}</span>
           </Button>
 
-          {/* Kamera Miring 3D Toggle (seperti di HTML) */}
+          {/* Kamera Miring 3D Toggle */}
           <Button
             variant="outline"
             size="sm"
@@ -1944,28 +1995,54 @@ export default function GisMap() {
                 ? 'border-sky-500 bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-semibold shadow-sm'
                 : 'text-foreground hover:bg-muted'
             }`}
-            title={isTilted ? 'Kembalikan ke kamera datar 2D' : 'Aktifkan kamera miring 3D (seperti di HTML)'}
+            title={isTilted ? 'Kembalikan ke kamera datar 2D standar' : 'Aktifkan kamera miring 3D perspektif kartografis'}
           >
             <Compass className={`w-3.5 h-3.5 transition-transform duration-500 ${isTilted ? 'rotate-45 text-sky-600 dark:text-sky-400' : 'text-muted-foreground'}`} />
-            <span>Kamera Miring</span>
+            <span>{isTilted ? 'Kamera 3D' : 'Kamera 2D'}</span>
           </Button>
 
           {/* Basemap Switcher */}
           <Select value={basemapKey} onValueChange={(val: any) => setBasemapKey(val)}>
-            <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-36">
+            <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-48">
               <Layers className="w-3.5 h-3.5 mr-1 text-primary shrink-0" />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="border-border bg-card">
-              <SelectItem value="positron">Positron (OpenFreeMap GL)</SelectItem>
+            <SelectContent container={mapContainerRef.current} className="border-border bg-card z-[9999]">
+              <SelectItem value="futuristik_light">Modern Futuristik Terang (Aero White GL)</SelectItem>
+              <SelectItem value="futuristik">Modern Futuristik Gelap (Cyber Neon GL)</SelectItem>
+              <SelectItem value="vektor">Peta Vektor Mandiri (GL)</SelectItem>
+              <SelectItem value="dark">Mode Gelap Vektor (Bebas API Key)</SelectItem>
+              <SelectItem value="positron">Positron Terang (OpenFreeMap GL)</SelectItem>
               <SelectItem value="light">Abu-Abu Terang (Esri Canvas)</SelectItem>
               <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
               <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
-              <SelectItem value="topo">Topografi & Relief</SelectItem>
-              <SelectItem value="vektor">Peta Vektor Mandiri (GL)</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Sinkronisasi Data Pelanggan Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              toast.info('Memeriksa pembaruan data pelanggan...');
+              try {
+                const res = await pdamService.syncFromCloud(true);
+                if (res.ok) {
+                  toast.success(res.message || `Data pelanggan tersinkron (${res.count} titik).`);
+                } else {
+                  toast.info(`Data lokal siap (${res.count} titik). ${res.message || ''}`);
+                }
+              } catch (e: any) {
+                toast.error('Gagal sinkron: ' + e.message);
+              }
+            }}
+            className="h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all"
+            title="Sinkronkan data pelanggan atau segarkan data lokal"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <span className="hidden sm:inline">Sinkron Data</span>
+          </Button>
 
           {/* QGIS Live Sync Pill */}
           <div className="flex items-center bg-card/95 backdrop-blur-md border border-border rounded-xl p-0.5 shadow-xs">
@@ -2186,7 +2263,11 @@ export default function GisMap() {
       )}
 
       {/* ── Floating Right Action Buttons ── */}
-      <div className="absolute top-3 right-3 z-[450] flex flex-col gap-1.5">
+      <div
+        className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5"
+        onMouseDown={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
         <Button
           variant="outline"
           size="sm"
@@ -2232,7 +2313,7 @@ export default function GisMap() {
 
       {/* ── Notice Banner if Other Kecamatan Selected (Pilot Scope) ── */}
       {selectedKecamatan !== 'all' && selectedKecamatan !== '07' && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[450] bg-card/95 backdrop-blur-md border border-amber-300 dark:border-amber-800 rounded-2xl p-4 shadow-xl max-w-md text-center space-y-2">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 backdrop-blur-md border border-amber-300 dark:border-amber-800 rounded-2xl p-4 shadow-xl max-w-md text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
             <Building2 className="w-4 h-4" />
             <span>Kecamatan {selectedKecamatanObj?.nama || selectedKecamatan}</span>
@@ -2252,7 +2333,7 @@ export default function GisMap() {
 
       {/* ── Slide-over Detail & Map View Drawer ── */}
       {selectedCustomer && (
-        <Card className="absolute top-3 right-14 bottom-4 z-[500] w-full max-w-sm rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4">
+        <Card className="absolute top-3 right-14 bottom-4 z-[1100] w-full max-w-sm rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4">
           {/* Header */}
           <div className="p-3.5 border-b border-border flex items-center justify-between bg-muted/40">
             <div className="flex items-center gap-2">
@@ -2492,15 +2573,27 @@ export default function GisMap() {
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl border border-border bg-card">
-                <span className="text-[10px] text-muted-foreground uppercase font-mono flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-primary" />
-                  Tanggal Pasang
+              <a
+                href={`https://www.google.com/maps?q=${selectedCustomer.latitude},${selectedCustomer.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all group block cursor-pointer"
+                title="Buka lokasi koordinat titik pelanggan langsung di Google Maps"
+              >
+                <span className="text-[10px] text-primary uppercase font-mono flex items-center justify-between font-semibold">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-primary" />
+                    Google Maps
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </span>
-                <div className="font-medium text-foreground truncate mt-0.5">
-                  {selectedCustomer.tanggal_pasang || '-'}
+                <div className="font-semibold text-foreground text-xs mt-1 truncate">
+                  Buka di Google Maps &rarr;
                 </div>
-              </div>
+                <div className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                  {selectedCustomer.latitude.toFixed(6)}, {selectedCustomer.longitude.toFixed(6)}
+                </div>
+              </a>
             </div>
           </div>
 
@@ -2536,7 +2629,7 @@ export default function GisMap() {
 
       {/* ── Interactive GIS Legend Card (Pipelines & Wilayah) ── */}
       {showLegend && !selectedCustomer && (
-        <Card className="absolute bottom-5 right-3 z-[450] w-80 max-h-[460px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+        <Card className="absolute bottom-5 right-3 z-[1000] w-80 max-h-[460px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
           {/* Header with Tab Switcher */}
           <div className="p-2 border-b border-border flex items-center justify-between bg-muted/40 gap-1">
             <span className="font-heading font-semibold text-xs text-foreground shrink-0 pl-1">
@@ -2914,51 +3007,18 @@ export default function GisMap() {
       )}
 
       {/* ── Bottom Left Status Pill ── */}
-      <div className="absolute bottom-4 left-3 z-[450] flex flex-wrap items-center gap-1.5">
-        <div className="px-3 py-1.5 rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-md text-xs font-mono flex items-center gap-2">
+      <div className="absolute bottom-4 left-3 z-[1000] flex flex-wrap items-center gap-1.5 pointer-events-none">
+        <div className="px-3 py-1.5 rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-md text-xs font-mono flex items-center gap-2 pointer-events-auto">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-muted-foreground">Aktif:</span>
           <span className="font-bold text-foreground">{filteredCustomers.length.toLocaleString('id-ID')} Titik</span>
         </div>
-
-        {anomalyCount > 0 && (
-          <div
-            onClick={() => {
-              const next = !onlyAnomaly;
-              setOnlyAnomaly(next);
-              if (next && filters.quality === 'colocation') {
-                update({ quality: 'all' });
-              }
-            }}
-            className="px-2.5 py-1.5 rounded-xl bg-rose-50/90 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-md hover:bg-rose-100 transition-colors"
-          >
-            <AlertOctagon className="w-3 h-3 text-rose-600 dark:text-rose-400" />
-            <span className="text-rose-800 dark:text-rose-200 font-semibold">
-              {anomalyCount} Anomali Batas
-            </span>
-          </div>
-        )}
-
-        {colocationCount > 0 && (
-          <div
-            onClick={() => {
-              setOnlyAnomaly(false);
-              update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
-            }}
-            className="px-2.5 py-1.5 rounded-xl bg-purple-50/90 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-md hover:bg-purple-100 transition-colors"
-          >
-            <MapPin className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-            <span className="text-purple-800 dark:text-purple-200 font-semibold">
-              {colocationCount} Titik Dobel
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* ── 3D Viewport Wrapper for Kamera Miring (Persis seperti di HTML) ── */}
+      {/* ── Viewport Wrapper for Kamera Miring 3D ── */}
       <div
         className="w-full h-full overflow-hidden"
-        style={{ perspective: isTilted ? '1000px' : 'none' }}
+        style={{ perspective: isTilted ? '1400px' : 'none' }}
       >
         <div className={`w-full h-full ${isTilted ? 'gis-3d-tilted' : 'gis-2d-normal'}`}>
           <MapContainer
@@ -2972,19 +3032,39 @@ export default function GisMap() {
             className="w-full h-full"
             zoomControl={false}
           >
-            {basemapKey !== 'vektor' && basemapKey !== 'positron' && (
+            {basemapKey !== 'vektor' &&
+              basemapKey !== 'futuristik' &&
+              basemapKey !== 'futuristik_light' &&
+              basemapKey !== 'positron' &&
+              basemapKey !== 'dark' && (
               <TileLayer
                 key={basemapKey}
-                attribution={(BASEMAPS[basemapKey] || BASEMAPS.cerah).attribution}
-                url={(BASEMAPS[basemapKey] || BASEMAPS.cerah).url}
+                attribution={(BASEMAPS[basemapKey] || BASEMAPS.futuristik_light).attribution}
+                url={(BASEMAPS[basemapKey] || BASEMAPS.futuristik_light).url}
                 subdomains="abc"
                 maxZoom={MAX_ZOOM}
               />
             )}
 
             <MapLibreLayer
-              active={basemapKey === 'positron' || basemapKey === 'vektor'}
-              style={basemapKey === 'vektor' ? undefined : 'https://tiles.openfreemap.org/styles/positron'}
+              active={
+                basemapKey === 'futuristik' ||
+                basemapKey === 'futuristik_light' ||
+                basemapKey === 'vektor' ||
+                basemapKey === 'positron' ||
+                basemapKey === 'dark'
+              }
+              style={
+                basemapKey === 'futuristik'
+                  ? 'futuristik'
+                  : basemapKey === 'futuristik_light'
+                  ? 'futuristik_light'
+                  : basemapKey === 'dark'
+                  ? 'https://tiles.openfreemap.org/styles/dark'
+                  : basemapKey === 'vektor'
+                  ? 'vektor'
+                  : 'https://tiles.openfreemap.org/styles/positron'
+              }
             />
             <MapController targetPoint={targetPoint} />
             <PulseOverlay position={pulsePosition} active={pulseActive} />

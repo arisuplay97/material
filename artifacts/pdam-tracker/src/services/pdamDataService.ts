@@ -1,5 +1,6 @@
 import { Pelanggan, WilayahAcuan, UploadSnapshot, GolonganTarif, StatusSambungan } from '@/types/pdam';
 import { sanitizeSpreadsheetCell } from '@/lib/escape';
+import { idbGet, idbSet } from './indexedDbStorage';
 
 type Bounds = { minLat: number; maxLat: number; minLng: number; maxLng: number };
 
@@ -456,6 +457,17 @@ class PdamDataService {
         this.tryArchive(this.activeSnapshotId, this.pelanggan);
       }
 
+      // Muat dataset dari IndexedDB jika ada (mengatasi limit kuota 5MB localStorage)
+      idbGet<Pelanggan[]>('current_pelanggan_dataset').then((saved) => {
+        if (saved && Array.isArray(saved) && saved.length > 0) {
+          const isDemo = this.snapshots.some((s) => s.id === this.activeSnapshotId && s.is_demo);
+          if (saved.length > this.pelanggan.length || isDemo) {
+            this.pelanggan = saved;
+            this.notify();
+          }
+        }
+      }).catch(() => {});
+
       // Sinkronkan otomatis ke server Neon Cloud di latar belakang
       setTimeout(() => {
         this.syncFromCloud().catch(() => {});
@@ -706,8 +718,13 @@ class PdamDataService {
     }
     detectColocationAnomalies(next);
 
-    // Persist first; only mutate in-memory state once storage succeeded.
-    this.writeWithPruning(STORAGE_KEYS.PELANGGAN, next);
+    // Persist first; try localStorage with pruning, always persist full set to IndexedDB
+    try {
+      this.writeWithPruning(STORAGE_KEYS.PELANGGAN, next);
+    } catch (e) {
+      console.warn('localStorage quota reached, dataset preserved in IndexedDB:', e);
+    }
+    idbSet('current_pelanggan_dataset', next).catch(() => {});
 
     const now = new Date();
     const id = newSnapshotId(now);
@@ -737,6 +754,7 @@ class PdamDataService {
     this.activeSnapshotId = id;
     this.persistSnapshotMeta();
     this.tryArchive(id, next);
+    idbSet(`archive_${id}`, next).catch(() => {});
     this.enforceArchiveLimit();
     this.notify();
 
@@ -769,6 +787,7 @@ class PdamDataService {
           if (force || isCurrentDemo || countDiffers) {
             this.pelanggan = data.pelanggan;
             this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+            idbSet('current_pelanggan_dataset', this.pelanggan).catch(() => {});
 
             const now = new Date();
             const cloudSnapId = 'cloud-sync-' + now.toISOString().slice(0, 10);
@@ -793,6 +812,7 @@ class PdamDataService {
             this.activeSnapshotId = cloudSnapId;
             this.persistSnapshotMeta();
             this.tryArchive(cloudSnapId, this.pelanggan);
+            idbSet(`archive_${cloudSnapId}`, this.pelanggan).catch(() => {});
             this.notify();
 
             return { 
@@ -809,6 +829,16 @@ class PdamDataService {
             this.pushToCloud(this.pelanggan, 'replace').catch(() => {});
           }
         }
+      } else if (data && data.ok === false) {
+        let msg = data.error || 'Server database cloud sedang tidak tersedia.';
+        if (msg.includes('402') || msg.toLowerCase().includes('quota')) {
+          msg = 'Database Neon Cloud melampaui batas kuota gratis (HTTP 402 Quota Exceeded). Data di server Neon belum tersimpan. Silakan upload file Excel langsung di PC ini atau reset kuota Neon.';
+        }
+        return {
+          ok: false,
+          count: this.pelanggan.length,
+          message: msg,
+        };
       }
       return { ok: true, count: this.pelanggan.length };
     } catch (err: any) {
@@ -834,9 +864,15 @@ class PdamDataService {
           body: JSON.stringify({ customers, mode }),
         });
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data;
+      const data = await res.json().catch(() => null);
+      if (!res.ok || (data && data.ok === false)) {
+        let msg = data?.error || `HTTP ${res.status}`;
+        if (msg.includes('402') || msg.toLowerCase().includes('quota')) {
+          msg = 'Database Neon Cloud melampaui batas kuota gratis (402 Quota Exceeded). Data gagal terkirim ke server Neon.';
+        }
+        return { ok: false, error: msg };
+      }
+      return data || { ok: true, count: customers.length };
     } catch (err: any) {
       console.error('Gagal mengirim pelanggan ke Neon Cloud:', err);
       return { ok: false, error: err.message };

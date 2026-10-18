@@ -294,20 +294,39 @@ svg.leaflet-zoom-animated {
   50% { transform: scale(1.9); opacity: 0.1; }
 }
 
-/* Marker clusters — single-hue scale */
-.marker-cluster { background-clip: padding-box; border-radius: 9999px; }
-.marker-cluster div {
-  width: 30px; height: 30px; margin-left: 5px; margin-top: 5px; border-radius: 9999px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-sans); font-size: 11px; font-weight: 600; color: #fff;
-  font-variant-numeric: tabular-nums;
+/* Marker clusters — modern sleek cartographic */
+.marker-cluster {
+  background-clip: padding-box;
+  border-radius: 9999px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease-out;
 }
-.marker-cluster-small { background-color: hsl(213 52% 50% / 0.25); }
-.marker-cluster-small div { background-color: hsl(213 52% 50%); }
-.marker-cluster-medium { background-color: hsl(213 55% 40% / 0.28); }
-.marker-cluster-medium div { background-color: hsl(213 55% 40%); }
-.marker-cluster-large { background-color: hsl(218 60% 28% / 0.3); }
-.marker-cluster-large div { background-color: hsl(218 60% 28%); }
+.marker-cluster:hover {
+  transform: scale(1.08);
+}
+.marker-cluster div {
+  width: 28px;
+  height: 28px;
+  margin-left: 3px;
+  margin-top: 3px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.marker-cluster-small { background-color: rgba(59, 130, 246, 0.35); }
+.marker-cluster-small div { background-color: #2563eb; }
+.marker-cluster-medium { background-color: rgba(14, 165, 233, 0.35); }
+.marker-cluster-medium div { background-color: #0284c7; }
+.marker-cluster-large { background-color: rgba(99, 102, 241, 0.35); }
+.marker-cluster-large div { background-color: #4f46e5; }
 
 /* Selected marker pulse */
 @keyframes selected-pulse-ring {
@@ -330,16 +349,16 @@ svg.leaflet-zoom-animated {
 ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.22); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
 
-/* 3D Tilt Camera (Kamera Miring seperti di HTML) */
+/* Modern Clean 3D Perspective Tilt - Elegant, Non-Distorting, High-End Cartographic */
 .gis-3d-tilted {
-  transform: perspective(900px) rotateX(50deg) rotateZ(-12deg) scale(1.18);
-  transform-origin: 50% 65%;
-  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 35px 70px rgba(0, 0, 0, 0.45);
+  transform: perspective(1400px) rotateX(24deg) scale(1.02);
+  transform-origin: 50% 85%;
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
 }
 .gis-2d-normal {
-  transform: perspective(900px) rotateX(0deg) rotateZ(0deg) scale(1);
-  transform-origin: 50% 65%;
-  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: perspective(1400px) rotateX(0deg) scale(1);
+  transform-origin: 50% 85%;
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
