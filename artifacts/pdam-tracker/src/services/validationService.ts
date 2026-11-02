@@ -1,5 +1,5 @@
 import { Pelanggan, WilayahAcuan, ValidationErrorItem, ValidationSummary, GolonganTarif, StatusSambungan } from '@/types/pdam';
-import { checkSpatialAnomaly, isInBounds, SERVICE_AREA_BOUNDS } from './pdamDataService';
+import { boundsCenter, checkSpatialAnomaly, isInBounds, KECAMATAN_BOUNDS, SERVICE_AREA_BOUNDS } from './pdamDataService';
 import { GOLONGAN_LIST, GOLONGAN_META, MAX_UPLOAD_BYTES } from '@/lib/constants';
 import type { SpreadsheetWorkerResponse } from './spreadsheet.worker';
 
@@ -152,7 +152,7 @@ export class ValidationService {
       // ── 4. Alamat (opsional) ──
       const alamat = (str(r.alamat ?? r.address) || `Ds. ${wilayahMatch?.nama || '-'}`).slice(0, 300);
 
-      // ── 5. Koordinat (wajib, desimal WGS84) ──
+      // ── 5. Koordinat (desimal WGS84, atau estimasi otomatis dari dekadi/kecamatan) ──
       const rawLat = r.latitude ?? r.lat ?? r.y;
       const rawLng = r.longitude ?? r.lng ?? r.long ?? r.x;
       let lat = parseFloat(str(rawLat).replace(',', '.'));
@@ -163,8 +163,32 @@ export class ValidationService {
         warn('koordinat', `${rawLat}, ${rawLng}`, 'Latitude dan longitude tertukar, dibalik otomatis.', 'Koordinat sempat tertukar (diperbaiki otomatis)');
       }
 
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-        fail('koordinat', `${rawLat}, ${rawLng}`, 'Latitude/longitude tidak valid (wajib angka desimal WGS84, bukan 0).');
+      const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+
+      if (!hasValidCoords) {
+        // Fallback cerdas: jika belum ada koordinat GPS, gunakan titik acuan dekadi atau perkiraan kecamatan
+        if (wilayahMatch && Number.isFinite(wilayahMatch.centerLat) && Number.isFinite(wilayahMatch.centerLng)) {
+          lat = wilayahMatch.centerLat;
+          lng = wilayahMatch.centerLng;
+          warn(
+            'koordinat',
+            str(rawLat) || str(rawLng) ? `${rawLat}, ${rawLng}` : '(Kosong)',
+            `Koordinat GPS belum ada. Menggunakan estimasi titik pusat dekadi ${wilayahMatch.nama} (${wilayahMatch.kode}) sementara.`,
+            'Belum ada titik GPS (estimasi dekadi)'
+          );
+        } else if (kodeKecamatan && KECAMATAN_BOUNDS[kodeKecamatan]) {
+          const [cLat, cLng] = boundsCenter(KECAMATAN_BOUNDS[kodeKecamatan]);
+          lat = cLat;
+          lng = cLng;
+          warn(
+            'koordinat',
+            str(rawLat) || str(rawLng) ? `${rawLat}, ${rawLng}` : '(Kosong)',
+            `Koordinat GPS belum ada. Menggunakan estimasi titik pusat kecamatan ${kodeKecamatan} sementara.`,
+            'Belum ada titik GPS (estimasi kecamatan)'
+          );
+        } else {
+          fail('koordinat', `${rawLat}, ${rawLng}`, 'Latitude/longitude tidak valid (wajib angka desimal WGS84, bukan 0).');
+        }
       } else if (!isInBounds(lat, lng, SERVICE_AREA_BOUNDS)) {
         warn('koordinat', `${lat}, ${lng}`, `Titik (${lat.toFixed(5)}, ${lng.toFixed(5)}) di luar area layanan Pulau Lombok.`, 'Koordinat di luar area layanan');
       }
