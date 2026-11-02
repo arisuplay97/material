@@ -6,7 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
-import { KECAMATAN_LIST, pdamService } from '@/services/pdamDataService';
+import { KECAMATAN_LIST, KECAMATAN_BOUNDS, boundsCenter, pdamService } from '@/services/pdamDataService';
 import { Pelanggan, WilayahAcuan, UserRole } from '@/types/pdam';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePdamData } from '@/hooks/usePdamData';
@@ -1081,6 +1081,7 @@ export default function GisMap() {
   // Search & Navigation
   const [searchQuery, setSearchQuery] = useState<string>(filters.q || '');
   const [targetPoint, setTargetPoint] = useState<[number, number] | null>(null);
+  const [targetZoom, setTargetZoom] = useState<number>(12);
   const [selectedCustomer, setSelectedCustomer] = useState<Pelanggan | null>(null);
   const [copiedCoords, setCopiedCoords] = useState<boolean>(false);
 
@@ -1636,6 +1637,7 @@ export default function GisMap() {
   const handleSelectCustomer = useCallback((customer: Pelanggan) => {
     setSelectedCustomer(customer);
     setLoadStreetView(false); // Reset Street View iframe on change
+    setTargetZoom(17);
     setTargetPoint([customer.latitude, customer.longitude]);
     triggerPulse(customer.latitude, customer.longitude);
   }, [triggerPulse]);
@@ -1745,6 +1747,7 @@ export default function GisMap() {
 
   // Reset map view
   const handleResetMap = () => {
+    setTargetZoom(12);
     setTargetPoint(CENTER_PRAYA_BARAT);
     reset();
     setOnlyAnomaly(false);
@@ -1760,6 +1763,7 @@ export default function GisMap() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          setTargetZoom(16);
           setTargetPoint([pos.coords.latitude, pos.coords.longitude]);
           toast.success('Peta difokuskan ke koordinat GPS perangkat Anda.');
         },
@@ -1881,6 +1885,28 @@ export default function GisMap() {
                 setSelectedKecamatan(val);
                 update({ wilayah: 'all' });
                 setSelectedCustomer(null);
+
+                // Auto-center camera to selected kecamatan or its customer points
+                if (val !== 'all') {
+                  const custsInKec = pelangganList.filter(
+                    (p) => p.kode_kecamatan === val && Number.isFinite(p.latitude) && Number.isFinite(p.longitude)
+                  );
+                  if (custsInKec.length > 0) {
+                    const avgLat = custsInKec.reduce((sum, p) => sum + p.latitude, 0) / custsInKec.length;
+                    const avgLng = custsInKec.reduce((sum, p) => sum + p.longitude, 0) / custsInKec.length;
+                    setTargetZoom(13);
+                    setTargetPoint([avgLat, avgLng]);
+                  } else {
+                    const bounds = KECAMATAN_BOUNDS[val];
+                    if (bounds) {
+                      setTargetZoom(12);
+                      setTargetPoint(boundsCenter(bounds));
+                    }
+                  }
+                } else {
+                  setTargetZoom(11);
+                  setTargetPoint([-8.75, 116.25]);
+                }
               }}
             >
               <SelectTrigger className="h-7 border-0 bg-transparent text-xs font-medium focus:ring-0 p-0 pr-1 w-[130px]">
@@ -2325,23 +2351,16 @@ export default function GisMap() {
         </Button>
       </div>
 
-      {/* ── Notice Banner if Other Kecamatan Selected (Pilot Scope) ── */}
-      {selectedKecamatan !== 'all' && selectedKecamatan !== '07' && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 backdrop-blur-md border border-amber-300 dark:border-amber-800 rounded-2xl p-4 shadow-xl max-w-md text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
-            <Building2 className="w-4 h-4" />
+      {/* ── Empty State Notice only if selected kecamatan has NO data ── */}
+      {selectedKecamatan !== 'all' && kecamatanCustomers.length === 0 && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 backdrop-blur-md border border-border rounded-2xl p-4 shadow-xl max-w-md text-center space-y-2 animate-in fade-in">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground font-semibold text-xs">
+            <Building2 className="w-4 h-4 text-primary" />
             <span>Kecamatan {selectedKecamatanObj?.nama || selectedKecamatan}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Data spasial pilot aktif saat ini terkonsentrasi di <strong>Kecamatan 07 Praya Barat</strong> (642 titik pelanggan terverifikasi).
+            Belum ada data pelanggan untuk kecamatan ini. Silakan unggah file data di menu Settingan.
           </p>
-          <Button
-            size="sm"
-            onClick={() => setSelectedKecamatan('07')}
-            className="rounded-xl text-xs h-7 px-3 shadow-xs"
-          >
-            Beralih ke Kecamatan 07 Praya Barat
-          </Button>
         </div>
       )}
 
@@ -2617,6 +2636,7 @@ export default function GisMap() {
               variant="outline"
               size="sm"
               onClick={() => {
+                setTargetZoom(17);
                 setTargetPoint([selectedCustomer.latitude, selectedCustomer.longitude]);
                 triggerPulse(selectedCustomer.latitude, selectedCustomer.longitude);
               }}
@@ -3080,7 +3100,7 @@ export default function GisMap() {
                   : 'https://tiles.openfreemap.org/styles/positron'
               }
             />
-            <MapController targetPoint={targetPoint} />
+            <MapController targetPoint={targetPoint} zoomLevel={targetZoom} />
             <PulseOverlay position={pulsePosition} active={pulseActive} />
 
             {/* ── QGIS Realtime Pipeline & Accessories Layer ── */}
