@@ -103,17 +103,17 @@ const BASEMAPS = {
     attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
   },
   light: {
-    name: 'Abu-Abu Terang (Esri Canvas)',
+    name: 'Abu-Abu Terang (Esri Canvas - Cepat & Ringan)',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
   },
   cerah: {
-    name: 'Peta Cerah (Humaniter)',
+    name: 'Peta Cerah (Humaniter - Cepat)',
     url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors, Humanitarian OpenStreetMap Team',
   },
   osm: {
-    name: 'OpenStreetMap (Standar)',
+    name: 'OpenStreetMap (Standar - Cepat)',
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
   },
@@ -1061,7 +1061,13 @@ export default function GisMap() {
   }, [pelangganList]);
 
   // Basemap state (default Modern Futuristik Terang GL)
-  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>('futuristik_light');
+  const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>(() => {
+    try {
+      const saved = localStorage.getItem('pdam_basemap_pref');
+      if (saved && saved in BASEMAPS) return saved as keyof typeof BASEMAPS;
+    } catch {}
+    return 'light';
+  });
 
   // Customer marker mode: false = Sebaran Titik HTML (Canvas 60FPS), true = Mode Klaster
   const [useCluster, setUseCluster] = useState<boolean>(false);
@@ -2002,21 +2008,29 @@ export default function GisMap() {
           </Button>
 
           {/* Basemap Switcher */}
-          <Select value={basemapKey} onValueChange={(val: any) => setBasemapKey(val)}>
+          <Select
+            value={basemapKey}
+            onValueChange={(val: any) => {
+              setBasemapKey(val);
+              try {
+                localStorage.setItem('pdam_basemap_pref', val);
+              } catch {}
+            }}
+          >
             <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-48">
               <Layers className="w-3.5 h-3.5 mr-1 text-primary shrink-0" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent container={mapContainerRef.current} className="border-border bg-card z-[9999]">
+              <SelectItem value="light">Abu-Abu Terang (Esri Canvas - Cepat & Ringan)</SelectItem>
+              <SelectItem value="cerah">Peta Cerah (Humaniter - Cepat)</SelectItem>
+              <SelectItem value="osm">OpenStreetMap (Standar - Cepat)</SelectItem>
+              <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
               <SelectItem value="futuristik_light">Modern Futuristik Terang (Aero White GL)</SelectItem>
               <SelectItem value="futuristik">Modern Futuristik Gelap (Cyber Neon GL)</SelectItem>
               <SelectItem value="vektor">Peta Vektor Mandiri (GL)</SelectItem>
               <SelectItem value="dark">Mode Gelap Vektor (Bebas API Key)</SelectItem>
               <SelectItem value="positron">Positron Terang (OpenFreeMap GL)</SelectItem>
-              <SelectItem value="light">Abu-Abu Terang (Esri Canvas)</SelectItem>
-              <SelectItem value="cerah">Peta Cerah (Humaniter)</SelectItem>
-              <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
-              <SelectItem value="satellite">Citra Satelit (Esri)</SelectItem>
             </SelectContent>
           </Select>
 
@@ -3039,8 +3053,8 @@ export default function GisMap() {
               basemapKey !== 'dark' && (
               <TileLayer
                 key={basemapKey}
-                attribution={(BASEMAPS[basemapKey] || BASEMAPS.futuristik_light).attribution}
-                url={(BASEMAPS[basemapKey] || BASEMAPS.futuristik_light).url}
+                attribution={(BASEMAPS[basemapKey] || BASEMAPS.light).attribution}
+                url={(BASEMAPS[basemapKey] || BASEMAPS.light).url}
                 subdomains="abc"
                 maxZoom={MAX_ZOOM}
               />

@@ -63,8 +63,34 @@ export function kecamatanName(kode: string): string {
   return KECAMATAN_LIST.find((k) => k.kode === kode)?.nama || kode;
 }
 
-// ── 20 Acuan Wilayah Resmi Kecamatan 07 (Praya Barat) Sesuai PRD v1.2 ──
+// ── Acuan Wilayah Resmi PDAM Sesuai Database & PRD ──
 export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
+  // ── 23 Acuan Wilayah / Dekadi Resmi Kecamatan 01 (Praya) ──
+  { kode: '0101', nama: 'SUDIRMAN', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#E11D48', centerLat: -8.7065, centerLng: 116.2740, totalPelanggan: 474 },
+  { kode: '0102', nama: 'KR. LEBAH', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#2563EB', centerLat: -8.7120, centerLng: 116.2680, totalPelanggan: 373 },
+  { kode: '0103', nama: 'PASAR LAMA', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#059669', centerLat: -8.7050, centerLng: 116.2710, totalPelanggan: 18 },
+  { kode: '0104', nama: 'KR. BULAYAK', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#D97706', centerLat: -8.7150, centerLng: 116.2750, totalPelanggan: 120 },
+  { kode: '0105', nama: 'GURU BANGKOL', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#7C3AED', centerLat: -8.7010, centerLng: 116.2780, totalPelanggan: 39 },
+  { kode: '0106', nama: 'H. AGUS SALIM', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#DB2777', centerLat: -8.7080, centerLng: 116.2770, totalPelanggan: 22 },
+  { kode: '0107', nama: 'BASUKI RAHMAT', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#0891B2', centerLat: -8.7030, centerLng: 116.2690, totalPelanggan: 996 },
+  { kode: '0108', nama: 'KALI SADE', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#4F46E5', centerLat: -8.7180, centerLng: 116.2730, totalPelanggan: 98 },
+  { kode: '0109', nama: 'TAMPENG', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#EA580C', centerLat: -8.6980, centerLng: 116.2680, totalPelanggan: 75 },
+  { kode: '0110', nama: 'BOGAK', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#16A34A', centerLat: -8.7100, centerLng: 116.2820, totalPelanggan: 464 },
+  { kode: '0111', nama: 'KPR. HANKAM', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#9333EA', centerLat: -8.6950, centerLng: 116.2700, totalPelanggan: 111 },
+  { kode: '0112', nama: 'RENTENG', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#0284C7', centerLat: -8.7130, centerLng: 116.2670, totalPelanggan: 539 },
+  { kode: '0114', nama: 'GAJAH MADA', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#CA8A04', centerLat: -8.7090, centerLng: 116.2730, totalPelanggan: 196 },
+  { kode: '0115', nama: 'TG. LOPAN', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#0D9488', centerLat: -8.7220, centerLng: 116.2780, totalPelanggan: 637 },
+  { kode: '0116', nama: 'SERENGAT', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#DC2626', centerLat: -8.7040, centerLng: 116.2850, totalPelanggan: 236 },
+  { kode: '0117', nama: 'YOS SUDARSO', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#65A30D', centerLat: -8.7070, centerLng: 116.2670, totalPelanggan: 208 },
+  { kode: '0118', nama: 'SUMBAWA', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#64748B', centerLat: -8.7020, centerLng: 116.2720, totalPelanggan: 7 },
+  { kode: '0119', nama: 'IMAM BONJOL', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#B45309', centerLat: -8.7060, centerLng: 116.2760, totalPelanggan: 194 },
+  { kode: '0120', nama: 'SOBIRIN', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#C026D3', centerLat: -8.7140, centerLng: 116.2710, totalPelanggan: 63 },
+  { kode: '0121', nama: 'LENENG', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#1D4ED8', centerLat: -8.6990, centerLng: 116.2800, totalPelanggan: 1245 },
+  { kode: '0122', nama: 'MELUR', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#10B981', centerLat: -8.7085, centerLng: 116.2660, totalPelanggan: 137 },
+  { kode: '0123', nama: 'MAWAR', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#BE123C', centerLat: -8.7075, centerLng: 116.2660, totalPelanggan: 11 },
+  { kode: '0124', nama: 'RINJANI', kodeKecamatan: '01', namaKecamatan: 'Praya', warna: '#047857', centerLat: -8.7035, centerLng: 116.2750, totalPelanggan: 768 },
+
+  // ── 20 Acuan Wilayah Resmi Kecamatan 07 (Praya Barat) Sesuai PRD v1.2 ──
   { kode: '0701', nama: 'Karang Dalam', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#EF4444', centerLat: -8.7892, centerLng: 116.2198 },
   { kode: '0702', nama: 'Kateng', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#10B981', centerLat: -8.8251, centerLng: 116.1952 },
   { kode: '0703', nama: 'Gabak', kodeKecamatan: '07', namaKecamatan: 'Praya Barat', warna: '#F59E0B', centerLat: -8.7615, centerLng: 116.2284 },
@@ -393,7 +419,23 @@ class PdamDataService {
         const parsed: WilayahAcuan[] = JSON.parse(storedWilayah);
         const existingCodes = new Set(parsed.map((w) => w.kode));
         const missing = DEFAULT_WILAYAH_LIST.filter((w) => !existingCodes.has(w.kode));
-        if (missing.length > 0) {
+        let updated = missing.length > 0;
+
+        const defaultMap = new Map(DEFAULT_WILAYAH_LIST.map((w) => [w.kode, w]));
+        parsed.forEach((w) => {
+          const def = defaultMap.get(w.kode);
+          if (def && (w.nama === w.kode || !w.nama || w.nama.startsWith('Wilayah ' + w.kode))) {
+            w.nama = def.nama;
+            w.namaKecamatan = def.namaKecamatan;
+            w.kodeKecamatan = def.kodeKecamatan;
+            if (def.totalPelanggan && !w.totalPelanggan) {
+              w.totalPelanggan = def.totalPelanggan;
+            }
+            updated = true;
+          }
+        });
+
+        if (updated) {
           this.wilayah = [...parsed, ...missing].sort((a, b) => a.kode.localeCompare(b.kode));
           this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
         } else {
