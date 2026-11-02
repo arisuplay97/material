@@ -172,6 +172,18 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   // ── Acuan Wilayah Kecamatan 10 (Batukliang Utara) ──
   { kode: '1001', nama: 'Teratak / Batukliang Utara 01', kodeKecamatan: '10', namaKecamatan: 'Batukliang Utara', warna: '#0284C7', centerLat: -8.5150, centerLng: 116.3300 },
   { kode: '1002', nama: 'Lantan / Batukliang Utara 02', kodeKecamatan: '10', namaKecamatan: 'Batukliang Utara', warna: '#10B981', centerLat: -8.5250, centerLng: 116.3450 },
+  // ── 11 Acuan Wilayah / Dekadi Resmi Kecamatan 13 (Praya Barat Daya) ──
+  { kode: '1301', nama: 'PELAMBIK', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#2563EB', centerLat: -8.7750, centerLng: 116.1250 },
+  { kode: '1302', nama: 'TANGGONG', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#059669', centerLat: -8.7850, centerLng: 116.1350 },
+  { kode: '1303', nama: 'UNGGA', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#D97706', centerLat: -8.7650, centerLng: 116.1450 },
+  { kode: '1304', nama: 'MENGELOK', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#7C3AED', centerLat: -8.7950, centerLng: 116.1150 },
+  { kode: '1305', nama: 'BALE BUWUH', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#DB2777', centerLat: -8.7800, centerLng: 116.1550 },
+  { kode: '1306', nama: 'PERMAS', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#0891B2', centerLat: -8.8100, centerLng: 116.1200 },
+  { kode: '1307', nama: 'BL. LUAH', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#4F46E5', centerLat: -8.8250, centerLng: 116.1300 },
+  { kode: '1308', nama: 'BUAL', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#EA580C', centerLat: -8.8050, centerLng: 116.1400 },
+  { kode: '1309', nama: 'TENARU', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#16A34A', centerLat: -8.7900, centerLng: 116.1500 },
+  { kode: '1310', nama: 'BT. BEDUK', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#9333EA', centerLat: -8.8150, centerLng: 116.1600 },
+  { kode: '1311', nama: 'KRAN UMUM', kodeKecamatan: '13', namaKecamatan: 'Praya Barat Daya', warna: '#0284C7', centerLat: -8.7700, centerLng: 116.1300 },
 ];
 
 const STORAGE_KEYS = {
