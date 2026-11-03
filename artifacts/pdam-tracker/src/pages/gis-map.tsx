@@ -1633,14 +1633,41 @@ export default function GisMap() {
     }, 3800);
   }, []);
 
-  // Stable customer selection handler (fixes B4 marker flicker)
+  // Stable customer selection handler (fixes B4 marker flicker & guards out-of-bounds GPS)
   const handleSelectCustomer = useCallback((customer: Pelanggan) => {
     setSelectedCustomer(customer);
     setLoadStreetView(false); // Reset Street View iframe on change
-    setTargetZoom(17);
-    setTargetPoint([customer.latitude, customer.longitude]);
-    triggerPulse(customer.latitude, customer.longitude);
-  }, [triggerPulse]);
+
+    // Validasi apakah koordinat berada di dalam area Pulau Lombok
+    const isInsideLombok =
+      customer.latitude >= -9.15 &&
+      customer.latitude <= -8.15 &&
+      customer.longitude >= 115.80 &&
+      customer.longitude <= 116.80;
+
+    if (isInsideLombok) {
+      setTargetZoom(17);
+      setTargetPoint([customer.latitude, customer.longitude]);
+      triggerPulse(customer.latitude, customer.longitude);
+    } else {
+      // Koordinat di luar Pulau Lombok (misal anomali koordinat Sumatera/luar pulau)
+      const wRef = wilayahMap.get(customer.kode_wilayah);
+      if (wRef && Number.isFinite(wRef.centerLat) && Number.isFinite(wRef.centerLng)) {
+        setTargetZoom(15);
+        setTargetPoint([wRef.centerLat, wRef.centerLng]);
+        triggerPulse(wRef.centerLat, wRef.centerLng);
+        toast.warning(
+          `Titik GPS (${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}) di luar Pulau Lombok. Peta difokuskan ke wilayah/dekade ${wRef.nama}.`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(
+          `Koordinat (${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}) berada di luar Pulau Lombok. Harap perbarui data survei GPS.`,
+          { duration: 6000 }
+        );
+      }
+    }
+  }, [triggerPulse, wilayahMap]);
 
   // Synchronize URL search params (e.g. redirected from Dashboard "Lihat di Peta" or "Tinjau di Peta")
   useEffect(() => {
@@ -2636,9 +2663,9 @@ export default function GisMap() {
               variant="outline"
               size="sm"
               onClick={() => {
-                setTargetZoom(17);
-                setTargetPoint([selectedCustomer.latitude, selectedCustomer.longitude]);
-                triggerPulse(selectedCustomer.latitude, selectedCustomer.longitude);
+                if (selectedCustomer) {
+                  handleSelectCustomer(selectedCustomer);
+                }
               }}
               className="flex-1 h-8 rounded-xl text-xs gap-1.5"
             >

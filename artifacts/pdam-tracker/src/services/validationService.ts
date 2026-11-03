@@ -173,8 +173,8 @@ export class ValidationService {
           warn(
             'koordinat',
             str(rawLat) || str(rawLng) ? `${rawLat}, ${rawLng}` : '(Kosong)',
-            `Koordinat GPS belum ada. Menggunakan estimasi titik pusat dekadi ${wilayahMatch.nama} (${wilayahMatch.kode}) sementara.`,
-            'Belum ada titik GPS (estimasi dekadi)'
+            `Koordinat GPS belum ada. Menggunakan estimasi titik pusat dekade ${wilayahMatch.nama} (${wilayahMatch.kode}) sementara.`,
+            'Belum ada titik GPS (estimasi dekade)'
           );
         } else if (kodeKecamatan && KECAMATAN_BOUNDS[kodeKecamatan]) {
           const [cLat, cLng] = boundsCenter(KECAMATAN_BOUNDS[kodeKecamatan]);

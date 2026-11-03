@@ -54,9 +54,11 @@ import {
   FileText,
   RefreshCw,
   Sparkles,
+  ArrowRight,
+  AlertOctagon,
 } from 'lucide-react';
 
-// ── Haversine distance formula (returns distance in meters) ──
+// ── Haversine distance formula (returns meters) ──
 function haversineDistance(
   lat1: number,
   lng1: number,
@@ -82,8 +84,33 @@ function formatNumber(n: number): string {
   return n.toLocaleString('id-ID');
 }
 
-type SortField = 'distance' | 'kode' | 'nama' | 'wilayah';
+// ── Find nearest dekade centroid to a given GPS coordinate ──
+function findNearestDekade(
+  lat: number,
+  lng: number,
+  wilayahList: WilayahAcuan[],
+): { wilayah: WilayahAcuan; distance: number } | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  let nearest: WilayahAcuan | null = null;
+  let minDistance = Infinity;
+
+  for (const w of wilayahList) {
+    if (Number.isFinite(w.centerLat) && Number.isFinite(w.centerLng)) {
+      const d = haversineDistance(lat, lng, w.centerLat, w.centerLng);
+      if (d < minDistance) {
+        minDistance = d;
+        nearest = w;
+      }
+    }
+  }
+
+  return nearest ? { wilayah: nearest, distance: minDistance } : null;
+}
+
+type SortField = 'distance' | 'kode' | 'nama' | 'wilayah' | 'kesesuaian';
 type SortDir = 'asc' | 'desc';
+type AnomalyCategory = 'all' | 'wrong_dekade' | 'same_dekade_far' | 'estimated_only';
 
 export default function DataCorrection() {
   const { user } = useAuth();
@@ -93,11 +120,11 @@ export default function DataCorrection() {
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>('all');
   const [selectedWilayah, setSelectedWilayah] = useState<string>('all');
   const [distanceThreshold, setDistanceThreshold] = useState<number>(500); // meters
+  const [anomalyCategory, setAnomalyCategory] = useState<AnomalyCategory>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('distance');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [showOnlyEstimated, setShowOnlyEstimated] = useState<boolean>(false);
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
 
   // ── Build wilayah map for fast lookup ──
@@ -107,7 +134,7 @@ export default function DataCorrection() {
     return map;
   }, [wilayah]);
 
-  // ── Compute distance for every customer ──
+  // ── Enriched data with distance + detected nearest dekade ──
   const enrichedData = useMemo(() => {
     const result: PelangganOutlierItem[] = [];
     for (const p of pelanggan) {
@@ -116,7 +143,7 @@ export default function DataCorrection() {
         !Number.isFinite(p.longitude) ||
         (p.latitude === 0 && p.longitude === 0)
       ) {
-        continue; // Skip completely invalid coordinates
+        continue;
       }
 
       const wRef = wilayahMap.get(p.kode_wilayah);
@@ -134,22 +161,33 @@ export default function DataCorrection() {
           wRef.centerLng,
         );
       } else if (p.kode_kecamatan && KECAMATAN_BOUNDS[p.kode_kecamatan]) {
-        // Fallback to kecamatan centroid if dekadi is not registered
+        // Fallback to kecamatan centroid
         const [cLat, cLng] = boundsCenter(KECAMATAN_BOUNDS[p.kode_kecamatan]);
         wilayahCenter = { lat: cLat, lng: cLng };
         wilayahNamaAcuan = `Kec. ${kecamatanName(p.kode_kecamatan)} (Estimasi Pusat)`;
         distanceToCenter = haversineDistance(p.latitude, p.longitude, cLat, cLng);
       }
 
+      // Deteksi dekade fisik terdekat (misal Bonder vs Karang Daye)
+      const nearest = findNearestDekade(p.latitude, p.longitude, wilayah);
+      const detectedWilayah = nearest?.wilayah ?? null;
+      const distanceToDetectedCenter = nearest?.distance ?? 0;
+      const isWrongDekade = Boolean(
+        detectedWilayah && detectedWilayah.kode !== p.kode_wilayah,
+      );
+
       result.push({
         ...p,
         distanceToCenter,
         wilayahCenter,
         wilayahNamaAcuan,
+        detectedWilayah,
+        distanceToDetectedCenter,
+        isWrongDekade,
       });
     }
     return result;
-  }, [pelanggan, wilayahMap]);
+  }, [pelanggan, wilayahMap, wilayah]);
 
   // ── Scoped data based on selected kecamatan and wilayah ──
   const scopedData = useMemo(() => {
@@ -169,12 +207,19 @@ export default function DataCorrection() {
     return wilayah.filter((w) => w.kodeKecamatan === selectedKecamatan);
   }, [wilayah, selectedKecamatan]);
 
-  // ── Apply filters and sort ──
+  // ── Filtered Outliers List ──
   const outliers = useMemo(() => {
     let filtered = scopedData;
 
-    if (showOnlyEstimated) {
-      // If user checks "Hanya koordinat estimasi", show records with fallback flag (distance around 0)
+    // Filter berdasarkan Kategori Anomali
+    if (anomalyCategory === 'wrong_dekade') {
+      // Hanya yang salah dekade (terdaftar di A tapi titiknya di B, misal Bonder tapi di Karang Daye)
+      filtered = filtered.filter((p) => p.isWrongDekade);
+    } else if (anomalyCategory === 'same_dekade_far') {
+      // Sesuai dekadenya, tetapi jaraknya jauh (>= threshold)
+      filtered = filtered.filter((p) => !p.isWrongDekade && p.distanceToCenter >= distanceThreshold);
+    } else if (anomalyCategory === 'estimated_only') {
+      // Hanya pelanggan tanpa GPS (memakai titik estimasi)
       filtered = filtered.filter((p) =>
         (p.flag_reasons || []).some(
           (r) =>
@@ -183,10 +228,13 @@ export default function DataCorrection() {
         ),
       );
     } else {
-      // Normal outlier mode: distance to center >= threshold
-      filtered = filtered.filter((p) => p.distanceToCenter >= distanceThreshold);
+      // Default 'all': Salah dekade ATAU jarak ke pusat >= threshold
+      filtered = filtered.filter(
+        (p) => p.isWrongDekade || p.distanceToCenter >= distanceThreshold,
+      );
     }
 
+    // Filter Pencarian Teks
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(
@@ -195,11 +243,12 @@ export default function DataCorrection() {
           p.nama_pelanggan.toLowerCase().includes(q) ||
           p.alamat.toLowerCase().includes(q) ||
           p.nama_wilayah.toLowerCase().includes(q) ||
-          p.wilayahNamaAcuan.toLowerCase().includes(q),
+          p.wilayahNamaAcuan.toLowerCase().includes(q) ||
+          (p.detectedWilayah?.nama || '').toLowerCase().includes(q),
       );
     }
 
-    // Sort
+    // Sorting
     filtered.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -215,6 +264,9 @@ export default function DataCorrection() {
         case 'wilayah':
           cmp = a.kode_wilayah.localeCompare(b.kode_wilayah);
           break;
+        case 'kesesuaian':
+          cmp = (a.isWrongDekade ? 1 : 0) - (b.isWrongDekade ? 1 : 0);
+          break;
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
@@ -222,17 +274,18 @@ export default function DataCorrection() {
     return filtered;
   }, [
     scopedData,
+    anomalyCategory,
     distanceThreshold,
     searchQuery,
     sortField,
     sortDir,
-    showOnlyEstimated,
   ]);
 
   // ── Statistics (scoped to current selection) ──
   const stats = useMemo(() => {
     const totalWithCoords = scopedData.length;
-    const totalOutliers = scopedData.filter((p) => p.distanceToCenter >= distanceThreshold).length;
+    const totalWrongDekade = scopedData.filter((p) => p.isWrongDekade).length;
+    const totalOutliersDistance = scopedData.filter((p) => p.distanceToCenter >= distanceThreshold).length;
     const totalEstimated = scopedData.filter((p) =>
       (p.flag_reasons || []).some(
         (r) =>
@@ -244,38 +297,25 @@ export default function DataCorrection() {
     // Per-wilayah breakdown of outliers
     const perWilayah = new Map<
       string,
-      { count: number; avgDist: number; totalDist: number; nama: string }
+      { count: number; wrongCount: number; avgDist: number; totalDist: number; nama: string }
     >();
 
     for (const p of outliers) {
       const entry = perWilayah.get(p.kode_wilayah) || {
         count: 0,
+        wrongCount: 0,
         avgDist: 0,
         totalDist: 0,
         nama: p.wilayahNamaAcuan,
       };
       entry.count++;
+      if (p.isWrongDekade) entry.wrongCount++;
       entry.totalDist += p.distanceToCenter;
       entry.avgDist = entry.totalDist / entry.count;
       perWilayah.set(p.kode_wilayah, entry);
     }
 
-    // Distance buckets
-    const buckets = {
-      near: scopedData.filter((p) => p.distanceToCenter < 200).length,
-      medium: scopedData.filter(
-        (p) => p.distanceToCenter >= 200 && p.distanceToCenter < 500,
-      ).length,
-      far: scopedData.filter(
-        (p) => p.distanceToCenter >= 500 && p.distanceToCenter < 1000,
-      ).length,
-      veryFar: scopedData.filter(
-        (p) => p.distanceToCenter >= 1000 && p.distanceToCenter < 2000,
-      ).length,
-      extreme: scopedData.filter((p) => p.distanceToCenter >= 2000).length,
-    };
-
-    return { totalWithCoords, totalOutliers, totalEstimated, perWilayah, buckets };
+    return { totalWithCoords, totalWrongDekade, totalOutliersDistance, totalEstimated, perWilayah };
   }, [scopedData, outliers, distanceThreshold]);
 
   // ── Sort toggle ──
@@ -313,18 +353,20 @@ export default function DataCorrection() {
         Kode_Pelanggan: p.kode_pelanggan,
         Nama_Pelanggan: p.nama_pelanggan,
         Alamat: p.alamat,
-        Kode_Wilayah: p.kode_wilayah,
-        Nama_Wilayah: p.wilayahNamaAcuan,
+        Kode_Dekade_Terdaftar: p.kode_wilayah,
+        Dekade_Terdaftar: p.wilayahNamaAcuan,
+        Kode_Dekade_Terdeteksi: p.detectedWilayah?.kode ?? '-',
+        Dekade_Terdeteksi_GPS: p.detectedWilayah?.nama ?? '-',
+        Status_Kesesuaian: p.isWrongDekade ? 'BEDA DEKADE (SALAH WILAYAH)' : 'SESUAI DEKADE',
         Kecamatan: kecamatanName(p.kode_kecamatan),
         Latitude: p.latitude,
         Longitude: p.longitude,
-        Lat_Pusat_Dekadi: p.wilayahCenter?.lat ?? '',
-        Lng_Pusat_Dekadi: p.wilayahCenter?.lng ?? '',
-        Jarak_Meter: Math.round(p.distanceToCenter),
-        Jarak_Km: (p.distanceToCenter / 1000).toFixed(3),
+        Lat_Pusat_Dekade: p.wilayahCenter?.lat ?? '',
+        Lng_Pusat_Dekade: p.wilayahCenter?.lng ?? '',
+        Jarak_ke_Pusat_Meter: Math.round(p.distanceToCenter),
+        Jarak_ke_Pusat_Km: (p.distanceToCenter / 1000).toFixed(3),
         Status: p.status_sambungan,
         Golongan: p.golongan,
-        Anomali_Spasial: p.spatial_anomaly ?? '',
         Catatan_Flag: (p.flag_reasons || []).join('; '),
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -333,17 +375,17 @@ export default function DataCorrection() {
 
       // Auto column widths
       const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-        wch: Math.max(key.length, 14),
+        wch: Math.max(key.length, 15),
       }));
       ws['!cols'] = colWidths;
 
-      const filename = `Koreksi_Data_PDAM_${selectedKecamatan === 'all' ? 'Semua' : `Kec_${selectedKecamatan}`}_Jarak_${distanceThreshold}m_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `Koreksi_Lokasi_PDAM_${selectedKecamatan === 'all' ? 'Semua' : `Kec_${selectedKecamatan}`}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(wb, filename);
-      toast.success(`Berhasil mengunduh Excel berisi ${formatNumber(outliers.length)} data.`);
+      toast.success(`Berhasil mengunduh Excel (${formatNumber(outliers.length)} data).`);
     } catch (e: any) {
       toast.error(e.message || 'Gagal mengekspor file Excel.');
     }
-  }, [outliers, selectedKecamatan, distanceThreshold]);
+  }, [outliers, selectedKecamatan]);
 
   // ── Export to PDF Resmi ──
   const handleExportPdf = useCallback(() => {
@@ -354,7 +396,7 @@ export default function DataCorrection() {
 
     try {
       setIsExportingPdf(true);
-      toast.info('Menyiapkan dokumen Laporan Audit Spasial PDF resmi...');
+      toast.info('Menyiapkan Laporan Hasil Koreksi Lokasi PDF resmi...');
 
       setTimeout(() => {
         try {
@@ -389,49 +431,6 @@ export default function DataCorrection() {
     wilayah,
   ]);
 
-  // ── Distance severity styling ──
-  const distanceSeverity = (meters: number) => {
-    if (meters < 200) return 'good';
-    if (meters < 500) return 'ok';
-    if (meters < 1000) return 'warning';
-    if (meters < 2000) return 'bad';
-    return 'critical';
-  };
-
-  const severityColor = (sev: string) => {
-    switch (sev) {
-      case 'good':
-        return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-900';
-      case 'ok':
-        return 'text-sky-600 bg-sky-50 border-sky-200 dark:text-sky-400 dark:bg-sky-950/40 dark:border-sky-900';
-      case 'warning':
-        return 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/40 dark:border-amber-900';
-      case 'bad':
-        return 'text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950/40 dark:border-orange-900';
-      case 'critical':
-        return 'text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-950/40 dark:border-rose-900';
-      default:
-        return '';
-    }
-  };
-
-  const severityLabel = (sev: string) => {
-    switch (sev) {
-      case 'good':
-        return 'Dekat (<200m)';
-      case 'ok':
-        return 'Wajar (200-500m)';
-      case 'warning':
-        return 'Agak Jauh (0.5-1km)';
-      case 'bad':
-        return 'Jauh (1-2km)';
-      case 'critical':
-        return 'Sangat Jauh (>2km)';
-      default:
-        return '';
-    }
-  };
-
   return (
     <div className="min-h-screen bg-neutral-50/60 dark:bg-neutral-950 px-4 sm:px-6 md:px-8 py-6 space-y-6">
       {/* ── Header ── */}
@@ -445,12 +444,12 @@ export default function DataCorrection() {
               variant="outline"
               className="font-mono text-xs text-primary border-primary/30 bg-primary/5"
             >
-              Audit Jarak Spasial
+              Analisis Dekade & Jarak
             </Badge>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
-            Deteksi otomatis pelanggan yang letak koordinat GPS-nya tidak dekat dengan titik pusat dekade/wilayahnya.
-            Bantu tim lapangan menemukan pelanggan yang salah kode dekadi atau koordinatnya salah survey.
+            Deteksi otomatis pelanggan yang titik GPS-nya berada di dekade lain (misal terdaftar di Bonder tapi titik di Karang Daye)
+            serta pelanggan yang jaraknya jauh dari titik pusat dekadenya.
           </p>
         </div>
 
@@ -485,7 +484,7 @@ export default function DataCorrection() {
       </div>
 
       {/* ── Stats Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="rounded-2xl border border-border bg-card shadow-sm">
           <CardContent className="p-4 text-center">
             <span className="text-[10px] font-mono uppercase text-muted-foreground block">
@@ -500,55 +499,45 @@ export default function DataCorrection() {
           </CardContent>
         </Card>
 
+        <Card className="rounded-2xl border border-rose-300 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <span className="text-[10px] font-mono uppercase text-rose-600 dark:text-rose-400 block font-bold">
+              Beda Dekade (Nyasar)
+            </span>
+            <span className="text-2xl font-mono font-bold text-rose-600 dark:text-rose-400">
+              {formatNumber(stats.totalWrongDekade)}
+            </span>
+            <span className="text-[10px] text-muted-foreground block mt-0.5">
+              Titik GPS masuk dekade lain
+            </span>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-2xl border border-border bg-card shadow-sm">
           <CardContent className="p-4 text-center">
             <span className="text-[10px] font-mono uppercase text-amber-600 dark:text-amber-400 block">
-              Outlier (≥{formatDistance(distanceThreshold)})
+              Jarak {`>=`} {formatDistance(distanceThreshold)}
             </span>
             <span className="text-2xl font-mono font-bold text-amber-600 dark:text-amber-400">
-              {formatNumber(stats.totalOutliers)}
+              {formatNumber(stats.totalOutliersDistance)}
             </span>
             <span className="text-[10px] text-muted-foreground block mt-0.5">
-              {stats.totalWithCoords
-                ? `${((stats.totalOutliers / stats.totalWithCoords) * 100).toFixed(1)}% dari data`
-                : '0%'}
+              Deviasi dari pusat dekade
             </span>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border border-border bg-card shadow-sm">
           <CardContent className="p-4 text-center">
-            <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 block">
-              {'< 200m (Sangat Dekat)'}
+            <span className="text-[10px] font-mono uppercase text-sky-600 dark:text-sky-400 block">
+              Hanya Titik Estimasi
             </span>
-            <span className="text-2xl font-mono font-bold text-emerald-600 dark:text-emerald-400">
-              {formatNumber(stats.buckets.near)}
+            <span className="text-2xl font-mono font-bold text-sky-600 dark:text-sky-400">
+              {formatNumber(stats.totalEstimated)}
             </span>
-            <span className="text-[10px] text-muted-foreground block mt-0.5">Posisi sangat akurat</span>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border border-border bg-card shadow-sm">
-          <CardContent className="p-4 text-center">
-            <span className="text-[10px] font-mono uppercase text-orange-600 dark:text-orange-400 block">
-              1–2 km (Jauh)
+            <span className="text-[10px] text-muted-foreground block mt-0.5">
+              Belum survei GPS fisik
             </span>
-            <span className="text-2xl font-mono font-bold text-orange-600 dark:text-orange-400">
-              {formatNumber(stats.buckets.veryFar)}
-            </span>
-            <span className="text-[10px] text-muted-foreground block mt-0.5">Perlu verifikasi</span>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border border-border bg-card shadow-sm">
-          <CardContent className="p-4 text-center">
-            <span className="text-[10px] font-mono uppercase text-rose-600 dark:text-rose-400 block">
-              {'> 2 km (Kritis)'}
-            </span>
-            <span className="text-2xl font-mono font-bold text-rose-600 dark:text-rose-400">
-              {formatNumber(stats.buckets.extreme)}
-            </span>
-            <span className="text-[10px] text-muted-foreground block mt-0.5">Prioritas mutasi kode</span>
           </CardContent>
         </Card>
       </div>
@@ -560,15 +549,34 @@ export default function DataCorrection() {
           <CardHeader className="pb-3 border-b border-border/50">
             <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
               <Filter className="w-4 h-4 text-primary" />
-              Filter & Ambang Batas
+              Filter & Kategori
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground mt-0.5">
-              Sesuaikan radius toleransi jarak antar titik
+              Pilih jenis anomali dan cakupan wilayah
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 space-y-5">
+          <CardContent className="p-4 space-y-4">
+            {/* Anomaly Category Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-foreground">Jenis Anomali Ditampilkan</Label>
+              <Select
+                value={anomalyCategory}
+                onValueChange={(v) => setAnomalyCategory(v as AnomalyCategory)}
+              >
+                <SelectTrigger className="h-9 rounded-xl text-xs font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Anomali (Beda Dekade & Jarak Jauh)</SelectItem>
+                  <SelectItem value="wrong_dekade">Hanya Beda Dekade (Nyasar ke Wilayah Lain)</SelectItem>
+                  <SelectItem value="same_dekade_far">Sesuai Dekade tapi Jarak Jauh</SelectItem>
+                  <SelectItem value="estimated_only">Hanya Titik Estimasi (Tanpa GPS)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Distance Threshold Slider */}
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 pt-2 border-t border-border/50">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Ruler className="w-3.5 h-3.5 text-primary" />
@@ -581,19 +589,19 @@ export default function DataCorrection() {
               <Slider
                 value={[distanceThreshold]}
                 onValueChange={([v]) => setDistanceThreshold(v)}
-                min={50}
+                min={100}
                 max={5000}
                 step={50}
                 className="py-1"
               />
               {/* Quick Presets */}
-              <div className="grid grid-cols-4 gap-1 pt-1">
-                {[200, 500, 1000, 2000].map((preset) => (
+              <div className="grid grid-cols-4 gap-1 pt-0.5">
+                {[300, 500, 1000, 2000].map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setDistanceThreshold(preset)}
-                    className={`text-[10px] py-1 px-1.5 rounded-lg border text-center transition-colors font-mono cursor-pointer ${
+                    className={`text-[10px] py-1 px-1 rounded-lg border text-center transition-colors font-mono cursor-pointer ${
                       distanceThreshold === preset
                         ? 'bg-primary text-primary-foreground border-primary font-bold'
                         : 'bg-muted/40 hover:bg-muted text-muted-foreground border-border'
@@ -603,13 +611,10 @@ export default function DataCorrection() {
                   </button>
                 ))}
               </div>
-              <p className="text-[10.5px] text-muted-foreground leading-relaxed">
-                Menyaring pelanggan yang letaknya <strong>≥ {formatDistance(distanceThreshold)}</strong> dari pusat dekadinya.
-              </p>
             </div>
 
             {/* Kecamatan Filter */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 pt-2 border-t border-border/50">
               <Label className="text-xs font-semibold text-foreground">Kecamatan</Label>
               <Select
                 value={selectedKecamatan}
@@ -632,9 +637,9 @@ export default function DataCorrection() {
               </Select>
             </div>
 
-            {/* Wilayah Filter */}
+            {/* Wilayah / Dekade Filter */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-foreground">Wilayah / Dekadi</Label>
+              <Label className="text-xs font-semibold text-foreground">Wilayah / Dekade Terdaftar</Label>
               <Select value={selectedWilayah} onValueChange={setSelectedWilayah}>
                 <SelectTrigger className="h-9 rounded-xl text-xs">
                   <SelectValue />
@@ -652,28 +657,13 @@ export default function DataCorrection() {
 
             {/* Search Input */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-foreground">Cari Nama / ID</Label>
+              <Label className="text-xs font-semibold text-foreground">Cari Nama / ID / Wilayah</Label>
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Kode pelanggan, nama, alamat..."
                 className="h-9 rounded-xl text-xs"
               />
-            </div>
-
-            {/* Show Only Estimated Toggle */}
-            <div className="flex items-start gap-2 pt-1 border-t border-border/50">
-              <input
-                type="checkbox"
-                id="show-estimated"
-                checked={showOnlyEstimated}
-                onChange={(e) => setShowOnlyEstimated(e.target.checked)}
-                className="rounded border-border h-4 w-4 mt-0.5 accent-primary cursor-pointer"
-              />
-              <label htmlFor="show-estimated" className="text-xs text-muted-foreground cursor-pointer leading-tight">
-                <span className="font-medium text-foreground block">Hanya Koordinat Estimasi</span>
-                Pelanggan tanpa survei GPS (memakai titik pusat dekadi)
-              </label>
             </div>
 
             {/* Per-Wilayah Breakdown */}
@@ -684,11 +674,11 @@ export default function DataCorrection() {
                     <BarChart3 className="w-3 h-3" />
                     Top Wilayah Anomali
                   </span>
-                  <span className="text-[9px]">Outlier</span>
+                  <span className="text-[9px]">Salah Dekade / Total</span>
                 </p>
                 <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
                   {Array.from(stats.perWilayah.entries())
-                    .sort(([, a], [, b]) => b.count - a.count)
+                    .sort(([, a], [, b]) => b.wrongCount - a.wrongCount || b.count - a.count)
                     .slice(0, 10)
                     .map(([kode, info]) => (
                       <button
@@ -698,7 +688,7 @@ export default function DataCorrection() {
                           setSelectedKecamatan(kode.slice(0, 2));
                           setSelectedWilayah(kode);
                         }}
-                        className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/60 transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted/60 transition-colors text-left cursor-pointer"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-mono text-[10px] text-muted-foreground shrink-0">
@@ -707,15 +697,21 @@ export default function DataCorrection() {
                           <span className="text-[11px] text-foreground truncate">{info.nama}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {info.wrongCount > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[9px] py-0 px-1.5 bg-rose-500/10 text-rose-600 border-rose-300"
+                              title={`${info.wrongCount} data beda dekade`}
+                            >
+                              {info.wrongCount} salah
+                            </Badge>
+                          )}
                           <Badge
                             variant="outline"
                             className="font-mono text-[9px] py-0 px-1.5 bg-amber-500/10 text-amber-600 border-amber-200"
                           >
                             {info.count}
                           </Badge>
-                          <span className="text-[9px] text-muted-foreground">
-                            ~{formatDistance(info.avgDist)}
-                          </span>
                         </div>
                       </button>
                     ))}
@@ -731,7 +727,7 @@ export default function DataCorrection() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <CardTitle className="text-base font-heading font-semibold text-foreground flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
-                Daftar Pelanggan Mencurigakan
+                Daftar Analisis Lokasi & Kesesuaian Dekade
                 <Badge
                   variant="outline"
                   className="font-mono text-[10px] py-0 px-1.5 bg-amber-500/10 text-amber-600 border-amber-200 ml-1"
@@ -740,8 +736,7 @@ export default function DataCorrection() {
                 </Badge>
               </CardTitle>
               <p className="text-[11px] text-muted-foreground">
-                Menampilkan pelanggan dengan jarak ≥{' '}
-                <strong className="text-foreground">{formatDistance(distanceThreshold)}</strong> dari titik pusat dekadi
+                Membandingkan <strong>Dekade Terdaftar</strong> dengan <strong>Dekade Terdeteksi dari Titik GPS</strong>
               </p>
             </div>
           </CardHeader>
@@ -751,9 +746,7 @@ export default function DataCorrection() {
                 <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 opacity-60" />
                 <p className="text-sm font-medium text-foreground">Tidak Ada Anomali Ditemukan</p>
                 <p className="text-xs max-w-md mx-auto">
-                  {scopedData.length === 0
-                    ? 'Belum ada data pelanggan ber-koordinat pada filter wilayah ini.'
-                    : `Semua pelanggan pada wilayah ini berada dalam radius toleransi ${formatDistance(distanceThreshold)} dari titik pusat dekadi.`}
+                  Semua titik pelanggan pada filter ini berada dalam dekade yang sesuai dan dalam batas jarak toleransi.
                 </p>
               </div>
             ) : (
@@ -767,7 +760,7 @@ export default function DataCorrection() {
                         onClick={() => toggleSort('kode')}
                       >
                         <span className="flex items-center gap-1">
-                          Kode Pelanggan <SortIcon field="kode" />
+                          Kode Pel. <SortIcon field="kode" />
                         </span>
                       </th>
                       <th
@@ -775,7 +768,7 @@ export default function DataCorrection() {
                         onClick={() => toggleSort('nama')}
                       >
                         <span className="flex items-center gap-1">
-                          Nama Pelanggan <SortIcon field="nama" />
+                          Nama & Alamat <SortIcon field="nama" />
                         </span>
                       </th>
                       <th
@@ -783,30 +776,43 @@ export default function DataCorrection() {
                         onClick={() => toggleSort('wilayah')}
                       >
                         <span className="flex items-center gap-1">
-                          Wilayah / Dekadi <SortIcon field="wilayah" />
+                          Dekade Terdaftar <SortIcon field="wilayah" />
+                        </span>
+                      </th>
+                      <th className="py-2.5 px-3">
+                        <span className="flex items-center gap-1 font-semibold text-foreground">
+                          Dekade Terdeteksi (GPS)
                         </span>
                       </th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors"
+                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors text-center"
+                        onClick={() => toggleSort('kesesuaian')}
+                      >
+                        <span className="flex items-center justify-center gap-1">
+                          Kesesuaian <SortIcon field="kesesuaian" />
+                        </span>
+                      </th>
+                      <th
+                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors text-right"
                         onClick={() => toggleSort('distance')}
                       >
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center justify-end gap-1">
                           Jarak ke Pusat <SortIcon field="distance" />
                         </span>
                       </th>
-                      <th className="py-2.5 px-3">Tingkat</th>
                       <th className="py-2.5 px-3 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {outliers.slice(0, 200).map((p, idx) => {
-                      const sev = distanceSeverity(p.distanceToCenter);
                       const isExpanded = expandedRow === p.kode_pelanggan;
 
                       return (
                         <React.Fragment key={p.kode_pelanggan}>
                           <tr
-                            className={`hover:bg-muted/30 transition-colors ${isExpanded ? 'bg-muted/20' : ''}`}
+                            className={`hover:bg-muted/30 transition-colors ${
+                              p.isWrongDekade ? 'bg-rose-500/[0.03]' : ''
+                            } ${isExpanded ? 'bg-muted/20' : ''}`}
                           >
                             <td className="py-2.5 px-3 font-mono text-muted-foreground text-[10px]">
                               {idx + 1}
@@ -818,14 +824,15 @@ export default function DataCorrection() {
                             </td>
                             <td className="py-2.5 px-3">
                               <div className="flex flex-col">
-                                <span className="text-foreground font-semibold truncate max-w-[190px]">
+                                <span className="text-foreground font-semibold truncate max-w-[170px]">
                                   {p.nama_pelanggan}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[190px]">
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[170px]">
                                   {p.alamat || '-'}
                                 </span>
                               </div>
                             </td>
+                            {/* Dekade Terdaftar */}
                             <td className="py-2.5 px-3">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-mono text-[10px] text-muted-foreground">
@@ -836,19 +843,54 @@ export default function DataCorrection() {
                                 </span>
                               </div>
                             </td>
+                            {/* Dekade Terdeteksi (Posisi GPS Nyata) */}
                             <td className="py-2.5 px-3">
-                              <span className="font-mono font-bold text-foreground">
+                              {p.detectedWilayah ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] font-semibold text-foreground">
+                                    {p.detectedWilayah.kode}
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-foreground">
+                                    {p.detectedWilayah.nama}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-[11px] italic">-</span>
+                              )}
+                            </td>
+                            {/* Kesesuaian Badge */}
+                            <td className="py-2.5 px-3 text-center">
+                              {p.isWrongDekade ? (
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[9.5px] py-0.5 px-2 bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-300 font-bold"
+                                >
+                                  Beda Dekade!
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[9.5px] py-0.5 px-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 font-medium"
+                                >
+                                  Sesuai Dekade
+                                </Badge>
+                              )}
+                            </td>
+                            {/* Jarak ke Pusat Dekade Terdaftar */}
+                            <td className="py-2.5 px-3 text-right">
+                              <span
+                                className={`font-mono font-bold ${
+                                  p.distanceToCenter >= 2000
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : p.distanceToCenter >= 1000
+                                    ? 'text-orange-600 dark:text-orange-400'
+                                    : 'text-foreground'
+                                }`}
+                              >
                                 {formatDistance(p.distanceToCenter)}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3">
-                              <Badge
-                                variant="outline"
-                                className={`font-mono text-[9px] py-0 px-2 border ${severityColor(sev)}`}
-                              >
-                                {severityLabel(sev)}
-                              </Badge>
-                            </td>
+                            {/* Aksi */}
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <Tooltip>
@@ -882,7 +924,7 @@ export default function DataCorrection() {
                                     </a>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="text-xs">
-                                    Buka di Google Maps
+                                    Buka Google Maps
                                   </TooltipContent>
                                 </Tooltip>
                               </div>
@@ -892,7 +934,7 @@ export default function DataCorrection() {
                           {/* Expanded Detail View */}
                           {isExpanded && (
                             <tr className="bg-muted/15 border-y border-border/80">
-                              <td colSpan={7} className="px-6 py-4">
+                              <td colSpan={8} className="px-6 py-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                                   {/* Col 1: Posisi GPS Pelanggan */}
                                   <div className="space-y-1.5 p-3 rounded-xl bg-card border border-border/60">
@@ -915,33 +957,35 @@ export default function DataCorrection() {
                                     </div>
                                   </div>
 
-                                  {/* Col 2: Pusat Dekadi Acuan */}
+                                  {/* Col 2: Perbandingan Dekade (Terdaftar vs Terdeteksi) */}
                                   <div className="space-y-1.5 p-3 rounded-xl bg-card border border-border/60">
                                     <p className="font-semibold text-foreground flex items-center gap-1.5">
                                       <Crosshair className="w-3.5 h-3.5 text-amber-500" />
-                                      Pusat Dekadi ({p.kode_wilayah} - {p.wilayahNamaAcuan})
+                                      Perbandingan Dekade
                                     </p>
-                                    {p.wilayahCenter ? (
-                                      <>
-                                        <p className="font-mono text-xs text-muted-foreground">
-                                          {p.wilayahCenter.lat.toFixed(6)}, {p.wilayahCenter.lng.toFixed(6)}
-                                        </p>
-                                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                                          Jarak Deviasi: {formatDistance(p.distanceToCenter)}
-                                        </p>
-                                      </>
-                                    ) : (
-                                      <p className="text-muted-foreground italic text-[11px]">
-                                        Titik pusat belum terdaftar di tabel acuan
+                                    <div className="space-y-1 text-[11px]">
+                                      <p className="text-muted-foreground">
+                                        Terdaftar: <strong className="text-foreground">{p.kode_wilayah} - {p.wilayahNamaAcuan}</strong>
                                       </p>
-                                    )}
+                                      <p className="text-muted-foreground">
+                                        Terdeteksi di Dekade:{' '}
+                                        <strong className={p.isWrongDekade ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-emerald-600 font-semibold'}>
+                                          {p.detectedWilayah?.kode} - {p.detectedWilayah?.nama}
+                                        </strong>
+                                      </p>
+                                      {p.isWrongDekade && (
+                                        <p className="text-rose-600 dark:text-rose-400 font-medium text-[10.5px]">
+                                          ⚠ Titik fisik berada di area {p.detectedWilayah?.nama}, bukan di {p.wilayahNamaAcuan}!
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* Col 3: Informasi Audit & Status */}
                                   <div className="space-y-1.5 p-3 rounded-xl bg-card border border-border/60">
                                     <p className="font-semibold text-foreground flex items-center gap-1.5">
                                       <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                                      Data Master & Rekomendasi
+                                      Data Master & Status
                                     </p>
                                     <div className="space-y-0.5 text-[11px] text-muted-foreground">
                                       <p>
@@ -990,27 +1034,18 @@ export default function DataCorrection() {
         </Card>
       </div>
 
-      {/* ── Distance Severity Legend ── */}
+      {/* ── Guidance Card ── */}
       <Card className="rounded-2xl border border-border bg-card shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <span className="font-semibold text-foreground flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-primary" /> Panduan Tingkat Anomali Spasial:
+              <Sparkles className="w-3.5 h-3.5 text-primary" /> Panduan Kesesuaian Dekade:
             </span>
-            <Badge variant="outline" className={`font-mono text-[9px] py-0.5 px-2.5 ${severityColor('good')}`}>
-              {'< 200m — Normal (Sesuai)'}
+            <Badge variant="outline" className="font-mono text-[9px] py-0.5 px-2.5 bg-rose-500/10 text-rose-700 border-rose-300">
+              Beda Dekade (Nyasar) — Titik GPS lebih dekat ke dekade lain (rekomendasi: mutasi kode pelanggan)
             </Badge>
-            <Badge variant="outline" className={`font-mono text-[9px] py-0.5 px-2.5 ${severityColor('ok')}`}>
-              200–500m — Wajar (Dekat)
-            </Badge>
-            <Badge variant="outline" className={`font-mono text-[9px] py-0.5 px-2.5 ${severityColor('warning')}`}>
-              500m–1km — Agak Jauh (Tinjau Batas)
-            </Badge>
-            <Badge variant="outline" className={`font-mono text-[9px] py-0.5 px-2.5 ${severityColor('bad')}`}>
-              1–2km — Jauh (Cek Lapangan)
-            </Badge>
-            <Badge variant="outline" className={`font-mono text-[9px] py-0.5 px-2.5 ${severityColor('critical')}`}>
-              {'> 2km — Kritis (Urgensi Mutasi / Re-tagging GPS)'}
+            <Badge variant="outline" className="font-mono text-[9px] py-0.5 px-2.5 bg-emerald-500/10 text-emerald-700 border-emerald-300">
+              Sesuai Dekade — Titik GPS berada di wilayah dekadenya sendiri
             </Badge>
           </div>
         </CardContent>
