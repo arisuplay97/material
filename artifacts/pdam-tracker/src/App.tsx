@@ -10,6 +10,7 @@ import Login from '@/pages/login';
 import Dashboard from '@/pages/dashboard';
 import GisMap from '@/pages/gis-map';
 import Settings from '@/pages/settings';
+import DataCorrection from '@/pages/data-correction';
 import NotFound from '@/pages/not-found';
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
@@ -34,6 +35,7 @@ function Router() {
       <ProtectedRoute path="/gis" component={GisMap} />
       <ProtectedRoute path="/gis-map" component={GisMap} />
       <ProtectedRoute path="/settings" component={Settings} />
+      <ProtectedRoute path="/data-correction" component={DataCorrection} />
 
       {/* Redirect root to dashboard */}
       <Route path="/">

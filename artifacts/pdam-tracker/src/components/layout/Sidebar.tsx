@@ -8,6 +8,7 @@ import {
   LogOut,
   Lock,
   ChevronLeft,
+  SearchCheck,
 } from 'lucide-react';
 import {
   Sidebar as SidebarPrimitive,
@@ -33,6 +34,7 @@ export function Sidebar() {
   const navItems = [
     { title: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, adminOnly: false },
     { title: 'Peta GIS', path: '/gis', icon: MapPin, adminOnly: false },
+    { title: 'Koreksi Data', path: '/data-correction', icon: SearchCheck, adminOnly: false },
     { title: 'Pengaturan', path: '/settings', icon: Settings, adminOnly: true },
   ];
 

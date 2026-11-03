@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePdamData } from '@/hooks/usePdamData';
 import { useLocation } from 'wouter';
-import { Sun, Moon, CalendarDays, LayoutDashboard, MapPin, Settings as SettingsIcon, Search } from 'lucide-react';
+import { Sun, Moon, CalendarDays, LayoutDashboard, MapPin, Settings as SettingsIcon, Search, SearchCheck } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ROLE_LABEL } from '@/lib/privacy';
@@ -17,6 +17,7 @@ export function Navbar() {
 
   const getPageInfo = (path: string) => {
     if (path.startsWith('/gis')) return { title: 'Peta GIS', icon: MapPin };
+    if (path.startsWith('/data-correction')) return { title: 'Koreksi Data', icon: SearchCheck };
     if (path.startsWith('/settings')) return { title: 'Pengaturan', icon: SettingsIcon };
     return { title: 'Dashboard', icon: LayoutDashboard };
   };
