@@ -70,7 +70,7 @@ export default async function handler(req: any, res: any) {
       }
 
       let savedCount = 0;
-      const chunkSize = 50;
+      const chunkSize = 500;
 
       for (let i = 0; i < customers.length; i += chunkSize) {
         const chunk = customers.slice(i, i + chunkSize);

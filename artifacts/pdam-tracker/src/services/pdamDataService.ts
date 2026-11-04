@@ -993,31 +993,62 @@ class PdamDataService {
   }
 
   /**
-   * Mengirim data pelanggan ke database Neon Cloud server.
+   * Mengirim data pelanggan ke database Neon Cloud server secara bertahap (chunked)
+   * agar aman dari batas ukuran request (4.5MB) dan timeout serverless Vercel.
    */
-  public async pushToCloud(customers: Pelanggan[], mode: 'replace' | 'update' = 'replace'): Promise<{ ok: boolean; count?: number; message?: string; error?: string }> {
+  public async pushToCloud(
+    customers: Pelanggan[],
+    mode: 'replace' | 'update' = 'replace',
+    onProgress?: (sent: number, total: number) => void
+  ): Promise<{ ok: boolean; count?: number; message?: string; error?: string }> {
+    if (!customers || customers.length === 0) {
+      return { ok: true, count: 0, message: 'Tidak ada data pelanggan yang dikirim.' };
+    }
+
     try {
-      let res = await fetch('/api/gis/pelanggan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customers, mode }),
-      });
-      if (!res.ok) {
-        res = await fetch('/api/pelanggan', {
+      const BATCH_SIZE = 500;
+      let totalSaved = 0;
+      const total = customers.length;
+
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const chunk = customers.slice(i, i + BATCH_SIZE);
+        // Mode 'replace' hanya dijalankan pada batch pertama (i === 0) jika dipilih.
+        // Batch berikutnya (i > 0) harus selalu 'update' (upsert) agar tidak menghapus batch sebelumnya!
+        const currentMode = (i === 0 && mode === 'replace') ? 'replace' : 'update';
+
+        let res = await fetch('/api/gis/pelanggan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customers, mode }),
+          body: JSON.stringify({ customers: chunk, mode: currentMode }),
         });
-      }
-      const data = await res.json().catch(() => null);
-      if (!res.ok || (data && data.ok === false)) {
-        let msg = data?.error || `HTTP ${res.status}`;
-        if (msg.includes('402') || msg.toLowerCase().includes('quota')) {
-          msg = 'Database Neon Cloud melampaui batas kuota gratis (402 Quota Exceeded). Data gagal terkirim ke server Neon.';
+        if (!res.ok) {
+          res = await fetch('/api/pelanggan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customers: chunk, mode: currentMode }),
+          });
         }
-        return { ok: false, error: msg };
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || (data && data.ok === false)) {
+          let msg = data?.error || `HTTP ${res.status}`;
+          if (msg.includes('402') || msg.toLowerCase().includes('quota')) {
+            msg = 'Database Neon Cloud melampaui batas kuota gratis (402 Quota Exceeded).';
+          }
+          return { ok: false, error: `Gagal pada baris ${i + 1}-${i + chunk.length}: ${msg}` };
+        }
+
+        totalSaved += (data?.savedCount || chunk.length);
+        if (onProgress) {
+          onProgress(Math.min(i + chunk.length, total), total);
+        }
       }
-      return data || { ok: true, count: customers.length };
+
+      return {
+        ok: true,
+        count: totalSaved,
+        message: `Berhasil menyimpan ${totalSaved.toLocaleString('id-ID')} titik pelanggan ke database Neon Cloud! Semua perangkat langsung tersinkronkan.`,
+      };
     } catch (err: any) {
       console.error('Gagal mengirim pelanggan ke Neon Cloud:', err);
       return { ok: false, error: err.message };

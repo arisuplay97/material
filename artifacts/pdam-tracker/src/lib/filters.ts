@@ -108,7 +108,10 @@ export function filterPelanggan(
   const q = f.q.trim().toLowerCase();
   return list.filter((p) => {
     if (f.kecamatan !== 'all' && p.kode_kecamatan !== f.kecamatan) return false;
-    if (f.wilayah !== 'all' && p.kode_wilayah !== f.wilayah) return false;
+    if (f.wilayah !== 'all') {
+      const allowed = new Set(f.wilayah.split(',').map((s) => s.trim()).filter(Boolean));
+      if (!allowed.has(p.kode_wilayah)) return false;
+    }
     if (f.golongan !== 'all' && p.golongan !== f.golongan) return false;
     if (f.status !== 'all' && p.status_sambungan !== f.status) return false;
     if (f.quality === 'valid' && p.is_flagged) return false;

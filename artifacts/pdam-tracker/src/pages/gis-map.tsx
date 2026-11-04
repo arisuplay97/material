@@ -1733,8 +1733,11 @@ export default function GisMap() {
   // Filter pipeline
   const filteredCustomers = useMemo(() => {
     return kecamatanCustomers.filter((item: Pelanggan) => {
-      if (filters.wilayah !== 'all' && item.kode_wilayah !== filters.wilayah) {
-        return false;
+      if (filters.wilayah !== 'all') {
+        const allowed = new Set(filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean));
+        if (!allowed.has(item.kode_wilayah)) {
+          return false;
+        }
       }
       if (filters.golongan !== 'all' && item.golongan !== filters.golongan) {
         return false;
@@ -1815,12 +1818,24 @@ export default function GisMap() {
     setTimeout(() => setCopiedCoords(false), 2000);
   };
 
-  // Legend click toggles filter for that wilayah without auto zooming
+  const selectedWilayahSet = useMemo(() => {
+    if (!filters.wilayah || filters.wilayah === 'all') return new Set<string>();
+    return new Set(filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean));
+  }, [filters.wilayah]);
+
+  // Legend click toggles filter for that wilayah (supports multi-selection)
   const handleLegendClick = (kodeWilayah: string) => {
-    if (filters.wilayah === kodeWilayah) {
-      update({ wilayah: 'all' });
-    } else {
+    if (filters.wilayah === 'all' || !filters.wilayah) {
       update({ wilayah: kodeWilayah });
+    } else {
+      const current = filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean);
+      let next: string[];
+      if (current.includes(kodeWilayah)) {
+        next = current.filter((k) => k !== kodeWilayah);
+      } else {
+        next = [...current, kodeWilayah];
+      }
+      update({ wilayah: next.length === 0 ? 'all' : next.join(',') });
     }
   };
 
@@ -2200,13 +2215,20 @@ export default function GisMap() {
                 Wilayah ({displayedWilayahList.length})
               </label>
               <Select
-                value={filters.wilayah}
+                value={filters.wilayah.includes(',') ? 'multiple' : filters.wilayah}
                 onValueChange={(val) => update({ wilayah: val })}
               >
                 <SelectTrigger className="h-8 text-xs rounded-xl border-border bg-background">
-                  <SelectValue placeholder="Semua Wilayah" />
+                  <SelectValue placeholder="Semua Wilayah">
+                    {filters.wilayah.includes(',') ? `${selectedWilayahSet.size} Wilayah Terpilih` : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-56 border-border bg-card">
+                  {filters.wilayah.includes(',') && (
+                    <SelectItem value="multiple" disabled>
+                      {selectedWilayahSet.size} Wilayah Terpilih (Multi-seleksi)
+                    </SelectItem>
+                  )}
                   <SelectItem value="all">
                     {selectedKecamatan === 'all'
                       ? `Semua Wilayah (${displayedWilayahList.length})`
@@ -3020,10 +3042,26 @@ export default function GisMap() {
           {legendTab === 'wilayah' && (
             <>
               <div className="p-1.5 text-[10px] text-muted-foreground border-b border-border/50 bg-muted/10 font-mono px-2.5 flex items-center justify-between">
-                <span>{selectedKecamatan === 'all' ? 'Semua Wilayah' : `Wilayah Kec. ${selectedKecamatan}`}:</span>
-                <Badge variant="outline" className="font-mono text-[9px] py-0 px-1 h-4 bg-background">
-                  {displayedWilayahList.length} Wilayah
-                </Badge>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span>{selectedKecamatan === 'all' ? 'Wilayah' : `Kec. ${selectedKecamatan}`}:</span>
+                  {selectedWilayahSet.size > 0 && (
+                    <Badge variant="default" className="text-[9px] py-0 px-1.5 h-4 bg-primary text-primary-foreground font-semibold">
+                      {selectedWilayahSet.size} Terpilih
+                    </Badge>
+                  )}
+                </div>
+                {selectedWilayahSet.size > 0 ? (
+                  <button
+                    onClick={() => update({ wilayah: 'all' })}
+                    className="text-[10px] text-primary hover:underline font-sans cursor-pointer font-medium shrink-0"
+                  >
+                    Reset Filter
+                  </button>
+                ) : (
+                  <Badge variant="outline" className="font-mono text-[9px] py-0 px-1 h-4 bg-background">
+                    {displayedWilayahList.length} Wilayah
+                  </Badge>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
@@ -3033,7 +3071,7 @@ export default function GisMap() {
                   </div>
                 ) : (
                   displayedWilayahList.map((w: WilayahAcuan) => {
-                    const isSelected = filters.wilayah === w.kode;
+                    const isSelected = selectedWilayahSet.has(w.kode);
                     const countInWilayah = pelangganList.filter((p: Pelanggan) => p.kode_wilayah === w.kode).length;
 
                     return (
@@ -3042,7 +3080,7 @@ export default function GisMap() {
                         onClick={() => handleLegendClick(w.kode)}
                         className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer text-xs transition-colors border ${
                           isSelected
-                            ? 'bg-primary/10 border-primary/40 font-semibold text-primary'
+                            ? 'bg-primary/10 border-primary/40 font-semibold text-primary shadow-2xs'
                             : 'hover:bg-muted/60 border-transparent text-foreground'
                         }`}
                       >
@@ -3054,9 +3092,14 @@ export default function GisMap() {
                           <span className="font-mono text-[11px]">{w.kode}</span>
                           <span className="text-[11px] truncate">{w.nama}</span>
                         </div>
-                        <span className="font-mono text-[10px] text-muted-foreground ml-2">
-                          {countInWilayah}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {countInWilayah}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-3 h-3 text-primary shrink-0" />
+                          )}
+                        </div>
                       </div>
                     );
                   })

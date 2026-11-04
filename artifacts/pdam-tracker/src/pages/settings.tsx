@@ -5,6 +5,7 @@ import { WilayahAcuan, UploadSnapshot } from '@/types/pdam';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePdamData } from '@/hooks/usePdamData';
 import { safeColor } from '@/lib/escape';
+import { cn } from '@/lib/utils';
 import { MAX_UPLOAD_BYTES, formatNumber } from '@/lib/constants';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
@@ -52,7 +53,7 @@ export default function Settings() {
   const [isParsing, setIsParsing] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [validationResult, setValidationResult] = useState<ValidationOutput | null>(null);
-  const [uploadMode, setUploadMode] = useState<'replace' | 'update'>('replace');
+  const [uploadMode, setUploadMode] = useState<'replace' | 'update'>('update');
 
   // Wilayah editing state
   const [newWilayahKode, setNewWilayahKode] = useState<string>('');
@@ -65,6 +66,7 @@ export default function Settings() {
   // Rollback confirmation modal
   const [confirmRollbackId, setConfirmRollbackId] = useState<string | null>(null);
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [cloudProgress, setCloudProgress] = useState<{ sent: number; total: number } | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -161,13 +163,14 @@ export default function Settings() {
   };
 
   // Apply Validated Data
-  const handleApplyUpload = () => {
+  const handleApplyUpload = async () => {
     if (!validationResult || !validationResult.summary.canProceed || !selectedFile) {
       toast.error('Data belum siap untuk diterapkan.');
       return;
     }
 
     try {
+      setIsSyncingCloud(true);
       const newSnapshot = pdamService.applyUploadedData(
         validationResult.parsedRecords,
         uploadMode,
@@ -176,14 +179,28 @@ export default function Settings() {
         `Upload file ${selectedFile.name} (${uploadMode === 'replace' ? 'Ganti Total' : 'Perbarui per ID'}).`
       );
 
+      const allRecords = pdamService.getPelangganList();
       toast.success(
-        `Berhasil menerapkan ${validationResult.parsedRecords.length} data pelanggan ke snapshot baru!`
+        `Berhasil menerapkan ${validationResult.parsedRecords.length.toLocaleString('id-ID')} data pelanggan (${uploadMode === 'update' ? 'digabungkan' : 'ganti total'}). Menyimpan ke Neon Cloud...`
       );
       setSelectedFile(null);
       setValidationResult(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+
+      const cloudRes = await pdamService.pushToCloud(allRecords, 'replace', (sent, total) => {
+        setCloudProgress({ sent, total });
+      });
+
+      if (cloudRes.ok) {
+        toast.success(`Sinkronisasi selesai! Total ${allRecords.length.toLocaleString('id-ID')} pelanggan tersimpan di Neon Cloud.`);
+      } else {
+        toast.warning(`Tersimpan lokal, namun sinkronisasi Neon Cloud gagal: ${cloudRes.error}`);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Gagal menerapkan data.');
+    } finally {
+      setIsSyncingCloud(false);
+      setCloudProgress(null);
     }
   };
 
@@ -331,8 +348,11 @@ export default function Settings() {
   // Unggah paksa data lokal ke database Neon Cloud
   const handlePushCloud = async () => {
     setIsSyncingCloud(true);
+    setCloudProgress({ sent: 0, total: pelangganList.length });
     try {
-      const res = await pdamService.pushToCloud(pelangganList, 'replace');
+      const res = await pdamService.pushToCloud(pelangganList, 'replace', (sent, total) => {
+        setCloudProgress({ sent, total });
+      });
       if (res.ok) {
         toast.success(res.message || 'Data lokal berhasil dikirim dan tersimpan di database Neon Cloud!');
       } else {
@@ -342,6 +362,7 @@ export default function Settings() {
       toast.error('Gagal mengirim data ke server cloud: ' + e.message);
     } finally {
       setIsSyncingCloud(false);
+      setCloudProgress(null);
     }
   };
 
@@ -456,34 +477,46 @@ export default function Settings() {
 
                 {/* Upload Mode Selector */}
                 <div className="space-y-2 pt-2 border-t border-border">
-                  <label className="text-xs font-heading font-semibold text-foreground">
-                    Mode Penerapan Data
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-heading font-semibold text-foreground">
+                      Mode Penerapan Data
+                    </label>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      Data saat ini: {pelangganList.length.toLocaleString('id-ID')}
+                    </span>
+                  </div>
                   <RadioGroup
                     value={uploadMode}
                     onValueChange={(val: any) => setUploadMode(val)}
                     className="space-y-2 text-xs"
                   >
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-muted/20">
-                      <RadioGroupItem value="replace" id="mode-replace" className="mt-0.5" />
+                    <div className={cn(
+                      "flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer",
+                      uploadMode === 'update' ? 'bg-primary/5 border-primary/40' : 'bg-muted/20 border-border hover:bg-muted/40'
+                    )}>
+                      <RadioGroupItem value="update" id="mode-update" className="mt-0.5" />
                       <div className="flex flex-col">
-                        <Label htmlFor="mode-replace" className="font-semibold text-xs cursor-pointer">
-                          Ganti Total (Snapshot Baru)
+                        <Label htmlFor="mode-update" className="font-semibold text-xs cursor-pointer flex items-center gap-1.5 text-foreground">
+                          <span>Gabungkan Data (Tambah & Perbarui ID)</span>
+                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium rounded-full">Rekomendasi</span>
                         </Label>
                         <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                          Seluruh data aktif digantikan dengan data baru. Snapshot lama diarsipkan secara aman di riwayat.
+                          Sangat cocok jika mengunggah file per kecamatan (misal menambah Praya / Kopang tanpa menimpa data Praya Barat, BKU, Prabarda yang sudah ada).
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border bg-muted/20">
-                      <RadioGroupItem value="update" id="mode-update" className="mt-0.5" />
+                    <div className={cn(
+                      "flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer",
+                      uploadMode === 'replace' ? 'bg-amber-500/5 border-amber-500/40' : 'bg-muted/20 border-border hover:bg-muted/40'
+                    )}>
+                      <RadioGroupItem value="replace" id="mode-replace" className="mt-0.5" />
                       <div className="flex flex-col">
-                        <Label htmlFor="mode-update" className="font-semibold text-xs cursor-pointer">
-                          Perbarui / Upsert per ID Pelanggan
+                        <Label htmlFor="mode-replace" className="font-semibold text-xs cursor-pointer text-foreground">
+                          Ganti Total Seluruh Data (Reset Master)
                         </Label>
                         <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                          Data dengan ID yang cocok diperbarui nilainya; ID baru otomatis ditambahkan ke daftar.
+                          Seluruh data master aktif digantikan sepenuhnya hanya dengan file ini.
                         </span>
                       </div>
                     </div>
@@ -508,11 +541,20 @@ export default function Settings() {
                 {validationResult && (
                   <Button
                     onClick={handleApplyUpload}
-                    disabled={!validationResult.summary.canProceed}
+                    disabled={!validationResult.summary.canProceed || isSyncingCloud}
                     className="rounded-xl text-xs font-semibold gap-1.5 h-9"
                   >
-                    <span>Terapkan Data</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {isSyncingCloud ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>{cloudProgress ? `Sinkron (${cloudProgress.sent}/${cloudProgress.total})...` : 'Menyimpan...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Terapkan Data</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
                   </Button>
                 )}
               </CardHeader>
@@ -1106,8 +1148,17 @@ export default function Settings() {
                     disabled={isSyncingCloud || pelangganList.length === 0}
                     className="h-8 text-xs rounded-xl gap-1.5 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/60 cursor-pointer shadow-xs"
                   >
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Kirim Data Perangkat Ini ke Cloud</span>
+                    {isSyncingCloud && cloudProgress ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mengunggah {cloudProgress.sent.toLocaleString('id-ID')} / {cloudProgress.total.toLocaleString('id-ID')}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>Kirim Data Perangkat Ini ke Cloud</span>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

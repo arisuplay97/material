@@ -213,7 +213,11 @@ export default function Dashboard() {
           valid: item.total - item.flagged,
         };
       })
-      .filter((w) => filters.wilayah === 'all' || filters.wilayah === w.kode)
+      .filter((w) => {
+        if (filters.wilayah === 'all') return true;
+        const allowed = new Set(filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean));
+        return allowed.has(w.kode);
+      })
       .sort((a, b) => b.total - a.total);
   }, [currentKecamatanWilayah, stats, filters.wilayah]);
 
@@ -258,7 +262,11 @@ export default function Dashboard() {
   const meetsTarget = stats.validityPct >= VALIDITY_TARGET;
 
   const wilayahDisplay =
-    filters.wilayah === 'all' ? 'Semua' : currentKecamatanWilayah.find((w) => w.kode === filters.wilayah)?.nama || filters.wilayah;
+    filters.wilayah === 'all'
+      ? 'Semua'
+      : filters.wilayah.includes(',')
+      ? `${filters.wilayah.split(',').filter(Boolean).length} Wilayah Terpilih`
+      : currentKecamatanWilayah.find((w) => w.kode === filters.wilayah)?.nama || filters.wilayah;
   const qualityDisplay: Record<QualityFilter, string> = {
     all: 'Semua',
     valid: 'Valid',

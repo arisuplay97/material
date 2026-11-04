@@ -120,7 +120,11 @@ export default function Dashboard() {
           valid: item.total - item.flagged,
         };
       })
-      .filter((w) => filters.wilayah === 'all' || filters.wilayah === w.kode)
+      .filter((w) => {
+        if (filters.wilayah === 'all') return true;
+        const allowed = new Set(filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean));
+        return allowed.has(w.kode);
+      })
       .sort((a, b) => b.total - a.total);
   }, [currentKecamatanWilayah, stats, filters.wilayah]);
 
@@ -511,16 +515,23 @@ export default function Dashboard() {
             {/* Wilayah selector */}
             <div>
               <Select
-                value={filters.wilayah}
+                value={filters.wilayah.includes(',') ? 'multiple' : filters.wilayah}
                 onValueChange={(val) => {
                   update({ wilayah: val });
                   setCurrentPage(1);
                 }}
               >
                 <SelectTrigger className="h-9 text-xs rounded-xl border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 focus:ring-1 focus:ring-neutral-400">
-                  <SelectValue placeholder="Semua Wilayah" />
+                  <SelectValue placeholder="Semua Wilayah">
+                    {filters.wilayah.includes(',') ? `${filters.wilayah.split(',').filter(Boolean).length} Wilayah Terpilih` : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-72 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-xl">
+                  {filters.wilayah.includes(',') && (
+                    <SelectItem value="multiple" disabled className="text-xs">
+                      {filters.wilayah.split(',').filter(Boolean).length} Wilayah Terpilih
+                    </SelectItem>
+                  )}
                   <SelectItem value="all" className="text-xs">
                     Semua Wilayah ({currentKecamatanWilayah.length})
                   </SelectItem>
@@ -852,7 +863,15 @@ export default function Dashboard() {
                   return (
                     <div
                       key={w.kode}
-                      onClick={() => update({ wilayah: filters.wilayah === w.kode ? 'all' : w.kode })}
+                      onClick={() => {
+                        if (filters.wilayah === 'all' || !filters.wilayah) {
+                          update({ wilayah: w.kode });
+                        } else {
+                          const list = filters.wilayah.split(',').map((s) => s.trim()).filter(Boolean);
+                          const next = list.includes(w.kode) ? list.filter((k) => k !== w.kode) : [...list, w.kode];
+                          update({ wilayah: next.length === 0 ? 'all' : next.join(',') });
+                        }
+                      }}
                       className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer transition-colors text-xs space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
