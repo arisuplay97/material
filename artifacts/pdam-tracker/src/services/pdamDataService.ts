@@ -18,7 +18,7 @@ export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
   '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.32, maxLng: 116.44 }, // Praya Timur
   '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.265, maxLng: 116.36 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
   '07': { minLat: -8.86, maxLat: -8.705, minLng: 116.12, maxLng: 116.266 }, // Praya Barat (selatan: Selong Belanak/Lolat, utara: Belemong/Penujak, timur: Batujai/Kr. Daye)
-  '08': { minLat: -8.67, maxLat: -8.56, minLng: 116.20, maxLng: 116.29 }, // Pringgarata
+  '08': { minLat: -8.67, maxLat: -8.56, minLng: 116.18, maxLng: 116.29 }, // Pringgarata (Sintung, Bagu, Bilebante, Barembeng)
   '09': { minLat: -8.96, maxLat: -8.83, minLng: 116.24, maxLng: 116.36 }, // Kuta (pesisir selatan Pujut/Kuta, Gerupuk, Rambitan)
   '10': { minLat: -8.58, maxLat: -8.45, minLng: 116.26, maxLng: 116.40 }, // Batukliang Utara
   '11': { minLat: -8.765, maxLat: -8.65, minLng: 116.270, maxLng: 116.365 }, // Praya Tengah (Batunyala, Kelebuh, Sasake, Gaong, Rantik)
@@ -360,6 +360,26 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   { kode: '1211', nama: 'PERINE', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#9333EA', centerLat: -8.6880, centerLng: 116.2500, totalPelanggan: 153 },
   { kode: '1215', nama: 'JELANTIK UTARA', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#0284C7', centerLat: -8.6890, centerLng: 116.2360, totalPelanggan: 29 },
   { kode: '1216', nama: 'JELANTIK SELATAN', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#CA8A04', centerLat: -8.6950, centerLng: 116.2340, totalPelanggan: 1 },
+  // ── 19 Acuan Wilayah / Dekadi Resmi Kecamatan 08 (Pringgarata) ──
+  { kode: '0801', nama: 'PRINGGARATA', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#E11D48', centerLat: -8.6050, centerLng: 116.2450, totalPelanggan: 488 },
+  { kode: '0802', nama: 'SALAM SUKUR', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#2563EB', centerLat: -8.6080, centerLng: 116.2500, totalPelanggan: 96 },
+  { kode: '0803', nama: 'KR. JANGKONG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#059669', centerLat: -8.6120, centerLng: 116.2480, totalPelanggan: 40 },
+  { kode: '0804', nama: 'SINTUNG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#D97706', centerLat: -8.5900, centerLng: 116.2350, totalPelanggan: 102 },
+  { kode: '0805', nama: 'ARJANGKA', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#7C3AED', centerLat: -8.5950, centerLng: 116.2400, totalPelanggan: 45 },
+  { kode: '0806', nama: 'BAGU', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#DB2777', centerLat: -8.6200, centerLng: 116.2300, totalPelanggan: 133 },
+  { kode: '0807', nama: 'MEDAS', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#0891B2', centerLat: -8.6150, centerLng: 116.2200, totalPelanggan: 71 },
+  { kode: '0808', nama: 'PENGENJEK', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#4F46E5', centerLat: -8.6300, centerLng: 116.2400, totalPelanggan: 265 },
+  { kode: '0809', nama: 'KRANT UMUM', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#EA580C', centerLat: -8.6040, centerLng: 116.2420, totalPelanggan: 11 },
+  { kode: '0810', nama: 'REPOK SINTUNG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#16A34A', centerLat: -8.5880, centerLng: 116.2380, totalPelanggan: 69 },
+  { kode: '0812', nama: 'BILEBANTE', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#9333EA', centerLat: -8.6100, centerLng: 116.2150, totalPelanggan: 12 },
+  { kode: '0813', nama: 'REPOK TUNJANG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#0284C7', centerLat: -8.6250, centerLng: 116.2500, totalPelanggan: 145 },
+  { kode: '0814', nama: 'DASAN BARU', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#CA8A04', centerLat: -8.6180, centerLng: 116.2550, totalPelanggan: 110 },
+  { kode: '0815', nama: 'DASAN BARU JABON', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#0D9488', centerLat: -8.6220, centerLng: 116.2580, totalPelanggan: 124 },
+  { kode: '0816', nama: 'BANTENG KESELET', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#DC2626', centerLat: -8.6350, centerLng: 116.2350, totalPelanggan: 48 },
+  { kode: '0817', nama: 'PRINGGARATA BARAT', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#65A30D', centerLat: -8.6060, centerLng: 116.2380, totalPelanggan: 21 },
+  { kode: '0818', nama: 'PRINGGARATA TIMUR', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#64748B', centerLat: -8.6040, centerLng: 116.2520, totalPelanggan: 18 },
+  { kode: '0819', nama: 'BAREMBENG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#B45309', centerLat: -8.6400, centerLng: 116.2450, totalPelanggan: 144 },
+  { kode: '0820', nama: 'SISIK', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#C026D3', centerLat: -8.6000, centerLng: 116.2600, totalPelanggan: 186 },
 ];
 
 const STORAGE_KEYS = {
