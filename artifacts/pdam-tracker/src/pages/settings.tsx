@@ -49,7 +49,10 @@ export default function Settings() {
 
   // Upload States
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [parsingProgress, setParsingProgress] = useState<{ current: number; total: number; fileName: string } | null>(null);
+  const [fileSummaries, setFileSummaries] = useState<{ name: string; rows: number; size: number }[]>([]);
+  const selectedFile = selectedFiles[0] || null;
   const [isParsing, setIsParsing] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [validationResult, setValidationResult] = useState<ValidationOutput | null>(null);
@@ -104,44 +107,76 @@ export default function Settings() {
     );
   }
 
-  // Handle File Selection with 20MB limit validation
-  const processFile = async (file: File) => {
-    if (!file) return;
+  // Handle File Selection (supports single or multiple files)
+  const processFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return;
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error('Ukuran file melebihi batas maksimal 20 MB.');
+    const validFiles: File[] = [];
+    for (const f of files) {
+      if (f.size > MAX_UPLOAD_BYTES) {
+        toast.error(`File "${f.name}" melebihi batas maksimal 20 MB.`);
+        continue;
+      }
+      const ext = f.name.split('.').pop()?.toLowerCase();
+      if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
+        toast.error(`File "${f.name}" diabaikan (format harus .xlsx, .xls, atau .csv).`);
+        continue;
+      }
+      validFiles.push(f);
+    }
+
+    if (validFiles.length === 0) {
+      toast.error('Tidak ada file Excel atau CSV yang valid untuk diproses.');
       return;
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
-      toast.error('Format file tidak didukung. Harap gunakan file Excel (.xlsx, .xls) atau CSV.');
-      return;
-    }
-
-    setSelectedFile(file);
+    setSelectedFiles(validFiles);
     setIsParsing(true);
     setValidationResult(null);
+    setFileSummaries([]);
 
     try {
-      const result = await ValidationService.parseAndValidateFile(file, wilayahList);
-      setValidationResult(result);
-      if (result.summary.canProceed) {
-        toast.success(`Validasi selesai: ${result.summary.validCount} data lolos bersih.`);
+      if (validFiles.length === 1) {
+        setParsingProgress({ current: 1, total: 1, fileName: validFiles[0].name });
+        const result = await ValidationService.parseAndValidateFile(validFiles[0], wilayahList);
+        setValidationResult(result);
+        setFileSummaries([{ name: validFiles[0].name, rows: result.parsedRecords.length, size: validFiles[0].size }]);
+        if (result.summary.canProceed) {
+          toast.success(`Validasi selesai: ${result.summary.validCount.toLocaleString('id-ID')} data siap diterapkan.`);
+        } else {
+          toast.error(`Validasi menemukan ${result.summary.errorCount} format kolom tidak valid.`);
+        }
       } else {
-        toast.error(`Validasi gagal: Ditemukan ${result.summary.errorCount} kesalahan fatal.`);
+        const result = await ValidationService.parseAndValidateMultipleFiles(
+          validFiles,
+          wilayahList,
+          (current, total, fileName) => {
+            setParsingProgress({ current, total, fileName });
+          }
+        );
+        setValidationResult(result);
+        setFileSummaries(result.fileSummaries);
+        if (result.summary.canProceed) {
+          toast.success(
+            `Validasi ${validFiles.length} file sukses: Total ${result.summary.validCount.toLocaleString('id-ID')} data siap diterapkan!`
+          );
+        } else {
+          toast.error(`Validasi ${validFiles.length} file selesai dengan ${result.summary.errorCount} kesalahan.`);
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Gagal memproses file upload.');
-      setSelectedFile(null);
+      setSelectedFiles([]);
+      setFileSummaries([]);
     } finally {
       setIsParsing(false);
+      setParsingProgress(null);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) processFiles(files);
   };
 
   // Drag and drop handlers
@@ -158,32 +193,38 @@ export default function Settings() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+    if (files.length > 0) processFiles(files);
   };
 
   // Apply Validated Data
   const handleApplyUpload = async () => {
-    if (!validationResult || !validationResult.summary.canProceed || !selectedFile) {
+    if (!validationResult || !validationResult.summary.canProceed || selectedFiles.length === 0) {
       toast.error('Data belum siap untuk diterapkan.');
       return;
     }
 
     try {
       setIsSyncingCloud(true);
+      const fileLabel =
+        selectedFiles.length === 1
+          ? selectedFiles[0].name
+          : `${selectedFiles.length} File Excel (${selectedFiles.map((f) => f.name.replace(/\.[^/.]+$/, '')).slice(0, 3).join(', ')}${selectedFiles.length > 3 ? '...' : ''})`;
+
       const newSnapshot = pdamService.applyUploadedData(
         validationResult.parsedRecords,
         uploadMode,
-        selectedFile.name,
+        fileLabel,
         user?.name || 'Administrator IT',
-        `Upload file ${selectedFile.name} (${uploadMode === 'replace' ? 'Ganti Total' : 'Perbarui per ID'}).`
+        `Upload ${fileLabel} (${uploadMode === 'replace' ? 'Ganti Total' : 'Perbarui/Gabungkan ID'}).`
       );
 
       const allRecords = pdamService.getPelangganList();
       toast.success(
-        `Berhasil menerapkan ${validationResult.parsedRecords.length.toLocaleString('id-ID')} data pelanggan (${uploadMode === 'update' ? 'digabungkan' : 'ganti total'}). Menyimpan ke Neon Cloud...`
+        `Berhasil menerapkan ${validationResult.parsedRecords.length.toLocaleString('id-ID')} data pelanggan dari ${selectedFiles.length} file (${uploadMode === 'update' ? 'digabungkan' : 'ganti total'}). Menyimpan ke Neon Cloud...`
       );
-      setSelectedFile(null);
+      setSelectedFiles([]);
+      setFileSummaries([]);
       setValidationResult(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -262,6 +303,17 @@ export default function Settings() {
     return Array.from(codes).sort();
   }, [validationResult]);
 
+  // Detected Kecamatans in the parsed records (useful for multi-file verification)
+  const detectedKecamatans = useMemo(() => {
+    if (!validationResult || !validationResult.parsedRecords) return [];
+    const counts = new Map<string, number>();
+    for (const p of validationResult.parsedRecords) {
+      const kec = p.kode_kecamatan || p.kode_pelanggan.slice(0, 2);
+      counts.set(kec, (counts.get(kec) || 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [validationResult]);
+
   // Auto-register missing wilayah codes and re-validate
   const handleAutoRegisterMissingWilayah = () => {
     if (missingWilayahCodes.length === 0) return;
@@ -291,8 +343,8 @@ export default function Settings() {
 
     toast.success(`${missingWilayahCodes.length} kode wilayah baru (${missingWilayahCodes.join(', ')}) berhasil didaftarkan! Memvalidasi ulang...`);
 
-    if (selectedFile) {
-      processFile(selectedFile);
+    if (selectedFiles.length > 0) {
+      processFiles(selectedFiles);
     }
   };
 
@@ -449,7 +501,7 @@ export default function Settings() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
                     isDragging
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40'
@@ -458,22 +510,94 @@ export default function Settings() {
                   <input
                     ref={fileInputRef}
                     type="file"
+                    multiple
                     accept=".xlsx,.xls,.csv"
                     onChange={handleFileChange}
                     className="hidden"
                   />
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
-                    <FileSpreadsheet className="w-6 h-6" />
-                  </div>
-                  <span className="text-xs font-semibold text-foreground block">
-                    {selectedFile ? selectedFile.name : 'Pilih atau Tarik File ke Sini'}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground mt-1 block">
-                    {selectedFile
-                      ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                      : 'File Excel (.xlsx) atau CSV sesuai template baku'}
-                  </span>
+                  {selectedFiles.length === 0 ? (
+                    <>
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                        <FileSpreadsheet className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs font-semibold text-foreground block">
+                        Pilih atau Tarik File ke Sini
+                      </span>
+                      <span className="text-[11px] text-muted-foreground mt-1 block">
+                        Bisa pilih 1 file atau <strong>BANYAK file Excel sekaligus</strong> (Ctrl / Shift + Klik)
+                      </span>
+                      <span className="inline-flex items-center gap-1 mt-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
+                        <Layers className="w-3 h-3" />
+                        Multi-File Excel Aktif
+                      </span>
+                    </>
+                  ) : selectedFiles.length === 1 ? (
+                    <>
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
+                        <FileSpreadsheet className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs font-semibold text-foreground block truncate font-medium">
+                        {selectedFiles[0].name}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                        {(selectedFiles[0].size / 1024).toFixed(1)} KB • Klik untuk ganti atau pilih banyak file
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                        <Layers className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs font-semibold text-foreground block">
+                        {selectedFiles.length} File Excel Terpilih
+                      </span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                        Total {(selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1)} KB • Klik untuk pilih ulang
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* File list preview if multiple files are selected */}
+                {selectedFiles.length > 1 && (
+                  <div className="space-y-1.5 p-2.5 rounded-xl border border-border bg-muted/20 max-h-40 overflow-y-auto">
+                    <div className="text-[10px] font-mono text-muted-foreground font-semibold flex items-center justify-between">
+                      <span>{selectedFiles.length} File Terunggah:</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFiles([]);
+                          setFileSummaries([]);
+                          setValidationResult(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="text-muted-foreground hover:text-destructive text-[10px] cursor-pointer"
+                      >
+                        Bersihkan
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {selectedFiles.map((f, idx) => {
+                        const summary = fileSummaries.find((s) => s.name === f.name);
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between text-[11px] px-2 py-1 rounded-lg bg-background border border-border/50"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <FileSpreadsheet className="w-3 h-3 text-primary shrink-0" />
+                              <span className="truncate font-medium">{f.name}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-muted-foreground shrink-0 ml-2">
+                              {summary ? `${summary.rows.toLocaleString('id-ID')} baris` : `${(f.size / 1024).toFixed(0)} KB`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Upload Mode Selector */}
                 <div className="space-y-2 pt-2 border-t border-border">
@@ -563,7 +687,11 @@ export default function Settings() {
                 {isParsing ? (
                   <div className="py-16 text-center space-y-3 font-mono text-xs text-primary animate-pulse">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
-                    <span>Sedang memvalidasi integritas data di Web Worker...</span>
+                    <span>
+                      {parsingProgress
+                        ? `Sedang membaca & memvalidasi file ${parsingProgress.current} dari ${parsingProgress.total} (${parsingProgress.fileName})...`
+                        : 'Sedang memvalidasi integritas data di Web Worker...'}
+                    </span>
                   </div>
                 ) : !validationResult ? (
                   <div className="py-16 text-center space-y-2 text-muted-foreground text-xs">
@@ -599,6 +727,35 @@ export default function Settings() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Detected Kecamatans Breakdown across all uploaded files */}
+                    {detectedKecamatans.length > 0 && (
+                      <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-semibold text-blue-800 dark:text-blue-200">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Cakupan Kecamatan ({detectedKecamatans.length} Kecamatan Terdeteksi):</span>
+                          </div>
+                          {selectedFiles.length > 1 && (
+                            <Badge variant="outline" className="text-[10px] bg-background border-blue-300 text-blue-700 font-mono">
+                              {selectedFiles.length} File Excel Digabung
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {detectedKecamatans.map(([kec, count]) => (
+                            <div
+                              key={kec}
+                              className="px-2 py-1 rounded-lg bg-background border border-blue-200 dark:border-blue-800 text-[11px] font-mono flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-blue-500" />
+                              <span className="font-bold text-foreground">Kec. {kec} ({kecamatanName(kec)})</span>
+                              <span className="text-muted-foreground">• {count.toLocaleString('id-ID')} titik</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Status Notice */}
                     {!validationResult.summary.canProceed ? (

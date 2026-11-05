@@ -57,6 +57,47 @@ export class ValidationService {
     return this.validateRawRows(rows, wilayahAcuanList);
   }
 
+  public static async parseAndValidateMultipleFiles(
+    files: File[],
+    wilayahAcuanList: WilayahAcuan[],
+    onProgress?: (current: number, total: number, fileName: string) => void
+  ): Promise<ValidationOutput & { fileSummaries: { name: string; rows: number; size: number }[] }> {
+    if (!files || files.length === 0) {
+      throw new Error('Tidak ada file yang dipilih.');
+    }
+
+    const fileSummaries: { name: string; rows: number; size: number }[] = [];
+    const allRows: (RawRow & { _source_file?: string })[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (onProgress) {
+        onProgress(i + 1, files.length, file.name);
+      }
+      if (!ALLOWED_EXTENSIONS.test(file.name)) {
+        throw new Error(`File "${file.name}" tidak didukung. Harap gunakan format .xlsx, .xls, atau .csv.`);
+      }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        throw new Error(`File "${file.name}" (${(file.size / 1024 / 1024).toFixed(1)} MB) melebihi batas 20 MB.`);
+      }
+
+      const buffer = await file.arrayBuffer();
+      const rows = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
+      fileSummaries.push({ name: file.name, rows: rows.length, size: file.size });
+
+      for (const r of rows) {
+        (r as any)._source_file = file.name;
+        allRows.push(r);
+      }
+    }
+
+    const result = this.validateRawRows(allRows, wilayahAcuanList);
+    return {
+      ...result,
+      fileSummaries,
+    };
+  }
+
   public static validateRawRows(rows: RawRow[], wilayahAcuanList: WilayahAcuan[]): ValidationOutput {
     const errors: ValidationErrorItem[] = [];
     const warnings: ValidationErrorItem[] = [];
@@ -125,7 +166,16 @@ export class ValidationService {
       } else if (!/^\d{9}$/.test(kodePelanggan)) {
         fail('kode_pelanggan', kodePelanggan, `Kode pelanggan harus 9 digit angka (KKWWxxxxx). Ditemukan "${kodePelanggan}" (${kodePelanggan.length} karakter).`);
       } else if (seenIds.has(kodePelanggan)) {
-        fail('kode_pelanggan', kodePelanggan, `Kode pelanggan "${kodePelanggan}" duplikat.`);
+        warn(
+          'kode_pelanggan',
+          kodePelanggan,
+          `ID "${kodePelanggan}" duplikat. Nilai otomatis diperbarui dengan data baris terbaru.`,
+          'ID duplikat diperbarui otomatis'
+        );
+        const prevIdx = parsedRecords.findIndex((p) => p.kode_pelanggan === kodePelanggan);
+        if (prevIdx !== -1) {
+          parsedRecords.splice(prevIdx, 1);
+        }
       } else {
         seenIds.add(kodePelanggan);
       }
