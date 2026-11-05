@@ -19,10 +19,10 @@ export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
   '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.265, maxLng: 116.36 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
   '07': { minLat: -8.86, maxLat: -8.705, minLng: 116.12, maxLng: 116.266 }, // Praya Barat (selatan: Selong Belanak/Lolat, utara: Belemong/Penujak, timur: Batujai/Kr. Daye)
   '08': { minLat: -8.67, maxLat: -8.56, minLng: 116.20, maxLng: 116.29 }, // Pringgarata
-  '09': { minLat: -8.96, maxLat: -8.86, minLng: 116.24, maxLng: 116.35 }, // Kuta (pesisir selatan Pujut/Kuta)
+  '09': { minLat: -8.96, maxLat: -8.83, minLng: 116.24, maxLng: 116.36 }, // Kuta (pesisir selatan Pujut/Kuta, Gerupuk, Rambitan)
   '10': { minLat: -8.58, maxLat: -8.45, minLng: 116.26, maxLng: 116.40 }, // Batukliang Utara
-  '11': { minLat: -8.745, maxLat: -8.65, minLng: 116.275, maxLng: 116.36 }, // Praya Tengah (Batunyala, Kelebuh, Sasake)
-  '12': { minLat: -8.700, maxLat: -8.62, minLng: 116.16, maxLng: 116.26 }, // Jonggat (Sukarara, Puyung, Ubung)
+  '11': { minLat: -8.765, maxLat: -8.65, minLng: 116.270, maxLng: 116.365 }, // Praya Tengah (Batunyala, Kelebuh, Sasake, Gaong, Rantik)
+  '12': { minLat: -8.730, maxLat: -8.62, minLng: 116.16, maxLng: 116.265 }, // Jonggat (Sukarara, Puyung, Ubung, Labulia)
   '13': { minLat: -8.92, maxLat: -8.74, minLng: 116.08, maxLng: 116.19 }, // Praya Barat Daya (Darek, Pelambik)
 };
 
@@ -312,6 +312,54 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   { kode: '0615', nama: 'KETARE', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#0D9488', centerLat: -8.7800, centerLng: 116.3000, totalPelanggan: 500 },
   { kode: '0616', nama: 'TANAK AWU', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#DC2626', centerLat: -8.7650, centerLng: 116.2850, totalPelanggan: 423 },
   { kode: '0617', nama: 'TERUWAI', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#65A30D', centerLat: -8.9100, centerLng: 116.3350, totalPelanggan: 529 },
+  // ── 5 Acuan Wilayah / Dekadi Resmi Kecamatan 09 (Kuta) ──
+  { kode: '0901', nama: 'GERUPUK', kodeKecamatan: '09', namaKecamatan: 'Kuta', warna: '#E11D48', centerLat: -8.9050, centerLng: 116.3450, totalPelanggan: 284 },
+  { kode: '0902', nama: 'KUTA', kodeKecamatan: '09', namaKecamatan: 'Kuta', warna: '#2563EB', centerLat: -8.8950, centerLng: 116.2820, totalPelanggan: 82 },
+  { kode: '0903', nama: 'RAMBITAN', kodeKecamatan: '09', namaKecamatan: 'Kuta', warna: '#059669', centerLat: -8.8500, centerLng: 116.2900, totalPelanggan: 533 },
+  { kode: '0904', nama: 'KRAN UMUM', kodeKecamatan: '09', namaKecamatan: 'Kuta', warna: '#D97706', centerLat: -8.8920, centerLng: 116.2800, totalPelanggan: 5 },
+  { kode: '0905', nama: 'SONGGONG', kodeKecamatan: '09', namaKecamatan: 'Kuta', warna: '#7C3AED', centerLat: -8.8750, centerLng: 116.3250, totalPelanggan: 10 },
+  // ── 27 Acuan Wilayah / Dekadi Resmi Kecamatan 11 (Praya Tengah) ──
+  { kode: '1101', nama: 'PERUMNAS', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#E11D48', centerLat: -8.7120, centerLng: 116.2950, totalPelanggan: 567 },
+  { kode: '1102', nama: 'BATU NYALA', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#2563EB', centerLat: -8.7250, centerLng: 116.3150, totalPelanggan: 309 },
+  { kode: '1103', nama: 'LAJUT', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#059669', centerLat: -8.7050, centerLng: 116.3100, totalPelanggan: 860 },
+  { kode: '1104', nama: 'SUDIRMAN', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#D97706', centerLat: -8.7100, centerLng: 116.2900, totalPelanggan: 347 },
+  { kode: '1106', nama: 'KANDONG', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#7C3AED', centerLat: -8.7180, centerLng: 116.3020, totalPelanggan: 209 },
+  { kode: '1107', nama: 'DS. GILIK', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#DB2777', centerLat: -8.7300, centerLng: 116.3200, totalPelanggan: 462 },
+  { kode: '1108', nama: 'SEMAYAN', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#0891B2', centerLat: -8.7080, centerLng: 116.2850, totalPelanggan: 703 },
+  { kode: '1109', nama: 'TAPON', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#4F46E5', centerLat: -8.7350, centerLng: 116.3250, totalPelanggan: 1 },
+  { kode: '1110', nama: 'GERANTUNG PRATENG', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#EA580C', centerLat: -8.7200, centerLng: 116.3300, totalPelanggan: 183 },
+  { kode: '1111', nama: 'KEKERE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#16A34A', centerLat: -8.7220, centerLng: 116.3080, totalPelanggan: 144 },
+  { kode: '1112', nama: 'PEKAT', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#9333EA', centerLat: -8.7150, centerLng: 116.3180, totalPelanggan: 49 },
+  { kode: '1113', nama: 'JERO BUWUH', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#0284C7', centerLat: -8.7280, centerLng: 116.2980, totalPelanggan: 165 },
+  { kode: '1114', nama: 'SASAKE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#CA8A04', centerLat: -8.7380, centerLng: 116.3050, totalPelanggan: 485 },
+  { kode: '1115', nama: 'BATU BANGKE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#0D9488', centerLat: -8.7420, centerLng: 116.3120, totalPelanggan: 4 },
+  { kode: '1116', nama: 'BAGEK RENDE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#DC2626', centerLat: -8.7190, centerLng: 116.3240, totalPelanggan: 37 },
+  { kode: '1117', nama: 'JONTLAK', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#65A30D', centerLat: -8.7020, centerLng: 116.2980, totalPelanggan: 492 },
+  { kode: '1118', nama: 'LEBUNG PRATENG', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#64748B', centerLat: -8.7280, centerLng: 116.3320, totalPelanggan: 13 },
+  { kode: '1119', nama: 'TEMPAS', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#B45309', centerLat: -8.7320, centerLng: 116.3100, totalPelanggan: 141 },
+  { kode: '1120', nama: 'JURANG JALER', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#C026D3', centerLat: -8.7400, centerLng: 116.3200, totalPelanggan: 85 },
+  { kode: '1121', nama: 'MERTAK MEN', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#1D4ED8', centerLat: -8.7450, centerLng: 116.3000, totalPelanggan: 41 },
+  { kode: '1122', nama: 'PRAI GUNUNG', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#10B981', centerLat: -8.7480, centerLng: 116.3180, totalPelanggan: 26 },
+  { kode: '1124', nama: 'NYAMPE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#BE123C', centerLat: -8.7360, centerLng: 116.3280, totalPelanggan: 80 },
+  { kode: '1125', nama: 'TORO', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#047857', centerLat: -8.7420, centerLng: 116.3350, totalPelanggan: 134 },
+  { kode: '1126', nama: 'GAONG', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#F59E0B', centerLat: -8.7500, centerLng: 116.3250, totalPelanggan: 84 },
+  { kode: '1127', nama: 'ULAR NAGE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#3B82F6', centerLat: -8.7520, centerLng: 116.3150, totalPelanggan: 45 },
+  { kode: '1129', nama: 'RANTIK', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#8B5CF6', centerLat: -8.7550, centerLng: 116.3200, totalPelanggan: 20 },
+  { kode: '1130', nama: 'BATU BANGE', kodeKecamatan: '11', namaKecamatan: 'Praya Tengah', warna: '#EC4899', centerLat: -8.7480, centerLng: 116.3080, totalPelanggan: 81 },
+  // ── 13 Acuan Wilayah / Dekadi Resmi Kecamatan 12 (Jonggat) ──
+  { kode: '1201', nama: 'PUYUNG', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#E11D48', centerLat: -8.6850, centerLng: 116.2450, totalPelanggan: 780 },
+  { kode: '1202', nama: 'SUKARARA', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#2563EB', centerLat: -8.7050, centerLng: 116.2250, totalPelanggan: 570 },
+  { kode: '1203', nama: 'KRANT UMUM', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#059669', centerLat: -8.6820, centerLng: 116.2400, totalPelanggan: 2 },
+  { kode: '1204', nama: 'NYEROT', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#D97706', centerLat: -8.6720, centerLng: 116.2300, totalPelanggan: 195 },
+  { kode: '1205', nama: 'UBUNG', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#7C3AED', centerLat: -8.6580, centerLng: 116.2420, totalPelanggan: 162 },
+  { kode: '1206', nama: 'BUNJERUK', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#DB2777', centerLat: -8.6650, centerLng: 116.2200, totalPelanggan: 80 },
+  { kode: '1207', nama: 'BUNKATE', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#0891B2', centerLat: -8.6780, centerLng: 116.2150, totalPelanggan: 15 },
+  { kode: '1208', nama: 'JELANTIK', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#4F46E5', centerLat: -8.6920, centerLng: 116.2350, totalPelanggan: 399 },
+  { kode: '1209', nama: 'BATU TULIS', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#EA580C', centerLat: -8.7000, centerLng: 116.2100, totalPelanggan: 149 },
+  { kode: '1210', nama: 'LABULIA', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#16A34A', centerLat: -8.7180, centerLng: 116.2050, totalPelanggan: 259 },
+  { kode: '1211', nama: 'PERINE', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#9333EA', centerLat: -8.6880, centerLng: 116.2500, totalPelanggan: 153 },
+  { kode: '1215', nama: 'JELANTIK UTARA', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#0284C7', centerLat: -8.6890, centerLng: 116.2360, totalPelanggan: 29 },
+  { kode: '1216', nama: 'JELANTIK SELATAN', kodeKecamatan: '12', namaKecamatan: 'Jonggat', warna: '#CA8A04', centerLat: -8.6950, centerLng: 116.2340, totalPelanggan: 1 },
 ];
 
 const STORAGE_KEYS = {
