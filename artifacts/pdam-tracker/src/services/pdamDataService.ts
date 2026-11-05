@@ -217,6 +217,101 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   { kode: '0330', nama: 'SEMPARU', kodeKecamatan: '03', namaKecamatan: 'Kopang', warna: '#F97316', centerLat: -8.6170, centerLng: 116.3650 },
   { kode: '0331', nama: 'DASAN BARU', kodeKecamatan: '03', namaKecamatan: 'Kopang', warna: '#6366F1', centerLat: -8.6270, centerLng: 116.3930 },
   { kode: '0332', nama: 'MUNCAN', kodeKecamatan: '03', namaKecamatan: 'Kopang', warna: '#06B6D4', centerLat: -8.6530, centerLng: 116.3950 },
+  // ── 53 Acuan Wilayah / Dekadi Resmi Kecamatan 02 (Batukliang) ──
+  { kode: '0201', nama: 'SENGKOL/MANTANG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#E11D48', centerLat: -8.6180, centerLng: 116.3120, totalPelanggan: 512 },
+  { kode: '0202', nama: 'PEDALAMAN', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#2563EB', centerLat: -8.6220, centerLng: 116.3160, totalPelanggan: 48 },
+  { kode: '0203', nama: 'JANTUK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#059669', centerLat: -8.6250, centerLng: 116.3080, totalPelanggan: 160 },
+  { kode: '0204', nama: 'GB BARU', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#D97706', centerLat: -8.6140, centerLng: 116.3090, totalPelanggan: 115 },
+  { kode: '0205', nama: 'RAJU MAS', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#7C3AED', centerLat: -8.6100, centerLng: 116.3150, totalPelanggan: 71 },
+  { kode: '0206', nama: 'SEGANTENG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#DB2777', centerLat: -8.6280, centerLng: 116.3140, totalPelanggan: 64 },
+  { kode: '0207', nama: 'BARA BALI', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0891B2', centerLat: -8.6320, centerLng: 116.3050, totalPelanggan: 365 },
+  { kode: '0208', nama: 'CERET', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#4F46E5', centerLat: -8.6350, centerLng: 116.3100, totalPelanggan: 36 },
+  { kode: '0209', nama: 'OTAK DESA', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#EA580C', centerLat: -8.6150, centerLng: 116.3220, totalPelanggan: 211 },
+  { kode: '0210', nama: 'DAYE MESJID', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#16A34A', centerLat: -8.6200, centerLng: 116.3250, totalPelanggan: 56 },
+  { kode: '0211', nama: 'GB EMBUNG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#9333EA', centerLat: -8.6270, centerLng: 116.3210, totalPelanggan: 60 },
+  { kode: '0212', nama: 'KRANT UMUM Batukliang', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0284C7', centerLat: -8.6170, centerLng: 116.3180, totalPelanggan: 11 },
+  { kode: '0213', nama: 'PAGUTAN', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#CA8A04', centerLat: -8.6250, centerLng: 116.3000, totalPelanggan: 245 },
+  { kode: '0214', nama: 'PONDOK PANDE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#475569', centerLat: -8.6300, centerLng: 116.2980, totalPelanggan: 79 },
+  { kode: '0217', nama: 'TOJANG BERENG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0D9488', centerLat: -8.6380, centerLng: 116.3030, totalPelanggan: 4 },
+  { kode: '0218', nama: 'MERTAK PAOK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#DC2626', centerLat: -8.6410, centerLng: 116.3120, totalPelanggan: 119 },
+  { kode: '0219', nama: 'REPOK PUYUNG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#65A30D', centerLat: -8.6450, centerLng: 116.3080, totalPelanggan: 133 },
+  { kode: '0220', nama: 'KEMBANG KERANG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#64748B', centerLat: -8.6230, centerLng: 116.3310, totalPelanggan: 180 },
+  { kode: '0221', nama: 'AIK DAREK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#B45309', centerLat: -8.6150, centerLng: 116.3350, totalPelanggan: 130 },
+  { kode: '0223', nama: 'GUNUNG JAE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#C026D3', centerLat: -8.6080, centerLng: 116.3380, totalPelanggan: 34 },
+  { kode: '0224', nama: 'LENDANG TAMPEL', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#1D4ED8', centerLat: -8.6120, centerLng: 116.3420, totalPelanggan: 152 },
+  { kode: '0225', nama: 'GERANTUNG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#10B981', centerLat: -8.6190, centerLng: 116.3450, totalPelanggan: 26 },
+  { kode: '0226', nama: 'REPUK PERINE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#BE123C', centerLat: -8.6260, centerLng: 116.3410, totalPelanggan: 30 },
+  { kode: '0227', nama: 'BEBANTE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#047857', centerLat: -8.6330, centerLng: 116.3370, totalPelanggan: 14 },
+  { kode: '0228', nama: 'PANCOR DAO', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#F59E0B', centerLat: -8.6390, centerLng: 116.3340, totalPelanggan: 8 },
+  { kode: '0229', nama: 'DASAN CERMEN', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#3B82F6', centerLat: -8.6440, centerLng: 116.3300, totalPelanggan: 1 },
+  { kode: '0230', nama: 'CEMPAKA PUTIH', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#8B5CF6', centerLat: -8.6480, centerLng: 116.3260, totalPelanggan: 5 },
+  { kode: '0231', nama: 'SURABAYA', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#EC4899', centerLat: -8.6200, centerLng: 116.2900, totalPelanggan: 150 },
+  { kode: '0232', nama: 'TOJAK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#14B8A6', centerLat: -8.6350, centerLng: 116.2950, totalPelanggan: 277 },
+  { kode: '0233', nama: 'KEBUN NYIUR BARABALI', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#F97316', centerLat: -8.6360, centerLng: 116.3020, totalPelanggan: 71 },
+  { kode: '0235', nama: 'LENDANG DODE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#6366F1', centerLat: -8.6050, centerLng: 116.3050, totalPelanggan: 121 },
+  { kode: '0236', nama: 'KELANJUH', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#06B6D4', centerLat: -8.6020, centerLng: 116.3120, totalPelanggan: 128 },
+  { kode: '0237', nama: 'SELEBUNG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#E11D48', centerLat: -8.6050, centerLng: 116.3200, totalPelanggan: 242 },
+  { kode: '0238', nama: 'LD. KEKAH', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#2563EB', centerLat: -8.5980, centerLng: 116.3150, totalPelanggan: 111 },
+  { kode: '0239', nama: 'TOJONG OJONG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#059669', centerLat: -8.6010, centerLng: 116.3270, totalPelanggan: 287 },
+  { kode: '0240', nama: 'KEBUN KARET', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#D97706', centerLat: -8.5950, centerLng: 116.3220, totalPelanggan: 65 },
+  { kode: '0241', nama: 'LENDANG PAOK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#7C3AED', centerLat: -8.5920, centerLng: 116.3280, totalPelanggan: 150 },
+  { kode: '0246', nama: 'BEBER', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#DB2777', centerLat: -8.6400, centerLng: 116.3250, totalPelanggan: 171 },
+  { kode: '0247', nama: 'PAOK KUNING', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0891B2', centerLat: -8.6460, centerLng: 116.3210, totalPelanggan: 56 },
+  { kode: '0248', nama: 'LEKONG EMPAT', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#4F46E5', centerLat: -8.6520, centerLng: 116.3180, totalPelanggan: 55 },
+  { kode: '0249', nama: 'SUBAHNALE', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#EA580C', centerLat: -8.6550, centerLng: 116.3250, totalPelanggan: 23 },
+  { kode: '0250', nama: 'PAJANGAN', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#16A34A', centerLat: -8.6500, centerLng: 116.3320, totalPelanggan: 69 },
+  { kode: '0251', nama: 'DASAN BARU', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#9333EA', centerLat: -8.6420, centerLng: 116.3390, totalPelanggan: 3 },
+  { kode: '0252', nama: 'AIK GERING', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0284C7', centerLat: -8.6360, centerLng: 116.3450, totalPelanggan: 135 },
+  { kode: '0253', nama: 'BATU LAJANG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#CA8A04', centerLat: -8.6300, centerLng: 116.3500, totalPelanggan: 48 },
+  { kode: '0254', nama: 'TAMPAK SIRING', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#475569', centerLat: -8.6000, centerLng: 116.3400, totalPelanggan: 265 },
+  { kode: '0255', nama: 'JERANJANG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#0D9488', centerLat: -8.5960, centerLng: 116.3460, totalPelanggan: 35 },
+  { kode: '0256', nama: 'DASAN BARU TAMPAK SIRING', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#DC2626', centerLat: -8.6040, centerLng: 116.3480, totalPelanggan: 114 },
+  { kode: '0261', nama: 'ANTAK-ANTAK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#65A30D', centerLat: -8.5880, centerLng: 116.3350, totalPelanggan: 2 },
+  { kode: '0270', nama: 'BENENG', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#64748B', centerLat: -8.5850, centerLng: 116.3100, totalPelanggan: 174 },
+  { kode: '0271', nama: 'BUJAK', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#B45309', centerLat: -8.5900, centerLng: 116.3200, totalPelanggan: 157 },
+  { kode: '0272', nama: 'CELEGAH', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#C026D3', centerLat: -8.5820, centerLng: 116.3180, totalPelanggan: 109 },
+  { kode: '0274', nama: 'RIRIS', kodeKecamatan: '02', namaKecamatan: 'Batukliang', warna: '#1D4ED8', centerLat: -8.5780, centerLng: 116.3250, totalPelanggan: 109 },
+  // ── 22 Acuan Wilayah / Dekadi Resmi Kecamatan 04 (Janapria) ──
+  { kode: '0401', nama: 'PENDEM', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#E11D48', centerLat: -8.6850, centerLng: 116.4150, totalPelanggan: 407 },
+  { kode: '0402', nama: 'JANAPRIA', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#2563EB', centerLat: -8.6980, centerLng: 116.4120, totalPelanggan: 194 },
+  { kode: '0403', nama: 'SABA', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#059669', centerLat: -8.7050, centerLng: 116.3950, totalPelanggan: 326 },
+  { kode: '0404', nama: 'LOANG MAKA', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#D97706', centerLat: -8.6750, centerLng: 116.3850, totalPelanggan: 394 },
+  { kode: '0405', nama: 'DURIAN', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#7C3AED', centerLat: -8.7150, centerLng: 116.4250, totalPelanggan: 226 },
+  { kode: '0406', nama: 'KRANT WARGA', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#DB2777', centerLat: -8.6920, centerLng: 116.4080, totalPelanggan: 4 },
+  { kode: '0408', nama: 'DASAN TINGGI', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#0891B2', centerLat: -8.6880, centerLng: 116.3980, totalPelanggan: 84 },
+  { kode: '0409', nama: 'JURING', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#4F46E5', centerLat: -8.6820, centerLng: 116.4220, totalPelanggan: 104 },
+  { kode: '0410', nama: 'JELITONG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#EA580C', centerLat: -8.6780, centerLng: 116.4120, totalPelanggan: 115 },
+  { kode: '0411', nama: 'SADAH', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#16A34A', centerLat: -8.7120, centerLng: 116.4380, totalPelanggan: 9 },
+  { kode: '0412', nama: 'PONDOK REMPUNG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#9333EA', centerLat: -8.7020, centerLng: 116.4280, totalPelanggan: 110 },
+  { kode: '0413', nama: 'BILE TAWAH', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#0284C7', centerLat: -8.6900, centerLng: 116.4350, totalPelanggan: 117 },
+  { kode: '0414', nama: 'SIWI', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#CA8A04', centerLat: -8.6950, centerLng: 116.4420, totalPelanggan: 103 },
+  { kode: '0415', nama: 'LIWUNG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#475569', centerLat: -8.7080, centerLng: 116.4180, totalPelanggan: 66 },
+  { kode: '0416', nama: 'BERORE', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#0D9488', centerLat: -8.7220, centerLng: 116.4150, totalPelanggan: 20 },
+  { kode: '0417', nama: 'TONJONG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#DC2626', centerLat: -8.7180, centerLng: 116.4020, totalPelanggan: 37 },
+  { kode: '0418', nama: 'PENAMBONG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#65A30D', centerLat: -8.7280, centerLng: 116.3980, totalPelanggan: 29 },
+  { kode: '0419', nama: 'NUNANG', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#64748B', centerLat: -8.7320, centerLng: 116.4120, totalPelanggan: 42 },
+  { kode: '0420', nama: 'LINGKOK TERES', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#B45309', centerLat: -8.7250, centerLng: 116.4050, totalPelanggan: 110 },
+  { kode: '0421', nama: 'PRAKO', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#C026D3', centerLat: -8.6800, centerLng: 116.4450, totalPelanggan: 101 },
+  { kode: '0422', nama: 'PEMANTEK BAT DAYE', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#1D4ED8', centerLat: -8.6720, centerLng: 116.4320, totalPelanggan: 153 },
+  { kode: '0423', nama: 'BAKAN JANAPRIA', kodeKecamatan: '04', namaKecamatan: 'Janapria', warna: '#10B981', centerLat: -8.7200, centerLng: 116.3800, totalPelanggan: 65 },
+  // ── 17 Acuan Wilayah / Dekadi Resmi Kecamatan 06 (Pujut) ──
+  { kode: '0601', nama: 'SENGKOL SELATAN', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#E11D48', centerLat: -8.8800, centerLng: 116.3050, totalPelanggan: 193 },
+  { kode: '0602', nama: 'SENGKOL', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#2563EB', centerLat: -8.8650, centerLng: 116.3080, totalPelanggan: 808 },
+  { kode: '0603', nama: 'KAWO', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#059669', centerLat: -8.8100, centerLng: 116.2900, totalPelanggan: 229 },
+  { kode: '0604', nama: 'BALE ALONG', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#D97706', centerLat: -8.8720, centerLng: 116.3120, totalPelanggan: 35 },
+  { kode: '0605', nama: 'GB DAREK', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#7C3AED', centerLat: -8.8550, centerLng: 116.2980, totalPelanggan: 107 },
+  { kode: '0606', nama: 'DAYEN KUBUR', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#DB2777', centerLat: -8.8580, centerLng: 116.3050, totalPelanggan: 74 },
+  { kode: '0607', nama: 'KR JANGKONG', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#0891B2', centerLat: -8.8620, centerLng: 116.3150, totalPelanggan: 71 },
+  { kode: '0608', nama: 'BALE MONTONG', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#4F46E5', centerLat: -8.8500, centerLng: 116.3150, totalPelanggan: 337 },
+  { kode: '0609', nama: 'PENGADANG', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#EA580C', centerLat: -8.8350, centerLng: 116.3300, totalPelanggan: 223 },
+  { kode: '0610', nama: 'KMP SEDO', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#16A34A', centerLat: -8.8420, centerLng: 116.3220, totalPelanggan: 102 },
+  { kode: '0611', nama: 'SENGKOL BARAT', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#9333EA', centerLat: -8.8680, centerLng: 116.2950, totalPelanggan: 29 },
+  { kode: '0612', nama: 'BGK PENYILUK', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#0284C7', centerLat: -8.8750, centerLng: 116.3180, totalPelanggan: 21 },
+  { kode: '0613', nama: 'KP SELAK', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#CA8A04', centerLat: -8.8850, centerLng: 116.3120, totalPelanggan: 47 },
+  { kode: '0614', nama: 'KRANT UMUM', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#475569', centerLat: -8.8600, centerLng: 116.3100, totalPelanggan: 15 },
+  { kode: '0615', nama: 'KETARE', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#0D9488', centerLat: -8.7800, centerLng: 116.3000, totalPelanggan: 500 },
+  { kode: '0616', nama: 'TANAK AWU', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#DC2626', centerLat: -8.7650, centerLng: 116.2850, totalPelanggan: 423 },
+  { kode: '0617', nama: 'TERUWAI', kodeKecamatan: '06', namaKecamatan: 'Pujut', warna: '#65A30D', centerLat: -8.9100, centerLng: 116.3350, totalPelanggan: 529 },
 ];
 
 const STORAGE_KEYS = {
@@ -743,9 +838,32 @@ class PdamDataService {
     return this.wilayah.find((w) => w.kode === kode);
   }
 
+  public async pushWilayahToCloud(wilayahList: WilayahAcuan[]): Promise<boolean> {
+    try {
+      let res = await fetch('/api/gis/wilayah', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wilayah: wilayahList }),
+      });
+      if (!res.ok) {
+        res = await fetch('/api/wilayah', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wilayah: wilayahList }),
+        });
+      }
+      return res.ok;
+    } catch (e) {
+      console.warn('Gagal sinkron acuan wilayah ke Neon Cloud:', e);
+      return false;
+    }
+  }
+
   public updateWilayahColor(kode: string, warna: string) {
     this.wilayah = this.wilayah.map((w) => (w.kode === kode ? { ...w, warna } : w));
     this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    const updated = this.wilayah.find((w) => w.kode === kode);
+    if (updated) this.pushWilayahToCloud([updated]).catch(() => {});
     this.notify();
   }
 
@@ -755,6 +873,8 @@ class PdamDataService {
     this.pelanggan = this.pelanggan.map((p) => (p.kode_wilayah === kode ? { ...p, nama_wilayah: nama } : p));
     this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
     this.safePersist(STORAGE_KEYS.PELANGGAN, this.pelanggan);
+    const updated = this.wilayah.find((w) => w.kode === kode);
+    if (updated) this.pushWilayahToCloud([updated]).catch(() => {});
     this.notify();
   }
 
@@ -766,6 +886,7 @@ class PdamDataService {
       this.wilayah = [...this.wilayah, newWilayah].sort((a, b) => a.kode.localeCompare(b.kode));
     }
     this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.pushWilayahToCloud([newWilayah]).catch(() => {});
     this.notify();
   }
 
@@ -773,6 +894,7 @@ class PdamDataService {
     const defaultColorMap = new Map(DEFAULT_WILAYAH_LIST.map((w) => [w.kode, w.warna]));
     this.wilayah = this.wilayah.map((w) => ({ ...w, warna: defaultColorMap.get(w.kode) || w.warna }));
     this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+    this.pushWilayahToCloud(this.wilayah).catch(() => {});
     this.notify();
   }
 
@@ -917,6 +1039,27 @@ class PdamDataService {
    */
   public async syncFromCloud(force = false): Promise<{ ok: boolean; count: number; message?: string }> {
     try {
+      // Sync Acuan Wilayah dari Neon Cloud agar nama wilayah tersimpan di semua perangkat otomatis
+      try {
+        let wRes = await fetch(`/api/gis/wilayah?t=${Date.now()}`);
+        if (!wRes.ok) wRes = await fetch(`/api/wilayah?t=${Date.now()}`);
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          if (wData && wData.ok && Array.isArray(wData.wilayah) && wData.wilayah.length > 0) {
+            const cloudMap = new Map<string, WilayahAcuan>(wData.wilayah.map((w: WilayahAcuan) => [w.kode, w]));
+            const localMap = new Map<string, WilayahAcuan>(this.wilayah.map((w) => [w.kode, w]));
+            for (const [kode, cloudW] of cloudMap.entries()) {
+              localMap.set(kode, cloudW);
+            }
+            this.wilayah = Array.from(localMap.values()).sort((a, b) => a.kode.localeCompare(b.kode));
+            this.safePersist(STORAGE_KEYS.WILAYAH, this.wilayah);
+            this.notify();
+          }
+        }
+      } catch (wErr) {
+        console.warn('Gagal sinkron acuan wilayah dari Neon Cloud:', wErr);
+      }
+
       let res = await fetch(`/api/gis/pelanggan?t=${Date.now()}`);
       if (!res.ok) {
         res = await fetch(`/api/pelanggan?t=${Date.now()}`);
