@@ -15,7 +15,7 @@ export const KECAMATAN_BOUNDS: Record<string, Bounds> = {
   '02': { minLat: -8.66, maxLat: -8.56, minLng: 116.27, maxLng: 116.36 }, // Batukliang
   '03': { minLat: -8.68, maxLat: -8.58, minLng: 116.32, maxLng: 116.42 }, // Kopang
   '04': { minLat: -8.74, maxLat: -8.65, minLng: 116.36, maxLng: 116.46 }, // Janapria
-  '05': { minLat: -8.82, maxLat: -8.72, minLng: 116.32, maxLng: 116.44 }, // Praya Timur
+  '05': { minLat: -8.86, maxLat: -8.70, minLng: 116.31, maxLng: 116.46 }, // Praya Timur (Mujur, Ganti, Sengkerang, Marong, Beleka, Kidang)
   '06': { minLat: -8.96, maxLat: -8.75, minLng: 116.265, maxLng: 116.36 }, // Pujut (Tanak Awu, Sengkol, Rembitan)
   '07': { minLat: -8.86, maxLat: -8.705, minLng: 116.12, maxLng: 116.266 }, // Praya Barat (selatan: Selong Belanak/Lolat, utara: Belemong/Penujak, timur: Batujai/Kr. Daye)
   '08': { minLat: -8.67, maxLat: -8.56, minLng: 116.18, maxLng: 116.29 }, // Pringgarata (Sintung, Bagu, Bilebante, Barembeng)
@@ -380,6 +380,27 @@ export const DEFAULT_WILAYAH_LIST: WilayahAcuan[] = [
   { kode: '0818', nama: 'PRINGGARATA TIMUR', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#64748B', centerLat: -8.6040, centerLng: 116.2520, totalPelanggan: 18 },
   { kode: '0819', nama: 'BAREMBENG', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#B45309', centerLat: -8.6400, centerLng: 116.2450, totalPelanggan: 144 },
   { kode: '0820', nama: 'SISIK', kodeKecamatan: '08', namaKecamatan: 'Pringgarata', warna: '#C026D3', centerLat: -8.6000, centerLng: 116.2600, totalPelanggan: 186 },
+  // ── 20 Acuan Wilayah / Dekadi Resmi Kecamatan 05 (Praya Timur) ──
+  { kode: '0503', nama: 'MUJUR', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#E11D48', centerLat: -8.7650, centerLng: 116.3750, totalPelanggan: 891 },
+  { kode: '0504', nama: 'GANTI', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#2563EB', centerLat: -8.7850, centerLng: 116.3850, totalPelanggan: 702 },
+  { kode: '0505', nama: 'SENGKERANG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#059669', centerLat: -8.7800, centerLng: 116.4150, totalPelanggan: 287 },
+  { kode: '0506', nama: 'SEMOYANG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#D97706', centerLat: -8.7250, centerLng: 116.3950, totalPelanggan: 294 },
+  { kode: '0507', nama: 'MARONG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#7C3AED', centerLat: -8.8050, centerLng: 116.3800, totalPelanggan: 577 },
+  { kode: '0508', nama: 'KRANT UMUM', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#DB2777', centerLat: -8.7630, centerLng: 116.3720, totalPelanggan: 20 },
+  { kode: '0509', nama: 'BELEKA', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#0891B2', centerLat: -8.7350, centerLng: 116.3650, totalPelanggan: 194 },
+  { kode: '0510', nama: 'BELEKE TIMUR', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#4F46E5', centerLat: -8.7380, centerLng: 116.3750, totalPelanggan: 1 },
+  { kode: '0512', nama: 'SENAYAN', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#EA580C', centerLat: -8.7750, centerLng: 116.3900, totalPelanggan: 73 },
+  { kode: '0513', nama: 'PERLUASAN', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#16A34A', centerLat: -8.7680, centerLng: 116.3800, totalPelanggan: 31 },
+  { kode: '0514', nama: 'OROK-OROK', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#9333EA', centerLat: -8.7550, centerLng: 116.3900, totalPelanggan: 97 },
+  { kode: '0515', nama: 'TEMBUKU-DAHA', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#0284C7', centerLat: -8.7700, centerLng: 116.4050, totalPelanggan: 54 },
+  { kode: '0516', nama: 'MANGGU-SANTONG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#CA8A04', centerLat: -8.7600, centerLng: 116.4100, totalPelanggan: 10 },
+  { kode: '0517', nama: 'BT.RINTANG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#0D9488', centerLat: -8.7900, centerLng: 116.3750, totalPelanggan: 73 },
+  { kode: '0518', nama: 'MENSEH-KULEM', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#DC2626', centerLat: -8.7950, centerLng: 116.3950, totalPelanggan: 75 },
+  { kode: '0519', nama: 'NYANTREN+PENYABUKAN', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#65A30D', centerLat: -8.8000, centerLng: 116.4100, totalPelanggan: 115 },
+  { kode: '0520', nama: 'KR PAYUNG+MOTOR', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#64748B', centerLat: -8.8100, centerLng: 116.3900, totalPelanggan: 69 },
+  { kode: '0521', nama: 'RANGAH KONDOK', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#B45309', centerLat: -8.8150, centerLng: 116.4050, totalPelanggan: 74 },
+  { kode: '0522', nama: 'PENGENDONG-PRATIM', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#C026D3', centerLat: -8.8200, centerLng: 116.3750, totalPelanggan: 238 },
+  { kode: '0525', nama: 'KIDANG', kodeKecamatan: '05', namaKecamatan: 'Praya Timur', warna: '#1D4ED8', centerLat: -8.8350, centerLng: 116.3850, totalPelanggan: 596 },
 ];
 
 const STORAGE_KEYS = {
