@@ -1106,8 +1106,8 @@ export default function GisMap() {
   // Pewarnaan titik pelanggan: 'wilayah' (warna dekade) | 'status' (ekspresi match berdasarkan status_sambungan)
   const [colorBy, setColorBy] = useState<'wilayah' | 'status'>('wilayah');
 
-  // Visibilitas layer Batas Wilayah Kecamatan & Centroid Dekade
-  const [showBoundaries, setShowBoundaries] = useState<boolean>(true);
+  // Visibilitas layer Batas Wilayah Kecamatan & Centroid Dekade (default nonaktif agar peta bersih)
+  const [showBoundaries, setShowBoundaries] = useState<boolean>(false);
 
   // Metrik Performa Peta (Waktu Render, Waktu Filter GPU, FPS, Penghematan Memori)
   const [perfMetrics, setPerfMetrics] = useState<MapPerformanceMetrics | null>(null);
@@ -1896,8 +1896,8 @@ export default function GisMap() {
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
-        {/* Row 1: Search Bar + Kecamatan Dropdown */}
-        <div className="flex items-center gap-2">
+        {/* Row 1: Search Bar + Kecamatan Dropdown + Anomali Batas + Titik Dobel */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Search Box */}
           <div className="relative shadow-sm rounded-xl w-60 sm:w-80">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -2006,11 +2006,8 @@ export default function GisMap() {
               </SelectContent>
             </Select>
           </div>
-        </div>
 
-        {/* Row 2: Action Pills (Filter, Anomaly, Colocation, Basemap) */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Anomaly Quick Filter Pill */}
+          {/* Anomaly Quick Filter Pill (sebelah kanan Kecamatan) */}
           {anomalyCount > 0 && (
             <Button
               variant="outline"
@@ -2022,7 +2019,7 @@ export default function GisMap() {
                   update({ quality: 'all' });
                 }
               }}
-              className={`h-8 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+              className={`h-9 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
                 onlyAnomaly
                   ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold'
                   : 'border-border text-foreground hover:bg-muted'
@@ -2037,7 +2034,7 @@ export default function GisMap() {
             </Button>
           )}
 
-          {/* Colocation Anomaly Quick Filter Pill */}
+          {/* Colocation Anomaly Quick Filter Pill (sebelah kanan Anomali) */}
           {colocationCount > 0 && (
             <Button
               variant="outline"
@@ -2046,7 +2043,7 @@ export default function GisMap() {
                 setOnlyAnomaly(false);
                 update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
               }}
-              className={`h-8 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+              className={`h-9 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
                 filters.quality === 'colocation'
                   ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold'
                   : 'border-border text-foreground hover:bg-muted'
@@ -2060,7 +2057,10 @@ export default function GisMap() {
               </span>
             </Button>
           )}
+        </div>
 
+        {/* Row 2: Action Pills (Filter, Klaster, Kamera, Basemap, Sinkron, QGIS, Titik Pelanggan) */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Filter Popover Toggle */}
           <Button
             variant="outline"
@@ -2224,66 +2224,6 @@ export default function GisMap() {
               {filteredCustomers.length}
             </span>
           </button>
-
-          {/* Toggle Batas Wilayah & Dekade */}
-          {mapEngine === 'maplibre' && (
-            <button
-              type="button"
-              onClick={() => setShowBoundaries(!showBoundaries)}
-              className={`h-8 px-2.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card/95 backdrop-blur-md shadow-xs ${
-                showBoundaries
-                  ? 'border-teal-300 dark:border-teal-800 bg-teal-50/70 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 font-semibold'
-                  : 'border-border text-muted-foreground hover:text-foreground'
-              }`}
-              title="Tampilkan / sembunyikan poligon Batas Wilayah Kecamatan & label Dekade di MapLibre"
-            >
-              <span className={`w-2 h-2 rounded-full ${showBoundaries ? 'bg-teal-500' : 'bg-neutral-300'}`} />
-              <span>Batas Wilayah</span>
-            </button>
-          )}
-
-          {/* Toggle Mode Warna Titik (Wilayah vs Ekspresi Match Status) */}
-          {mapEngine === 'maplibre' && (
-            <button
-              type="button"
-              onClick={() => setColorBy(colorBy === 'wilayah' ? 'status' : 'wilayah')}
-              className={`h-8 px-2.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card/95 backdrop-blur-md shadow-xs ${
-                colorBy === 'status'
-                  ? 'border-amber-400 dark:border-amber-700 bg-amber-50/80 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-semibold'
-                  : 'border-border text-foreground hover:bg-muted'
-              }`}
-              title="Ganti skema warna titik pelanggan: berdasarkan Wilayah Dekade atau Status Sambungan (Ekspresi Match GPU)"
-            >
-              <Activity className="w-3.5 h-3.5 text-amber-500" />
-              <span>Warna: {colorBy === 'status' ? 'Status (Match)' : 'Wilayah'}</span>
-            </button>
-          )}
-
-          {/* Engine Switcher Flag (MapLibre GL Primary vs Leaflet Fallback) */}
-          <button
-            type="button"
-            onClick={() => {
-              const next = mapEngine === 'maplibre' ? 'leaflet' : 'maplibre';
-              setMapEngine(next);
-              try {
-                localStorage.setItem('pdam_map_engine', next);
-              } catch {}
-              toast.success(
-                next === 'maplibre'
-                  ? 'Mesin Peta Utama: MapLibre GL (WebGL GPU) diaktifkan.'
-                  : 'Mode Cadangan: Mesin Peta Leaflet diaktifkan.'
-              );
-            }}
-            className={`h-8 px-2.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card/95 backdrop-blur-md shadow-xs ${
-              mapEngine === 'maplibre'
-                ? 'border-emerald-400 dark:border-emerald-700 bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold'
-                : 'border-slate-400 dark:border-slate-700 bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300 font-semibold'
-            }`}
-            title="Alihkan mesin peta utama antara MapLibre GL (WebGL GPU) dan mode cadangan Leaflet"
-          >
-            <span className={`w-2 h-2 rounded-full ${mapEngine === 'maplibre' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            <span>{mapEngine === 'maplibre' ? 'Engine: MapLibre GL' : 'Engine: Leaflet (Cadangan)'}</span>
-          </button>
         </div>
       </div>
 
@@ -2445,6 +2385,67 @@ export default function GisMap() {
                 >
                   {filters.quality === 'flagged' ? 'Aktif' : 'Semua'}
                 </Button>
+              </div>
+
+              {/* Opsi Layer Batas Wilayah & Skema Warna di dalam Filter */}
+              <div className="pt-2 border-t border-border/60 space-y-2">
+                {mapEngine === 'maplibre' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-foreground">Tampilkan Batas Wilayah</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBoundaries(!showBoundaries)}
+                        className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                          showBoundaries
+                            ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30 font-semibold'
+                            : 'text-muted-foreground border-border'
+                        }`}
+                      >
+                        {showBoundaries ? 'Aktif' : 'Nonaktif'}
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-foreground">Skema Warna Titik</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setColorBy(colorBy === 'wilayah' ? 'status' : 'wilayah')}
+                        className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                          colorBy === 'status'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold'
+                            : 'bg-primary/10 text-primary border-primary/30 font-semibold'
+                        }`}
+                      >
+                        {colorBy === 'status' ? 'Status Sambungan' : 'Wilayah Dekade'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-foreground">Mesin Peta (Engine)</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const next = mapEngine === 'maplibre' ? 'leaflet' : 'maplibre';
+                      setMapEngine(next);
+                      try {
+                        localStorage.setItem('pdam_map_engine', next);
+                      } catch {}
+                    }}
+                    className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                      mapEngine === 'maplibre'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold'
+                        : 'text-muted-foreground border-border'
+                    }`}
+                  >
+                    {mapEngine === 'maplibre' ? 'MapLibre GL' : 'Leaflet'}
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -3209,48 +3210,6 @@ export default function GisMap() {
           )}
         </Card>
       )}
-
-      {/* ── Bottom Left Status & Telemetry Pill ── */}
-      <div className="absolute bottom-4 left-3 z-[1000] flex flex-wrap items-center gap-1.5 pointer-events-none">
-        <div className="px-3 py-1.5 rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-md text-xs font-mono flex items-center gap-2 pointer-events-auto">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-muted-foreground">Aktif:</span>
-          <span className="font-bold text-foreground">{filteredCustomers.length.toLocaleString('id-ID')} Titik</span>
-        </div>
-
-        {perfMetrics && (
-          <div className="px-3 py-1.5 rounded-xl bg-card/95 backdrop-blur-md border border-border shadow-md text-[11px] font-mono flex items-center gap-2.5 pointer-events-auto">
-            <span className="font-semibold text-primary">{perfMetrics.engine}</span>
-            <span className="text-muted-foreground">•</span>
-            <span title="Waktu muat/render layer titik ke peta">
-              Render: <strong className="text-foreground">{perfMetrics.renderTimeMs}ms</strong>
-            </span>
-            {mapEngine === 'maplibre' && (
-              <>
-                <span className="text-muted-foreground">•</span>
-                <span title="Waktu eksekusi map.setFilter di GPU">
-                  Filter GPU: <strong className="text-emerald-600 dark:text-emerald-400">{perfMetrics.filterTimeMs}ms</strong>
-                </span>
-              </>
-            )}
-            <span className="text-muted-foreground">•</span>
-            <span title="Kelancaran frame rate peta">
-              <strong className="text-emerald-600 dark:text-emerald-400">{perfMetrics.fps} FPS</strong>
-            </span>
-            {mapEngine === 'maplibre' && perfMetrics.memorySavedPct > 0 && (
-              <>
-                <span className="text-muted-foreground hidden sm:inline">•</span>
-                <span
-                  className="hidden sm:inline text-sky-600 dark:text-sky-400 font-semibold"
-                  title={`Payload properti minimal ke WebGL: ${perfMetrics.webglPayloadKb} KB (vs ${perfMetrics.fullPayloadKb} KB data penuh)`}
-                >
-                  Payload: {perfMetrics.webglPayloadKb}KB (-{perfMetrics.memorySavedPct}% Memori)
-                </span>
-              </>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* ── Viewport Peta Utama: MapLibre GL (Default) atau Leaflet (Fallback Flag) ── */}
       {mapEngine === 'maplibre' ? (

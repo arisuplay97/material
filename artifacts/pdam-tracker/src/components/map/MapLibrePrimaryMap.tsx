@@ -722,24 +722,9 @@ export default function MapLibrePrimaryMap({
     return ['coalesce', ['get', 'col'], '#3B6EA8'];
   }, []);
 
-  // Ekspresi warna garis pinggir (stroke) titik pelanggan menggunakan match berdasarkan status & anomali
+  // Garis pinggir (stroke) titik pelanggan: putih bersih (#FFFFFF) persis seperti tampilan asli
   const getCircleStrokeColorExpr = useCallback((): any => {
-    return [
-      'case',
-      ['==', ['get', 'a'], 1],
-      '#EF4444', // Anomali batas -> ring merah
-      ['==', ['get', 'c'], 1],
-      '#A855F7', // Titik dobel -> ring ungu
-      [
-        'match',
-        ['get', 's'],
-        'Putus',
-        '#EF4444',
-        'Nonaktif',
-        '#F59E0B',
-        '#FFFFFF',
-      ],
-    ];
+    return '#FFFFFF';
   }, []);
 
   // ── Fungsi Pemasang Seluruh Source & Layer GIS di atas Style MapLibre ──
@@ -901,41 +886,22 @@ export default function MapLibrePrimaryMap({
         });
       }
 
-      // Halo ring untuk titik anomali
-      if (!map.getLayer('pdam-customers-unclustered-halo')) {
-        map.addLayer({
-          id: 'pdam-customers-unclustered-halo',
-          type: 'circle',
-          source: 'pdam-customers-unclustered',
-          filter: ['all', custFilterExpr, ['any', ['==', ['get', 'a'], 1], ['==', ['get', 'c'], 1]]],
-          layout: {
-            visibility: showUnclustered ? 'visible' : 'none',
-          },
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4.5, 13, 6.5, 16, 9],
-            'circle-color': ['case', ['==', ['get', 'a'], 1], '#EF4444', '#A855F7'],
-            'circle-opacity': 0.22,
-            'circle-stroke-width': 0,
-          },
-        });
-      }
-
-      // Lingkaran utama titik pelanggan (GPU WebGL)
+      // Lingkaran utama titik pelanggan (GPU WebGL) — warna murni sesuai Wilayah/Status dengan border putih bersih
       if (!map.getLayer('pdam-customers-unclustered-circle')) {
         map.addLayer({
           id: 'pdam-customers-unclustered-circle',
           type: 'circle',
           source: 'pdam-customers-unclustered',
-          filter: custFilterExpr,
+          filter: custFilterExpr as any,
           layout: {
             visibility: showUnclustered ? 'visible' : 'none',
           },
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 13, 3.6, 16, 5.5, 18, 7],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 1.85, 13, 2.9, 16, 4.2, 18, 5.2],
             'circle-color': getCircleColorExpr(state.colorBy),
-            'circle-opacity': 0.94,
+            'circle-opacity': 0.95,
             'circle-stroke-color': getCircleStrokeColorExpr(),
-            'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 14, 1.1, 17, 1.6],
+            'circle-stroke-width': 0.6,
           },
         });
       }
@@ -1423,13 +1389,6 @@ export default function MapLibrePrimaryMap({
     if (map.getLayer('pdam-customers-unclustered-circle')) {
       map.setFilter('pdam-customers-unclustered-circle', filterExpr as any);
     }
-    if (map.getLayer('pdam-customers-unclustered-halo')) {
-      map.setFilter('pdam-customers-unclustered-halo', [
-        'all',
-        filterExpr,
-        ['any', ['==', ['get', 'a'], 1], ['==', ['get', 'c'], 1]],
-      ] as any);
-    }
     lastFilterMsRef.current = Math.round((performance.now() - t0) * 100) / 100;
   }, [selectedKecamatan, filters, onlyAnomaly]);
 
@@ -1441,8 +1400,8 @@ export default function MapLibrePrimaryMap({
     const unclusteredVis = showCustomerPoints && !useCluster ? 'visible' : 'none';
     const clusteredVis = showCustomerPoints && useCluster ? 'visible' : 'none';
 
-    for (const id of ['pdam-customers-unclustered-circle', 'pdam-customers-unclustered-halo']) {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', unclusteredVis);
+    if (map.getLayer('pdam-customers-unclustered-circle')) {
+      map.setLayoutProperty('pdam-customers-unclustered-circle', 'visibility', unclusteredVis);
     }
     for (const id of [
       'pdam-customers-clusters',
