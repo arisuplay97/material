@@ -5,6 +5,14 @@ import { Pelanggan, WilayahAcuan, UserRole } from '@/types/pdam';
 import { KECAMATAN_BOUNDS, KECAMATAN_LIST } from '@/services/pdamDataService';
 import { escapeHtml, safeColor } from '@/lib/escape';
 import { displayName, displayAddress } from '@/lib/privacy';
+import { futuristicMapStyle } from '@/lib/futuristicMapStyle';
+import { futuristicLightMapStyle } from '@/lib/futuristicLightMapStyle';
+import { lombokTengahStyle } from '@/lib/lombokTengahStyle';
+
+const EMPTY_FEATURE_COLLECTION = {
+  type: 'FeatureCollection' as const,
+  features: [],
+};
 
 export interface MapPerformanceMetrics {
   engine: 'MapLibre GL (WebGL GPU)' | 'Leaflet (Canvas/DOM)';
@@ -224,19 +232,16 @@ function createRasterBasemapStyle(basemapKey: string): maplibregl.StyleSpecifica
 }
 
 /**
- * Resolve style objek atau URL untuk basemap yang dipilih
+ * Resolve style objek atau URL untuk basemap yang dipilih secara sinkron (0ms delay)
  */
-async function resolveMapStyle(basemapKey: string): Promise<string | maplibregl.StyleSpecification> {
+function resolveMapStyleSync(basemapKey: string): string | maplibregl.StyleSpecification {
   if (basemapKey === 'futuristik') {
-    const { futuristicMapStyle } = await import('@/lib/futuristicMapStyle');
     return futuristicMapStyle as maplibregl.StyleSpecification;
   }
   if (basemapKey === 'futuristik_light') {
-    const { futuristicLightMapStyle } = await import('@/lib/futuristicLightMapStyle');
     return futuristicLightMapStyle as maplibregl.StyleSpecification;
   }
   if (basemapKey === 'vektor') {
-    const { lombokTengahStyle } = await import('@/lib/lombokTengahStyle');
     return lombokTengahStyle as maplibregl.StyleSpecification;
   }
   if (basemapKey === 'dark') {
@@ -256,7 +261,7 @@ function buildCustomerFilterExpression(
   selectedKecamatan: string,
   filters: { wilayah: string; golongan: string; status: string; quality: string },
   onlyAnomaly: boolean
-): any[] {
+): any[] | null {
   const expr: any[] = ['all'];
 
   if (selectedKecamatan !== 'all') {
@@ -295,6 +300,11 @@ function buildCustomerFilterExpression(
 
   if (filters.quality === 'colocation') {
     expr.push(['==', ['get', 'c'], 1]);
+  }
+
+  // Jika tidak ada filter aktif, kembalikan null agar MapLibre merender seluruh titik tanpa evaluasi filter
+  if (expr.length === 1) {
+    return null;
   }
 
   return expr;
@@ -478,8 +488,11 @@ export default function MapLibrePrimaryMap({
     };
   }, [allCustomers, wilayahMap]);
 
-  // ── 2. Bangun GeoJSON Terfilter untuk Mode Klaster (Supercluster C++) ──
+  // ── 2. Bangun GeoJSON Terfilter HANYA Saat Mode Klaster Aktif (Hemat CPU/Worker Saat Mode Sebaran) ──
   const filteredCustomerGeoJson = useMemo(() => {
+    if (!useCluster) {
+      return EMPTY_FEATURE_COLLECTION;
+    }
     const features: any[] = [];
     for (const c of filteredCustomers) {
       const lngLat = toMapLibreLngLat(c.latitude, c.longitude);
@@ -506,7 +519,7 @@ export default function MapLibrePrimaryMap({
       type: 'FeatureCollection' as const,
       features,
     };
-  }, [filteredCustomers, wilayahMap]);
+  }, [useCluster, filteredCustomers, wilayahMap]);
 
   // ── 3. Bangun GeoJSON Batas Wilayah Kecamatan, Zona DMA & Titik Pusat Dekade ──
   const { boundariesGeoJson, centroidsGeoJson } = useMemo(() => {
@@ -803,7 +816,11 @@ export default function MapLibrePrimaryMap({
       // 2. SOURCE & LAYER: JARINGAN PIPA & AKSESORIS (QGIS)
       const hiddenArr = Array.from(state.hiddenLayers);
       const qgisFilterExpr: any =
-        hiddenArr.length > 0 ? ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]] : ['all'];
+        hiddenArr.length > 0 ? ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]] : null;
+      const valveInnerFilterExpr: any =
+        hiddenArr.length > 0
+          ? ['all', ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]], ['==', ['get', '_hasDot'], 1]]
+          : ['==', ['get', '_hasDot'], 1];
 
       if (!map.getSource('pdam-qgis-pipes-source')) {
         map.addSource('pdam-qgis-pipes-source', {
@@ -816,7 +833,7 @@ export default function MapLibrePrimaryMap({
           id: 'pdam-qgis-pipes-line',
           type: 'line',
           source: 'pdam-qgis-pipes-source',
-          filter: qgisFilterExpr,
+          ...(qgisFilterExpr ? { filter: qgisFilterExpr } : {}),
           layout: {
             visibility: state.qgisLayerActive ? 'visible' : 'none',
             'line-cap': 'round',
@@ -841,7 +858,7 @@ export default function MapLibrePrimaryMap({
           id: 'pdam-qgis-valves-circle',
           type: 'circle',
           source: 'pdam-qgis-valves-source',
-          filter: qgisFilterExpr,
+          ...(qgisFilterExpr ? { filter: qgisFilterExpr } : {}),
           layout: {
             visibility: state.qgisLayerActive ? 'visible' : 'none',
           },
@@ -859,7 +876,7 @@ export default function MapLibrePrimaryMap({
           id: 'pdam-qgis-valves-inner',
           type: 'circle',
           source: 'pdam-qgis-valves-source',
-          filter: ['all', qgisFilterExpr, ['==', ['get', '_hasDot'], 1]],
+          filter: valveInnerFilterExpr,
           layout: {
             visibility: state.qgisLayerActive ? 'visible' : 'none',
           },
@@ -883,7 +900,14 @@ export default function MapLibrePrimaryMap({
         map.addSource('pdam-customers-unclustered', {
           type: 'geojson',
           data: state.allCustomerGeoJson as any,
+          maxzoom: 14,
+          tolerance: 0,
+          buffer: 64,
         });
+      } else {
+        (map.getSource('pdam-customers-unclustered') as maplibregl.GeoJSONSource).setData(
+          state.allCustomerGeoJson as any
+        );
       }
 
       // Lingkaran utama titik pelanggan (GPU WebGL) — warna murni sesuai Wilayah/Status dengan border putih bersih
@@ -892,7 +916,7 @@ export default function MapLibrePrimaryMap({
           id: 'pdam-customers-unclustered-circle',
           type: 'circle',
           source: 'pdam-customers-unclustered',
-          filter: custFilterExpr as any,
+          ...(custFilterExpr ? { filter: custFilterExpr as any } : {}),
           layout: {
             visibility: showUnclustered ? 'visible' : 'none',
           },
@@ -1035,9 +1059,9 @@ export default function MapLibrePrimaryMap({
     if (!containerRef.current) return;
     let isMounted = true;
 
-    const initMap = async () => {
+    const initMap = () => {
       const tStart = performance.now();
-      const initialStyle = await resolveMapStyle(basemapKey);
+      const initialStyle = resolveMapStyleSync(basemapKey);
       if (!isMounted || !containerRef.current) return;
 
       const map = new maplibregl.Map({
@@ -1063,11 +1087,22 @@ export default function MapLibrePrimaryMap({
       });
       hoverTooltipRef.current = hoverPopup;
 
-      map.on('load', () => {
-        if (!isMounted) return;
-        setupGisLayersOnStyle(map);
-        lastRenderMsRef.current = Math.round((performance.now() - tStart) * 10) / 10;
-      });
+      // Gunakan 'style.load' & 'styledata' (bukan 'load') agar titik pelanggan langsung muncul instan
+      // tanpa harus menunggu ubin gambar peta (Esri/OSM) selesai diunduh dari internet!
+      const handleStyleReady = () => {
+        if (!isMounted || styleReadyRef.current) return;
+        if (!((map as any).style && (map as any).style._loaded)) return;
+        try {
+          setupGisLayersOnStyle(map);
+          map.triggerRepaint();
+          lastRenderMsRef.current = Math.round((performance.now() - tStart) * 10) / 10;
+        } catch {}
+      };
+
+      map.on('style.load', handleStyleReady);
+      map.on('styledata', handleStyleReady);
+      map.on('load', handleStyleReady);
+      handleStyleReady();
 
       // ── INTERAKSI KLIK & HOVER (Langsung Ditangkap oleh MapLibre GL) ──
       const interactiveLayers = [
@@ -1340,34 +1375,38 @@ export default function MapLibrePrimaryMap({
     currentBasemapRef.current = basemapKey;
     styleReadyRef.current = false;
 
-    let cancelled = false;
-    (async () => {
-      const nextStyle = await resolveMapStyle(basemapKey);
-      if (cancelled || !mapRef.current) return;
-      map.setStyle(nextStyle);
-      map.once('style.load', () => {
-        if (!cancelled && mapRef.current) {
-          setupGisLayersOnStyle(mapRef.current);
-        }
-      });
-    })();
-
-    return () => {
-      cancelled = true;
+    const nextStyle = resolveMapStyleSync(basemapKey);
+    map.setStyle(nextStyle);
+    const onStyleLoad = () => {
+      if (mapRef.current && !styleReadyRef.current && (mapRef.current as any).style?._loaded) {
+        setupGisLayersOnStyle(mapRef.current);
+        mapRef.current.triggerRepaint();
+      }
     };
+    map.once('style.load', onStyleLoad);
+    map.once('styledata', onStyleLoad);
+    onStyleLoad();
   }, [basemapKey, setupGisLayersOnStyle]);
 
   // ── Update Data Sumber Titik Pelanggan (All Customers) ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current) return;
+    if (!map) return;
+    if (!styleReadyRef.current) {
+      if ((map as any).style && (map as any).style._loaded) {
+        setupGisLayersOnStyle(map);
+      } else {
+        return;
+      }
+    }
     const t0 = performance.now();
     const src = map.getSource('pdam-customers-unclustered') as maplibregl.GeoJSONSource | undefined;
     if (src) {
       src.setData(allCustomerGeoJson as any);
+      map.triggerRepaint();
       lastRenderMsRef.current = Math.round((performance.now() - t0) * 10) / 10;
     }
-  }, [allCustomerGeoJson]);
+  }, [allCustomerGeoJson, setupGisLayersOnStyle]);
 
   // ── Update Data Sumber Klaster ──
   useEffect(() => {
@@ -1446,7 +1485,11 @@ export default function MapLibrePrimaryMap({
     const vis = qgisLayerActive ? 'visible' : 'none';
     const hiddenArr = Array.from(hiddenLayers);
     const filterExpr: any =
-      hiddenArr.length > 0 ? ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]] : ['all'];
+      hiddenArr.length > 0 ? ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]] : null;
+    const valveInnerFilterExpr: any =
+      hiddenArr.length > 0
+        ? ['all', ['!', ['in', ['get', '_layerKey'], ['literal', hiddenArr]]], ['==', ['get', '_hasDot'], 1]]
+        : ['==', ['get', '_hasDot'], 1];
 
     if (map.getLayer('pdam-qgis-pipes-line')) {
       map.setLayoutProperty('pdam-qgis-pipes-line', 'visibility', vis);
@@ -1458,7 +1501,7 @@ export default function MapLibrePrimaryMap({
     }
     if (map.getLayer('pdam-qgis-valves-inner')) {
       map.setLayoutProperty('pdam-qgis-valves-inner', 'visibility', vis);
-      map.setFilter('pdam-qgis-valves-inner', ['all', filterExpr, ['==', ['get', '_hasDot'], 1]] as any);
+      map.setFilter('pdam-qgis-valves-inner', valveInnerFilterExpr);
     }
   }, [qgisLayerActive, hiddenLayers]);
 
