@@ -60,6 +60,38 @@ function localApiPlugin() {
           }
         }
 
+        if (url === '/api/gis/wilayah' || url === '/api/wilayah') {
+          try {
+            const apiModule = await server.ssrLoadModule(path.resolve(import.meta.dirname, '../../api/gis/wilayah.ts'));
+            const handler = apiModule.default || apiModule;
+            const customRes = {
+              setHeader(k: string, v: string) { res.setHeader(k, v); },
+              status(code: number) { res.statusCode = code; return this; },
+              json(data: any) {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(data));
+              },
+              end() { res.end(); },
+            };
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (chunk: any) => { body += chunk; });
+              req.on('end', () => {
+                req.body = body;
+                handler(req, customRes);
+              });
+            } else {
+              await handler(req, customRes);
+            }
+            return;
+          } catch (e: any) {
+            console.error('Local API wilayah error:', e);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: e.message }));
+            return;
+          }
+        }
+
         if (url === '/api/gis/pipa') {
           try {
             const apiModule = await server.ssrLoadModule(path.resolve(import.meta.dirname, '../../api/gis/pipa.ts'));

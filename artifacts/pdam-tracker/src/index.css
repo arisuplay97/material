@@ -265,6 +265,69 @@ svg.leaflet-zoom-animated {
   color: hsl(var(--primary)) !important;
 }
 
+/* ── MapLibre GL Primary Engine Styling ── */
+.maplibregl-map {
+  font-family: var(--font-sans) !important;
+  width: 100%;
+  height: 100%;
+  background-color: hsl(var(--muted));
+  outline: none !important;
+}
+
+.maplibregl-canvas:focus,
+.maplibregl-canvas-container:focus {
+  outline: none !important;
+}
+
+.maplibregl-popup {
+  z-index: 50;
+}
+
+.maplibregl-popup-content {
+  padding: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 28px -6px hsl(222 30% 10% / 0.28) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  overflow: hidden;
+  font-family: var(--font-sans) !important;
+}
+
+.maplibregl-popup-close-button {
+  font-size: 16px !important;
+  padding: 4px 8px !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-radius: 0 12px 0 8px !important;
+  right: 2px !important;
+  top: 2px !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: hsl(var(--card)) !important;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: hsl(var(--card)) !important;
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: hsl(var(--card)) !important;
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: hsl(var(--card)) !important;
+}
+
+.pdam-ml-tooltip .maplibregl-popup-content {
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  pointer-events: none !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+}
+
 /* Popup content (built as HTML string, values escaped) */
 .gis-popup { width: 248px; padding: 12px; font-size: 12px; }
 .gis-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid hsl(var(--border)); }

@@ -163,6 +163,52 @@ export default async function handler(req: any, res: any) {
   // ── GET: Ambil Data Pelanggan Aktif dari Neon Cloud ──
   try {
     await ensureTable();
+    const isMapSlim = req.query?.mode === 'map' || req.query?.slim === '1';
+
+    if (isMapSlim) {
+      const slimRows = await sql.query(`
+        SELECT 
+          id,
+          kode_pelanggan,
+          nama_pelanggan,
+          kode_wilayah,
+          nama_wilayah,
+          kode_kecamatan,
+          golongan,
+          status_sambungan,
+          spatial_anomaly,
+          is_flagged,
+          colocation_anomaly,
+          CASE WHEN geom IS NOT NULL THEN ROUND(ST_Y(geom::geometry)::numeric, 6) ELSE NULL END as latitude,
+          CASE WHEN geom IS NOT NULL THEN ROUND(ST_X(geom::geometry)::numeric, 6) ELSE NULL END as longitude
+        FROM gis_pelanggan
+        ORDER BY id ASC
+      `);
+
+      const slimList = (slimRows || []).map((r: any) => ({
+        id: String(r.id),
+        kode_pelanggan: r.kode_pelanggan,
+        nama_pelanggan: r.nama_pelanggan,
+        kode_wilayah: r.kode_wilayah,
+        nama_wilayah: r.nama_wilayah || '',
+        kode_kecamatan: r.kode_kecamatan || '07',
+        golongan: r.golongan,
+        status_sambungan: r.status_sambungan,
+        spatial_anomaly: r.spatial_anomaly || null,
+        is_flagged: Boolean(r.is_flagged),
+        colocation_anomaly: r.colocation_anomaly || null,
+        latitude: Number(r.latitude) || 0,
+        longitude: Number(r.longitude) || 0,
+      }));
+
+      return res.status(200).json({
+        ok: true,
+        mode: 'map',
+        count: slimList.length,
+        pelanggan: slimList,
+      });
+    }
+
     const rows = await sql.query(`
       SELECT 
         id,
@@ -180,8 +226,8 @@ export default async function handler(req: any, res: any) {
         flag_reasons,
         colocation_anomaly,
         tanggal_pasang,
-        CASE WHEN geom IS NOT NULL THEN ST_Y(geom::geometry) ELSE NULL END as latitude,
-        CASE WHEN geom IS NOT NULL THEN ST_X(geom::geometry) ELSE NULL END as longitude
+        CASE WHEN geom IS NOT NULL THEN ROUND(ST_Y(geom::geometry)::numeric, 6) ELSE NULL END as latitude,
+        CASE WHEN geom IS NOT NULL THEN ROUND(ST_X(geom::geometry)::numeric, 6) ELSE NULL END as longitude
       FROM gis_pelanggan
       ORDER BY id ASC
     `);
