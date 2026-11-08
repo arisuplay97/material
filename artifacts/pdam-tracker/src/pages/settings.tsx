@@ -419,60 +419,62 @@ export default function Settings() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-[1440px] mx-auto">
-      {/* ── Top Header (Kumo Console Style) ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-border">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-heading font-semibold tracking-tight text-foreground">
-              Pengaturan &amp; Master Data
+    <div className="p-4 sm:p-6 space-y-5 max-w-[1440px] mx-auto text-[#18181b] dark:text-zinc-100">
+      {/* ── Top Overview Container Card (Cloudflare Style) ── */}
+      <div className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[16px] font-semibold text-[#18181b] dark:text-zinc-100 tracking-[-0.01em]">
+              Master &amp; database
             </h1>
-            <Badge variant="default" className="font-mono text-[11px]">
-              Admin Data (IT)
-            </Badge>
+            <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 px-2.5 py-0.5 text-[11px] font-medium text-[#52525b] dark:text-zinc-300">
+              Admin IT
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Unggah dataset pelanggan, validasi integritas format, konfigurasi kode acuan wilayah dan riwayat snapshot.
-          </p>
-        </div>
 
-        {/* Template Downloads */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <Button
-            variant="outline"
-            onClick={() => pdamService.generateTemplate('xlsx')}
-          >
-            <Download className="w-3.5 h-3.5 text-primary" />
-            <span>Unduh Template Excel</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => pdamService.generateTemplate('csv')}
-          >
-            <Download className="w-3.5 h-3.5 text-muted-foreground" />
-            <span>Template CSV</span>
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pdamService.generateTemplate('csv')}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Template CSV</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pdamService.generateTemplate('xlsx')}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Template Excel</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSyncCloud}
+              disabled={isSyncingCloud}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+              <span>Sinkron Neon Cloud</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* ── Main Tabbed Content ── */}
-      <Tabs defaultValue="upload" className="space-y-5">
+      <Tabs defaultValue="upload" className="space-y-4">
         <TabsList className="flex-wrap h-auto gap-0.5">
-          <TabsTrigger value="upload" className="gap-1.5">
-            <UploadCloud className="w-3.5 h-3.5" />
-            <span>Upload &amp; Validasi Data</span>
+          <TabsTrigger value="upload">
+            Upload &amp; validasi data
           </TabsTrigger>
-          <TabsTrigger value="wilayah" className="gap-1.5">
-            <Palette className="w-3.5 h-3.5" />
-            <span>Acuan Wilayah &amp; Palet Warna</span>
+          <TabsTrigger value="wilayah">
+            Acuan wilayah &amp; warna
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
-            <History className="w-3.5 h-3.5" />
-            <span>Riwayat Snapshot &amp; Rollback</span>
+          <TabsTrigger value="history">
+            Riwayat snapshot &amp; rollback
           </TabsTrigger>
-          <TabsTrigger value="sync" className="gap-1.5">
-            <Database className="w-3.5 h-3.5" />
-            <span>Pindah / Sinkron Perangkat</span>
+          <TabsTrigger value="sync">
+            Sinkronisasi perangkat
           </TabsTrigger>
         </TabsList>
 
@@ -481,26 +483,25 @@ export default function Settings() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Upload Zone & Mode Settings */}
             <Card className="overflow-hidden">
-              <CardHeader className="px-4 py-3 border-b border-border bg-muted/25">
-                <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                  <UploadCloud className="w-4 h-4 text-primary" />
-                  Unggah File Pelanggan
-                </CardTitle>
-                <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
+              <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800">
+                <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                  Unggah file pelanggan
+                </h2>
+                <p className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5">
                   Mendukung file Excel (.xlsx, .xls) dan CSV hingga 20 MB.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 space-y-4">
+                </p>
+              </div>
+              <CardContent className="p-5 space-y-4">
                 {/* Drag & drop box */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
+                  className={`border border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
                     isDragging
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40'
+                      ? 'border-[#1368f6] bg-[#1368f6]/5'
+                      : 'border-[#d4d4d8] dark:border-zinc-700 hover:border-[#18181b] dark:hover:border-zinc-500 bg-[#fafafa] dark:bg-zinc-900/50'
                   }`}
                 >
                   <input
@@ -513,41 +514,31 @@ export default function Settings() {
                   />
                   {selectedFiles.length === 0 ? (
                     <>
-                      <div className="w-10 h-10 rounded-md bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto mb-2.5">
-                        <FileSpreadsheet className="w-5 h-5" />
-                      </div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        Pilih atau Tarik File ke Sini
+                      <FileSpreadsheet className="w-6 h-6 text-[#71717a] mx-auto mb-2.5 stroke-[1.6]" />
+                      <span className="text-[13px] font-medium text-[#18181b] dark:text-zinc-100 block">
+                        Pilih atau tarik file ke sini
                       </span>
-                      <span className="text-[11px] text-muted-foreground mt-1 block">
-                        Bisa pilih 1 file atau <strong>BANYAK file Excel sekaligus</strong> (Ctrl / Shift + Klik)
-                      </span>
-                      <span className="inline-flex items-center gap-1 mt-2.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-primary/10 text-primary border border-primary/20">
-                        <Layers className="w-3 h-3" />
-                        Multi-File Excel Aktif
+                      <span className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-1 block">
+                        Bisa pilih 1 file atau banyak file Excel sekaligus
                       </span>
                     </>
                   ) : selectedFiles.length === 1 ? (
                     <>
-                      <div className="w-10 h-10 rounded-md bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto mb-2">
-                        <FileSpreadsheet className="w-5 h-5" />
-                      </div>
-                      <span className="text-xs font-semibold text-foreground block truncate font-mono">
+                      <FileSpreadsheet className="w-6 h-6 text-[#1368f6] mx-auto mb-2 stroke-[1.6]" />
+                      <span className="text-[13px] font-medium text-[#18181b] dark:text-zinc-100 block truncate">
                         {selectedFiles[0].name}
                       </span>
-                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                        {(selectedFiles[0].size / 1024).toFixed(1)} KB • Klik untuk ganti atau pilih banyak file
+                      <span className="text-[12px] text-[#71717a] mt-0.5 block">
+                        {(selectedFiles[0].size / 1024).toFixed(1)} KB • Klik untuk ganti file
                       </span>
                     </>
                   ) : (
                     <>
-                      <div className="w-10 h-10 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                        <Layers className="w-5 h-5" />
-                      </div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {selectedFiles.length} File Excel Terpilih
+                      <Layers className="w-6 h-6 text-[#1368f6] mx-auto mb-2 stroke-[1.6]" />
+                      <span className="text-[13px] font-medium text-[#18181b] dark:text-zinc-100 block">
+                        {selectedFiles.length} file Excel terpilih
                       </span>
-                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                      <span className="text-[12px] text-[#71717a] mt-0.5 block">
                         Total {(selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1)} KB • Klik untuk pilih ulang
                       </span>
                     </>
@@ -556,9 +547,9 @@ export default function Settings() {
 
                 {/* File list preview if multiple files are selected */}
                 {selectedFiles.length > 1 && (
-                  <div className="space-y-1.5 p-2.5 rounded-md border border-border bg-muted/20 max-h-40 overflow-y-auto">
-                    <div className="text-[10px] font-mono text-muted-foreground font-semibold flex items-center justify-between">
-                      <span>{selectedFiles.length} File Terunggah:</span>
+                  <div className="space-y-1.5 p-3 rounded-lg border border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 max-h-40 overflow-y-auto">
+                    <div className="text-[12px] text-[#71717a] flex items-center justify-between">
+                      <span>{selectedFiles.length} file terunggah:</span>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -568,7 +559,7 @@ export default function Settings() {
                           setValidationResult(null);
                           if (fileInputRef.current) fileInputRef.current.value = '';
                         }}
-                        className="text-muted-foreground hover:text-destructive text-[10px] cursor-pointer"
+                        className="text-[#71717a] hover:text-red-600 text-[12px] cursor-pointer"
                       >
                         Bersihkan
                       </button>
@@ -579,13 +570,10 @@ export default function Settings() {
                         return (
                           <div
                             key={idx}
-                            className="flex items-center justify-between text-[11px] px-2 py-1 rounded-md bg-card border border-border"
+                            className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800"
                           >
-                            <div className="flex items-center gap-1.5 truncate">
-                              <FileSpreadsheet className="w-3 h-3 text-primary shrink-0" />
-                              <span className="truncate font-medium">{f.name}</span>
-                            </div>
-                            <span className="text-[10px] font-mono text-muted-foreground shrink-0 ml-2">
+                            <span className="truncate font-medium text-[#18181b] dark:text-zinc-100">{f.name}</span>
+                            <span className="text-[11.5px] text-[#71717a] shrink-0 ml-2 tabular-nums">
                               {summary ? `${summary.rows.toLocaleString('id-ID')} baris` : `${(f.size / 1024).toFixed(0)} KB`}
                             </span>
                           </div>
@@ -596,46 +584,56 @@ export default function Settings() {
                 )}
 
                 {/* Upload Mode Selector */}
-                <div className="space-y-2 pt-2.5 border-t border-border">
+                <div className="space-y-2.5 pt-3 border-t border-[#e5e7eb] dark:border-zinc-800">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-heading font-semibold text-foreground">
-                      Mode Penerapan Data
+                    <label className="text-[13px] font-medium text-[#18181b] dark:text-zinc-100">
+                      Mode penerapan data
                     </label>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      Data saat ini: {pelangganList.length.toLocaleString('id-ID')}
+                    <span className="text-[12px] text-[#71717a] tabular-nums">
+                      Aktif: {pelangganList.length.toLocaleString('id-ID')}
                     </span>
                   </div>
                   <RadioGroup
                     value={uploadMode}
                     onValueChange={(val: any) => setUploadMode(val)}
-                    className="space-y-2 text-xs"
+                    className="space-y-2 text-[13px]"
                   >
-                    <div className={cn(
-                      "flex items-start gap-2.5 p-2.5 rounded-md border transition-colors cursor-pointer",
-                      uploadMode === 'update' ? 'bg-primary/5 border-primary/40' : 'bg-muted/20 border-border hover:bg-muted/40'
-                    )}>
+                    <div
+                      className={cn(
+                        'flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer',
+                        uploadMode === 'update'
+                          ? 'bg-[#fafafa] dark:bg-zinc-800/60 border-[#18181b] dark:border-zinc-400'
+                          : 'bg-white dark:bg-zinc-900 border-[#e5e7eb] dark:border-zinc-800'
+                      )}
+                    >
                       <RadioGroupItem value="update" id="mode-update" className="mt-0.5" />
                       <div className="flex flex-col">
-                        <Label htmlFor="mode-update" className="font-semibold text-xs cursor-pointer flex items-center gap-1.5 text-foreground">
-                          <span>Gabungkan Data (Tambah &amp; Perbarui ID)</span>
-                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-medium rounded-[4px] border border-emerald-500/20">Rekomendasi</span>
+                        <Label htmlFor="mode-update" className="font-medium text-[13px] cursor-pointer flex items-center gap-2 text-[#18181b] dark:text-zinc-100">
+                          <span>Gabungkan data (tambah &amp; perbarui ID)</span>
+                          <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 px-2 py-0.2 text-[10.5px] font-normal text-[#52525b] dark:text-zinc-300">
+                            Rekomendasi
+                          </span>
                         </Label>
-                        <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                          Sangat cocok jika mengunggah file per kecamatan (misal menambah Praya / Kopang tanpa menimpa data Praya Barat, BKU, Prabarda yang sudah ada).
+                        <span className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5 leading-relaxed">
+                          Menambah atau memperbarui data per kecamatan tanpa menghapus kecamatan lain yang sudah tersimpan.
                         </span>
                       </div>
                     </div>
 
-                    <div className={cn(
-                      "flex items-start gap-2.5 p-2.5 rounded-md border transition-colors cursor-pointer",
-                      uploadMode === 'replace' ? 'bg-amber-500/5 border-amber-500/40' : 'bg-muted/20 border-border hover:bg-muted/40'
-                    )}>
+                    <div
+                      className={cn(
+                        'flex items-start gap-2.5 p-3 rounded-lg border transition-colors cursor-pointer',
+                        uploadMode === 'replace'
+                          ? 'bg-[#fafafa] dark:bg-zinc-800/60 border-[#18181b] dark:border-zinc-400'
+                          : 'bg-white dark:bg-zinc-900 border-[#e5e7eb] dark:border-zinc-800'
+                      )}
+                    >
                       <RadioGroupItem value="replace" id="mode-replace" className="mt-0.5" />
                       <div className="flex flex-col">
-                        <Label htmlFor="mode-replace" className="font-semibold text-xs cursor-pointer text-foreground">
-                          Ganti Total Seluruh Data (Reset Master)
+                        <Label htmlFor="mode-replace" className="font-medium text-[13px] cursor-pointer text-[#18181b] dark:text-zinc-100">
+                          Ganti total seluruh data (reset master)
                         </Label>
-                        <span className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        <span className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5 leading-relaxed">
                           Seluruh data master aktif digantikan sepenuhnya hanya dengan file ini.
                         </span>
                       </div>
@@ -647,19 +645,19 @@ export default function Settings() {
 
             {/* Validation Report & Preview */}
             <Card className="lg:col-span-2 overflow-hidden flex flex-col">
-              <CardHeader className="px-4 sm:px-5 py-3 border-b border-border bg-muted/25 flex flex-row items-center justify-between">
+              <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800 flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Laporan Hasil Validasi Data
-                  </CardTitle>
-                  <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
+                  <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                    Laporan hasil validasi data
+                  </h2>
+                  <p className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5">
                     Pemeriksaan format 9 digit KKWWxxxxx, kesesuaian kode wilayah acuan, dan rentang koordinat Pulau Lombok.
-                  </CardDescription>
+                  </p>
                 </div>
 
                 {validationResult && (
                   <Button
+                    size="sm"
                     onClick={handleApplyUpload}
                     disabled={!validationResult.summary.canProceed || isSyncingCloud}
                   >
@@ -670,54 +668,54 @@ export default function Settings() {
                       </>
                     ) : (
                       <>
-                        <span>Terapkan Data</span>
+                        <span>Terapkan data</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
                   </Button>
                 )}
-              </CardHeader>
+              </div>
 
-              <CardContent className="p-4 flex-1 flex flex-col justify-between">
+              <CardContent className="p-5 flex-1 flex flex-col justify-between">
                 {isParsing ? (
-                  <div className="py-16 text-center space-y-3 font-mono text-xs text-primary animate-pulse">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
-                    <span>
+                  <div className="py-16 text-center space-y-3 text-[13px] text-[#71717a]">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#1368f6]" />
+                    <span className="block">
                       {parsingProgress
                         ? `Sedang membaca & memvalidasi file ${parsingProgress.current} dari ${parsingProgress.total} (${parsingProgress.fileName})...`
-                        : 'Sedang memvalidasi integritas data di Web Worker...'}
+                        : 'Sedang memvalidasi integritas data...'}
                     </span>
                   </div>
                 ) : !validationResult ? (
-                  <div className="py-16 text-center space-y-2 text-muted-foreground text-xs">
-                    <Database className="w-7 h-7 mx-auto opacity-35 text-primary" />
-                    <span>Pilih file di panel sebelah kiri untuk memulai pemeriksaan validasi data.</span>
+                  <div className="py-16 text-center space-y-1.5 text-[#71717a] text-[13px]">
+                    <p className="font-medium text-[#18181b] dark:text-zinc-100">Belum ada file dipilih</p>
+                    <p className="text-[12.5px]">Pilih file di panel sebelah kiri untuk memulai pemeriksaan validasi data.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Summary Counters */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      <div className="p-3 rounded-md bg-muted/40 border border-border text-center">
-                        <span className="text-[10px] font-mono uppercase text-muted-foreground block">Total Baris</span>
-                        <span className="text-xl font-mono font-bold text-foreground tabular">
+                    {/* Summary Counters (Cloudflare Clean Metric Boxes) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                        <span className="text-[12px] text-[#71717a] block">Total baris</span>
+                        <span className="text-[20px] font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums mt-0.5 block">
                           {formatNumber(validationResult.summary.totalRows)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-emerald-600 dark:text-emerald-400 block">Lolos Bersih</span>
-                        <span className="text-xl font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular">
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                        <span className="text-[12px] text-[#71717a] block">Lolos bersih</span>
+                        <span className="text-[20px] font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums mt-0.5 block">
                           {formatNumber(validationResult.summary.validCount)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-amber-600 dark:text-amber-400 block">Peringatan (Flag)</span>
-                        <span className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400 tabular">
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                        <span className="text-[12px] text-[#71717a] block">Peringatan (flag)</span>
+                        <span className="text-[20px] font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums mt-0.5 block">
                           {formatNumber(validationResult.summary.flaggedCount)}
                         </span>
                       </div>
-                      <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-center">
-                        <span className="text-[10px] font-mono uppercase text-red-600 dark:text-red-400 block">Error Fatal</span>
-                        <span className="text-xl font-mono font-bold text-red-600 dark:text-red-400 tabular">
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                        <span className="text-[12px] text-[#71717a] block">Error fatal</span>
+                        <span className="text-[20px] font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums mt-0.5 block">
                           {formatNumber(validationResult.summary.errorCount)}
                         </span>
                       </div>
@@ -725,116 +723,92 @@ export default function Settings() {
 
                     {/* Detected Kecamatans Breakdown across all uploaded files */}
                     {detectedKecamatans.length > 0 && (
-                      <div className="p-3 rounded-md bg-primary/5 border border-primary/20 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-primary" />
-                            <span>Cakupan Kecamatan ({detectedKecamatans.length} Kecamatan Terdeteksi):</span>
-                          </div>
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 space-y-2">
+                        <div className="flex items-center justify-between text-[12.5px] font-medium text-[#18181b] dark:text-zinc-100">
+                          <span>Cakupan kecamatan ({detectedKecamatans.length} kecamatan terdeteksi)</span>
                           {selectedFiles.length > 1 && (
-                            <Badge variant="default" className="text-[10px] font-mono">
-                              {selectedFiles.length} File Excel Digabung
-                            </Badge>
+                            <span className="rounded-full border border-dashed border-[#d4d4d8] px-2.5 py-0.5 text-[11px] text-[#52525b]">
+                              {selectedFiles.length} file digabung
+                            </span>
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           {detectedKecamatans.map(([kec, count]) => (
                             <div
                               key={kec}
-                              className="px-2 py-1 rounded-md bg-card border border-border text-[11px] font-mono flex items-center gap-1.5"
+                              className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800 text-[12px] flex items-center gap-1.5"
                             >
-                              <span className="w-2 h-2 rounded-full bg-primary" />
-                              <span className="font-semibold text-foreground">Kec. {kec} ({kecamatanName(kec)})</span>
-                              <span className="text-muted-foreground">• {count.toLocaleString('id-ID')} titik</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#1368f6]" />
+                              <span className="font-medium text-[#18181b] dark:text-zinc-100">Kec. {kec} ({kecamatanName(kec)})</span>
+                              <span className="text-[#71717a] tabular-nums">• {count.toLocaleString('id-ID')}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Status Notice */}
-                    {!validationResult.summary.canProceed ? (
-                      <div className="p-3.5 rounded-md bg-red-500/5 border border-red-500/30 text-red-700 dark:text-red-300 text-xs space-y-1">
-                        <div className="flex items-center gap-2 font-bold">
-                          <XCircle className="w-4 h-4 shrink-0 text-red-600" />
-                          <span>Penerapan Ditolak — Ditemukan Format Kolom / Kode Fatal</span>
-                        </div>
-                        <p className="text-[11px] leading-relaxed pl-6 text-red-800 dark:text-red-200">
-                          Data master aktif yang sedang berjalan di PDAM <strong>TIDAK AKAN DIUBAH</strong>. Harap perbaiki baris data yang bermasalah pada tabel di bawah lalu unggah kembali file Anda.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-3 rounded-md bg-emerald-500/5 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                        <span>Validasi berhasil. File siap diterapkan ke sistem aktif PDAM Tirta Ardhia Rinjani.</span>
-                      </div>
-                    )}
-
                     {/* Helper: Auto-Register Missing Wilayah Banner */}
                     {missingWilayahCodes.length > 0 && (
-                      <div className="p-3.5 rounded-md bg-primary/5 border border-primary/25 text-xs space-y-2">
+                      <div className="p-4 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[13px] space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-primary shrink-0" />
-                            <span className="font-semibold text-foreground">
-                              Ditemukan {missingWilayahCodes.length} Kode Wilayah Baru Belum Terdaftar: {missingWilayahCodes.join(', ')}
-                            </span>
-                          </div>
+                          <span className="font-medium text-[#18181b] dark:text-zinc-100">
+                            Ditemukan {missingWilayahCodes.length} kode wilayah baru belum terdaftar: {missingWilayahCodes.join(', ')}
+                          </span>
                           <Button
                             size="sm"
                             onClick={handleAutoRegisterMissingWilayah}
                             className="shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>Daftarkan Otomatis &amp; Validasi Ulang</span>
+                            <span>Daftarkan otomatis &amp; validasi ulang</span>
                           </Button>
                         </div>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          Kode ini belum ada di tabel acuan wilayah: {missingWilayahCodes.map((k) => `${k} (Kec. ${kecamatanName(k.slice(0, 2))})`).join(', ')}. Klik tombol di atas untuk mendaftarkannya otomatis ke sistem agar data pelanggan Anda langsung lolos validasi.
+                        <p className="text-[12px] text-[#71717a] leading-relaxed">
+                          Klik tombol di atas untuk mendaftarkan kode wilayah tersebut secara otomatis agar data pelanggan langsung lolos validasi.
                         </p>
                       </div>
                     )}
 
                     {/* Detailed Errors Table */}
-                    <div className="border border-border rounded-md overflow-hidden max-h-56 overflow-y-auto">
-                      <table className="w-full text-left text-xs border-collapse font-sans">
+                    <div className="border border-[#e5e7eb] dark:border-zinc-800 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                      <table className="w-full text-left text-[12.5px] border-collapse">
                         <thead>
-                          <tr className="bg-muted/35 border-b border-border text-[10.5px] font-mono text-muted-foreground uppercase tracking-wider">
-                            <th className="py-2 px-3">Baris</th>
-                            <th className="py-2 px-3">Kolom</th>
-                            <th className="py-2 px-3">Keterangan Validasi</th>
-                            <th className="py-2 px-3">Tingkat</th>
+                          <tr className="bg-[#fafafa] dark:bg-zinc-900/50 border-b border-[#e5e7eb] dark:border-zinc-800 text-[12px] text-[#71717a]">
+                            <th className="py-2.5 px-4 font-medium">Baris</th>
+                            <th className="py-2.5 px-4 font-medium">Kolom</th>
+                            <th className="py-2.5 px-4 font-medium">Keterangan validasi</th>
+                            <th className="py-2.5 px-4 font-medium">Tingkat</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
+                        <tbody className="divide-y divide-[#e5e7eb] dark:divide-zinc-800">
                           {validationResult.summary.errors.length === 0 &&
                           validationResult.summary.warnings.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="py-6 text-center text-muted-foreground text-xs font-mono">
+                              <td colSpan={4} className="py-8 text-center text-[#71717a] text-[12.5px]">
                                 Tidak ada error atau catatan anomali pada file ini.
                               </td>
                             </tr>
                           ) : (
                             [...validationResult.summary.errors, ...validationResult.summary.warnings].map(
                               (item, idx) => (
-                                <tr key={idx} className="hover:bg-muted/30">
-                                  <td className="py-2 px-3 font-mono font-semibold text-foreground">
+                                <tr key={idx} className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/40">
+                                  <td className="py-2.5 px-4 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
                                     {item.rowNumber}
                                   </td>
-                                  <td className="py-2 px-3 font-mono text-muted-foreground">
+                                  <td className="py-2.5 px-4 text-[#71717a]">
                                     {item.field}
                                   </td>
-                                  <td className="py-2 px-3 text-foreground text-[11px]">
+                                  <td className="py-2.5 px-4 text-[#18181b] dark:text-zinc-200">
                                     {item.message}
                                   </td>
-                                  <td className="py-2 px-3">
+                                  <td className="py-2.5 px-4">
                                     {item.severity === 'error' ? (
-                                      <Badge variant="destructive" className="font-mono text-[9.5px] py-0 px-1.5">
+                                      <span className="rounded-full border border-dashed border-red-300 bg-red-50/60 px-2.5 py-0.5 text-[11px] text-red-700">
                                         Error
-                                      </Badge>
+                                      </span>
                                     ) : (
-                                      <span className="inline-flex items-center rounded-md px-1.5 py-0 font-mono text-[9.5px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                                        Warning
+                                      <span className="rounded-full border border-dashed border-[#d4d4d8] bg-[#fafafa] px-2.5 py-0.5 text-[11px] text-[#52525b]">
+                                        Peringatan
                                       </span>
                                     )}
                                   </td>
@@ -855,15 +829,14 @@ export default function Settings() {
         {/* ════ TAB 2: ACUAN WILAYAH & WARNA ════ */}
         <TabsContent value="wilayah" className="space-y-5">
           <Card className="overflow-hidden">
-            <CardHeader className="px-4 sm:px-5 py-3 border-b border-border bg-muted/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-primary" />
-                  Tabel Acuan Wilayah &amp; Palet Warna Titik Spasial
-                </CardTitle>
-                <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
-                  Kode wilayah (4 digit KKWW) digunakan sebagai acuan validasi ID pelanggan dan penentuan warna marker pada peta GIS.
-                </CardDescription>
+                <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                  Tabel acuan wilayah &amp; palet warna titik spasial
+                </h2>
+                <p className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5">
+                  Kode wilayah (4 digit KKWW) digunakan sebagai acuan validasi ID pelanggan dan warna marker peta GIS.
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -873,39 +846,39 @@ export default function Settings() {
                   onClick={handleResetColors}
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset Default</span>
+                  <span>Reset warna</span>
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => setShowAddWilayahModal(true)}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Tambah Wilayah</span>
+                  <span>Tambah wilayah</span>
                 </Button>
               </div>
-            </CardHeader>
+            </div>
 
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-[13px] border-collapse">
                   <thead>
-                    <tr className="border-b border-border bg-muted/35 text-muted-foreground font-mono text-[10.5px] uppercase tracking-wider">
-                      <th className="py-2.5 px-4 font-semibold">Kode Acuan</th>
-                      <th className="py-2.5 px-4 font-semibold">Nama Wilayah</th>
-                      <th className="py-2.5 px-4 font-semibold">Kecamatan</th>
-                      <th className="py-2.5 px-4 font-semibold">Jumlah Pelanggan</th>
-                      <th className="py-2.5 px-4 font-semibold">Warna Marker</th>
-                      <th className="py-2.5 px-4 font-semibold">Kode HEX</th>
-                      <th className="py-2.5 px-4 font-semibold text-right">Aksi</th>
+                    <tr className="border-b border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 text-[#71717a] text-[12px]">
+                      <th className="py-2.5 px-5 font-medium">Kode acuan</th>
+                      <th className="py-2.5 px-4 font-medium">Nama wilayah</th>
+                      <th className="py-2.5 px-4 font-medium">Kecamatan</th>
+                      <th className="py-2.5 px-4 font-medium">Jumlah pelanggan</th>
+                      <th className="py-2.5 px-4 font-medium">Warna marker</th>
+                      <th className="py-2.5 px-4 font-medium">Kode HEX</th>
+                      <th className="py-2.5 px-5 font-medium text-right">Tindakan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border font-sans">
+                  <tbody className="divide-y divide-[#e5e7eb] dark:divide-zinc-800">
                     {wilayahList.map((w: WilayahAcuan) => (
-                      <tr key={w.kode} className="hover:bg-muted/40 transition-colors">
-                        <td className="py-2.5 px-4 font-mono font-semibold text-foreground">
+                      <tr key={w.kode} className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/40 transition-colors">
+                        <td className="py-3 px-5 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
                           {w.kode}
                         </td>
-                        <td className="py-2.5 px-4 font-medium text-foreground">
+                        <td className="py-3 px-4 text-[#18181b] dark:text-zinc-100">
                           {editingWilayahKode === w.kode ? (
                             <div className="flex items-center gap-1.5">
                               <Input
@@ -916,14 +889,14 @@ export default function Settings() {
                                   if (e.key === 'Escape') handleCancelEditWilayah();
                                 }}
                                 autoFocus
-                                className="h-7 text-xs px-2 w-48 font-medium border-primary bg-background"
+                                className="h-8 text-[12.5px] px-2.5 w-48"
                                 placeholder="Nama wilayah..."
                               />
                               <Button
                                 size="sm"
                                 onClick={() => handleSaveEditWilayah(w.kode)}
-                                className="h-7 w-7 p-0 shrink-0"
-                                title="Simpan Nama"
+                                className="h-8 w-8 p-0 shrink-0"
+                                title="Simpan nama"
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </Button>
@@ -931,66 +904,57 @@ export default function Settings() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={handleCancelEditWilayah}
-                                className="h-7 w-7 p-0 shrink-0"
+                                className="h-8 w-8 p-0 shrink-0"
                                 title="Batal"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </Button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 group">
-                              <span className="font-medium">{w.nama}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleStartEditWilayah(w)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary cursor-pointer"
-                                title={`Ubah nama wilayah ${w.nama}`}
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
-                            </div>
+                            <span>{w.nama}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 text-muted-foreground">
+                        <td className="py-3 px-4 text-[#71717a] dark:text-zinc-400">
                           {w.kodeKecamatan} ({w.namaKecamatan})
                         </td>
-                        <td className="py-2.5 px-4 font-mono text-muted-foreground tabular">
-                          {formatNumber(w.totalPelanggan || 0)} Pelanggan
+                        <td className="py-3 px-4 text-[#71717a] dark:text-zinc-400 tabular-nums">
+                          {formatNumber(w.totalPelanggan || 0)} pelanggan
                         </td>
-                        <td className="py-2.5 px-4">
+                        <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
                             <input
                               type="color"
                               value={w.warna}
                               onChange={(e) => handleColorChange(w.kode, e.target.value)}
-                              className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5 bg-background"
+                              className="w-7 h-7 rounded-lg cursor-pointer border border-[#e4e4e7] p-0.5 bg-white"
                               title={`Ubah warna wilayah ${w.nama}`}
                             />
                             <span
-                              className="w-3 h-3 rounded-full shrink-0 border border-white/50"
+                              className="w-3 h-3 rounded-full shrink-0"
                               style={{ backgroundColor: safeColor(w.warna, '#3B6EA8') }}
                             />
                           </div>
                         </td>
-                        <td className="py-2.5 px-4 font-mono text-xs uppercase text-muted-foreground">
+                        <td className="py-3 px-4 text-[12px] text-[#71717a] tabular-nums">
                           {w.warna}
                         </td>
-                        <td className="py-2.5 px-4 text-right">
+                        <td className="py-3 px-5 text-right">
                           {editingWilayahKode === w.kode ? (
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
                                 onClick={() => handleSaveEditWilayah(w.kode)}
+                                className="h-7 px-2.5 text-[12px]"
                               >
-                                <Check className="w-3 h-3" />
-                                <span>Simpan</span>
+                                Simpan
                               </Button>
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={handleCancelEditWilayah}
+                                className="h-7 px-2.5 text-[12px]"
                               >
-                                <span>Batal</span>
+                                Batal
                               </Button>
                             </div>
                           ) : (
@@ -998,9 +962,9 @@ export default function Settings() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleStartEditWilayah(w)}
+                              className="h-7 px-2.5 text-[12px]"
                             >
-                              <Pencil className="w-3 h-3 text-muted-foreground" />
-                              <span>Ubah Nama</span>
+                              Ubah nama
                             </Button>
                           )}
                         </td>
@@ -1014,51 +978,43 @@ export default function Settings() {
 
           {/* Add Wilayah Modal Inline */}
           {showAddWilayahModal && (
-            <Card className="p-5 max-w-md mx-auto space-y-4 animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <span className="font-heading font-semibold text-sm text-foreground flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  Tambah Acuan Wilayah Baru
+            <Card className="p-5 max-w-md mx-auto space-y-4">
+              <div className="flex items-center justify-between border-b border-[#e5e7eb] dark:border-zinc-800 pb-3">
+                <span className="font-semibold text-[14px] text-[#18181b] dark:text-zinc-100">
+                  Tambah acuan wilayah baru
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAddWilayahModal(false)}
-                  className="h-6 w-6 p-0 text-muted-foreground"
+                  className="h-7 w-7 p-0 text-[#71717a]"
                 >
                   ✕
                 </Button>
               </div>
 
-              <div className="space-y-3.5 text-xs">
+              <div className="space-y-3.5 text-[13px]">
                 <div>
-                  <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Kode Wilayah (4 Digit Angka, misal: 1001 atau 0733)
+                  <label className="text-[12px] text-[#71717a] block mb-1">
+                    Kode wilayah (4 digit angka, misal: 1001)
                   </label>
                   <Input
                     placeholder="Contoh: 1001"
                     value={newWilayahKode}
                     maxLength={4}
                     onChange={(e) => setNewWilayahKode(e.target.value)}
-                    className="font-mono"
                   />
                   {newWilayahKode.length >= 2 && (
-                    <div className="mt-1.5 p-2 rounded-md bg-primary/10 border border-primary/20 text-[11px] text-foreground flex items-center gap-1.5 flex-wrap">
-                      <span className="text-muted-foreground">Kecamatan:</span>
-                      <strong className="text-primary font-semibold">{kecamatanName(newWilayahKode.slice(0, 2))}</strong>
-                      <span className="text-muted-foreground font-mono">({newWilayahKode.slice(0, 2)})</span>
-                      {newWilayahKode.length === 4 && (
-                        <>
-                          <span className="text-muted-foreground ml-1.5">• Sub-wilayah:</span>
-                          <strong className="font-mono">{newWilayahKode.slice(2, 4)}</strong>
-                        </>
-                      )}
+                    <div className="mt-1.5 p-2.5 rounded-lg bg-[#fafafa] dark:bg-zinc-800 border border-[#e5e7eb] dark:border-zinc-700 text-[12px] text-[#18181b] dark:text-zinc-200 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[#71717a]">Kecamatan:</span>
+                      <strong className="font-medium">{kecamatanName(newWilayahKode.slice(0, 2))}</strong>
+                      <span className="text-[#71717a]">({newWilayahKode.slice(0, 2)})</span>
                     </div>
                   )}
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Nama Wilayah / Dusun
+                  <label className="text-[12px] text-[#71717a] block mb-1">
+                    Nama wilayah / dusun
                   </label>
                   <Input
                     placeholder="Contoh: Desa Kateng"
@@ -1067,22 +1023,22 @@ export default function Settings() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono text-muted-foreground block mb-1">
-                    Pilih Warna Marker
+                  <label className="text-[12px] text-[#71717a] block mb-1">
+                    Pilih warna marker
                   </label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
                       value={newWilayahWarna}
                       onChange={(e) => setNewWilayahWarna(e.target.value)}
-                      className="w-9 h-8 rounded-md cursor-pointer border border-border"
+                      className="w-9 h-8 rounded-lg cursor-pointer border border-[#e4e4e7]"
                     />
-                    <span className="font-mono text-xs uppercase text-foreground">{newWilayahWarna}</span>
+                    <span className="text-[12.5px] text-[#18181b] dark:text-zinc-200 tabular-nums">{newWilayahWarna}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e5e7eb] dark:border-zinc-800">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1094,7 +1050,7 @@ export default function Settings() {
                   size="sm"
                   onClick={handleAddNewWilayah}
                 >
-                  Simpan Wilayah
+                  Simpan wilayah
                 </Button>
               </div>
             </Card>
@@ -1104,34 +1060,33 @@ export default function Settings() {
         {/* ════ TAB 3: RIWAYAT SNAPSHOT & ROLLBACK ════ */}
         <TabsContent value="history" className="space-y-5">
           <Card className="overflow-hidden">
-            <CardHeader className="px-4 sm:px-5 py-3 border-b border-border bg-muted/25">
-              <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                <History className="w-4 h-4 text-primary" />
-                Riwayat Snapshot Dataset
-              </CardTitle>
-              <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
-                Daftar potret data yang tersimpan di sistem. Administrator dapat memulihkan (rollback) data aktif ke versi snapshot sebelumnya secara instan.
-              </CardDescription>
-            </CardHeader>
+            <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800">
+              <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                Riwayat snapshot dataset
+              </h2>
+              <p className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5">
+                Daftar versi data yang tersimpan di sistem. Anda dapat memulihkan (rollback) data aktif ke versi sebelumnya.
+              </p>
+            </div>
 
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-[13px] border-collapse">
                   <thead>
-                    <tr className="border-b border-border bg-muted/35 text-muted-foreground font-mono text-[10.5px] uppercase tracking-wider">
-                      <th className="py-2.5 px-4 font-semibold">Tanggal Unggah (WITA)</th>
-                      <th className="py-2.5 px-4 font-semibold">Nama File</th>
-                      <th className="py-2.5 px-4 font-semibold">Pengunggah</th>
-                      <th className="py-2.5 px-4 font-semibold">Total Baris</th>
-                      <th className="py-2.5 px-4 font-semibold">Lolos / Flag</th>
-                      <th className="py-2.5 px-4 font-semibold">Status Versi</th>
-                      <th className="py-2.5 px-4 font-semibold text-right">Tindakan</th>
+                    <tr className="border-b border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 text-[#71717a] text-[12px]">
+                      <th className="py-2.5 px-5 font-medium">Tanggal unggah (WITA)</th>
+                      <th className="py-2.5 px-4 font-medium">Nama file</th>
+                      <th className="py-2.5 px-4 font-medium">Pengunggah</th>
+                      <th className="py-2.5 px-4 font-medium">Total baris</th>
+                      <th className="py-2.5 px-4 font-medium">Lolos / flag</th>
+                      <th className="py-2.5 px-4 font-medium">Status versi</th>
+                      <th className="py-2.5 px-5 font-medium text-right">Tindakan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border font-sans">
+                  <tbody className="divide-y divide-[#e5e7eb] dark:divide-zinc-800">
                     {snapshots.map((snap) => (
-                      <tr key={snap.id} className="hover:bg-muted/40 transition-colors">
-                        <td className="py-2.5 px-4 font-mono text-foreground">
+                      <tr key={snap.id} className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/40 transition-colors">
+                        <td className="py-3 px-5 text-[#18181b] dark:text-zinc-100 tabular-nums">
                           {new Date(snap.uploaded_at).toLocaleDateString('id-ID', {
                             day: 'numeric',
                             month: 'short',
@@ -1144,49 +1099,45 @@ export default function Settings() {
                               .toString()
                               .padStart(2, '0')} WITA`}
                         </td>
-                        <td className="py-2.5 px-4 font-medium text-foreground">
+                        <td className="py-3 px-4 font-medium text-[#18181b] dark:text-zinc-100">
                           {snap.filename}
                         </td>
-                        <td className="py-2.5 px-4 text-muted-foreground">
+                        <td className="py-3 px-4 text-[#71717a] dark:text-zinc-400">
                           {snap.uploader_name}
                         </td>
-                        <td className="py-2.5 px-4 font-mono font-semibold text-foreground tabular">
+                        <td className="py-3 px-4 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
                           {formatNumber(snap.total_rows)}
                         </td>
-                        <td className="py-2.5 px-4 font-mono tabular">
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <td className="py-3 px-4 tabular-nums text-[#71717a]">
+                          <span className="text-[#18181b] dark:text-zinc-100 font-medium">
                             {formatNumber(snap.valid_rows)}
                           </span>{' '}
-                          /{' '}
-                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                            {formatNumber(snap.flagged_rows)}
-                          </span>
+                          / {formatNumber(snap.flagged_rows)}
                         </td>
-                        <td className="py-2.5 px-4">
+                        <td className="py-3 px-4">
                           {snap.is_active ? (
-                            <Badge variant="default" className="font-mono text-[10px]">
-                              Aktif Sekarang
-                            </Badge>
+                            <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 bg-[#fafafa] dark:bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-[#18181b] dark:text-zinc-100">
+                              Aktif
+                            </span>
                           ) : (
-                            <Badge variant="secondary" className="font-mono text-[10px]">
+                            <span className="text-[12px] text-[#71717a]">
                               Arsip
-                            </Badge>
+                            </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 text-right">
+                        <td className="py-3 px-5 text-right">
                           {!snap.is_active ? (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setConfirmRollbackId(snap.id)}
-                              title="Pulihkan data aktif ke versi snapshot ini"
+                              className="h-7 px-2.5 text-[12px]"
                             >
-                              <RotateCcw className="w-3 h-3 text-primary" />
-                              <span>Pulihkan</span>
+                              Pulihkan
                             </Button>
                           ) : (
-                            <span className="text-[11px] font-mono text-primary font-semibold">
-                              Aktif
+                            <span className="text-[12px] text-[#71717a]">
+                              Versi saat ini
                             </span>
                           )}
                         </td>
@@ -1200,26 +1151,21 @@ export default function Settings() {
 
           {/* Rollback confirmation modal */}
           {confirmRollbackId && (
-            <Card className="p-5 max-w-md mx-auto space-y-4 animate-in fade-in">
-              <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
-                <div className="w-9 h-9 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                  <RotateCcw className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-heading font-semibold text-sm text-foreground">
-                    Konfirmasi Pemulihan Data (Rollback)
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    ID Snapshot: <span className="font-mono font-semibold">{confirmRollbackId}</span>
-                  </p>
-                </div>
+            <Card className="p-5 max-w-md mx-auto space-y-4">
+              <div>
+                <h3 className="font-semibold text-[14px] text-[#18181b] dark:text-zinc-100">
+                  Konfirmasi pemulihan data (rollback)
+                </h3>
+                <p className="text-[12px] text-[#71717a] mt-0.5">
+                  ID snapshot: {confirmRollbackId}
+                </p>
               </div>
 
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Apakah Anda yakin ingin memulihkan seluruh data aktif ke versi snapshot ini? Data pelanggan yang sedang berjalan akan digantikan dengan data pada arsip snapshot terpilih.
+              <p className="text-[12.5px] text-[#52525b] dark:text-zinc-300 leading-relaxed">
+                Apakah Anda yakin ingin memulihkan seluruh data aktif ke versi snapshot ini?
               </p>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e5e7eb] dark:border-zinc-800">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1231,7 +1177,7 @@ export default function Settings() {
                   size="sm"
                   onClick={() => handleRollback(confirmRollbackId)}
                 >
-                  Ya, Pulihkan Versi Ini
+                  Ya, pulihkan versi ini
                 </Button>
               </div>
             </Card>
@@ -1241,35 +1187,34 @@ export default function Settings() {
         {/* ════ TAB 4: PINDAH / SINKRON PERANGKAT ════ */}
         <TabsContent value="sync" className="space-y-5">
           <Card className="overflow-hidden">
-            <CardHeader className="px-4 sm:px-5 py-3 border-b border-border bg-muted/25">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                  <Database className="w-4 h-4 text-primary" />
-                  Sinkronisasi Cloud Database (Neon PostgreSQL &amp; PostGIS)
-                </CardTitle>
-                <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10.5px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Cloud Sync Online
-                </span>
+            <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                  Sinkronisasi cloud database (Neon PostgreSQL &amp; PostGIS)
+                </h2>
+                <p className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-0.5">
+                  Data pelanggan dan jaringan pipa tersinkronisasi antar-perangkat melalui server database Neon Cloud.
+                </p>
               </div>
-              <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
-                Data pelanggan dan jaringan pipa tersinkronisasi otomatis antar-perangkat (Laptop Kantor, Rumah, HP) melalui server database Neon Cloud.
-              </CardDescription>
-            </CardHeader>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e4e4e7] dark:border-zinc-700 px-2.5 py-0.5 text-[11.5px] text-[#18181b] dark:text-zinc-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Cloud online
+              </span>
+            </div>
+
             <CardContent className="p-5 space-y-5">
               {/* Cloud Sync Status & Actions */}
-              <div className="p-4 rounded-md border border-primary/25 bg-primary/5 text-xs space-y-3">
+              <div className="p-4 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 text-[13px] space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-primary font-semibold">
-                    <Database className="w-4 h-4 shrink-0" />
-                    <span>Sinkronisasi Realtime Terhubung</span>
-                  </div>
-                  <span className="font-mono text-[11px] text-primary font-bold">
-                    {pelangganList.length.toLocaleString('id-ID')} Titik Aktif
+                  <span className="font-semibold text-[#18181b] dark:text-zinc-100">
+                    Sinkronisasi realtime terhubung
+                  </span>
+                  <span className="text-[12.5px] text-[#52525b] dark:text-zinc-300 font-medium tabular-nums">
+                    {pelangganList.length.toLocaleString('id-ID')} titik aktif
                   </span>
                 </div>
-                <p className="text-foreground/85 leading-relaxed text-[11.5px]">
-                  Setiap kali Anda mengunggah file Excel pelanggan atau file QGIS di laptop kantor, sistem otomatis menyimpannya ke Neon Cloud. Perangkat lain akan langsung memuat data terbaru secara otomatis saat membuka aplikasi.
+                <p className="text-[#52525b] dark:text-zinc-400 leading-relaxed text-[12.5px]">
+                  Setiap kali Anda mengunggah file Excel pelanggan atau file QGIS, sistem otomatis menyimpannya ke Neon Cloud agar perangkat lain selalu memuat data terbaru.
                 </p>
                 <div className="pt-1 flex items-center gap-2 flex-wrap">
                   <Button
@@ -1277,7 +1222,7 @@ export default function Settings() {
                     disabled={isSyncingCloud}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                    <span>Tarik Data Terbaru dari Cloud (Neon)</span>
+                    <span>Tarik data terbaru dari Cloud</span>
                   </Button>
 
                   <Button
@@ -1293,7 +1238,7 @@ export default function Settings() {
                     ) : (
                       <>
                         <UploadCloud className="w-3.5 h-3.5" />
-                        <span>Kirim Data Perangkat Ini ke Cloud</span>
+                        <span>Kirim data perangkat ini ke Cloud</span>
                       </>
                     )}
                   </Button>
@@ -1301,80 +1246,69 @@ export default function Settings() {
               </div>
 
               {/* Offline Manual Backup & Restore Section */}
-              <div className="space-y-3">
-                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>Cadangan File Manual (Offline Backup &amp; Restore)</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <h4 className="text-[13.5px] font-semibold text-[#18181b] dark:text-zinc-100">
+                      Unduh file cadangan (.json)
+                    </h4>
+                    <p className="text-[12px] text-[#71717a] leading-relaxed">
+                      Unduh salinan arsip lokal ({pelangganList.length.toLocaleString('id-ID')} titik) untuk cadangan di flashdisk atau arsip internal.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      pdamService.exportDatabaseBackup();
+                      toast.success('File backup database PDAM berhasil diunduh.');
+                    }}
+                    className="w-full"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download backup (.json)</span>
+                  </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Langkah 1: Ekspor dari perangkat ini */}
-                  <div className="p-4 rounded-md border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-primary/10 border border-primary/20 text-primary font-mono font-bold text-xs flex items-center justify-center">1</span>
-                        <h4 className="text-xs font-semibold text-foreground">Unduh File Cadangan (.json)</h4>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Unduh salinan arsip lokal ({pelangganList.length.toLocaleString('id-ID')} titik) untuk cadangan di flashdisk atau arsip internal.
-                      </p>
-                    </div>
+                <div className="p-4 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <h4 className="text-[13.5px] font-semibold text-[#18181b] dark:text-zinc-100">
+                      Pulihkan dari file cadangan
+                    </h4>
+                    <p className="text-[12px] text-[#71717a] leading-relaxed">
+                      Pilih file backup (.json) untuk memulihkan seluruh data dan snapshot jika perangkat sedang offline.
+                    </p>
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      id="restore-backup-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const content = event.target?.result as string;
+                          const res = pdamService.restoreDatabaseBackup(content);
+                          if (res.ok) {
+                            toast.success(`Berhasil memulihkan ${res.count?.toLocaleString('id-ID')} data pelanggan ke perangkat ini!`);
+                          } else {
+                            toast.error(res.reason || 'Gagal memulihkan database.');
+                          }
+                        };
+                        reader.readAsText(file);
+                        e.target.value = '';
+                      }}
+                    />
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        pdamService.exportDatabaseBackup();
-                        toast.success('File backup database PDAM berhasil diunduh.');
-                      }}
+                      onClick={() => document.getElementById('restore-backup-input')?.click()}
                       className="w-full"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Backup (.json)</span>
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Pilih file backup (.json) &amp; pulihkan</span>
                     </Button>
-                  </div>
-
-                  {/* Langkah 2: Pulihkan di perangkat lain */}
-                  <div className="p-4 rounded-md border border-border bg-muted/20 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 font-mono font-bold text-xs flex items-center justify-center">2</span>
-                        <h4 className="text-xs font-semibold text-foreground">Pulihkan dari File Cadangan</h4>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Pilih file backup (.json) untuk memulihkan seluruh data dan snapshot jika perangkat sedang offline tanpa internet.
-                      </p>
-                    </div>
-                    <div>
-                      <input
-                        type="file"
-                        accept=".json"
-                        id="restore-backup-input"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const content = event.target?.result as string;
-                            const res = pdamService.restoreDatabaseBackup(content);
-                            if (res.ok) {
-                              toast.success(`Berhasil memulihkan ${res.count?.toLocaleString('id-ID')} data pelanggan ke perangkat ini!`);
-                            } else {
-                              toast.error(res.reason || 'Gagal memulihkan database.');
-                            }
-                          };
-                          reader.readAsText(file);
-                          e.target.value = '';
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => document.getElementById('restore-backup-input')?.click()}
-                        className="w-full"
-                      >
-                        <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Pilih File Backup (.json) &amp; Pulihkan</span>
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </div>

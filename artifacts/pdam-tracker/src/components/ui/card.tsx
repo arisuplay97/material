@@ -2,8 +2,8 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Cloudflare Kumo UI Card Primitives
- * Crisp 8px radius (rounded-lg), 1px hairline border, subtle elevation.
+ * Exact Cloudflare Kumo UI Card (matching "Traffic overview" & inner metric cards):
+ * Pure white surface, crisp 1px #e5e7eb border, rounded-xl (10px), zero heavy shadow.
  */
 const Card = React.forwardRef<
   HTMLDivElement,
@@ -12,7 +12,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'rounded-lg border border-border bg-card text-card-foreground shadow-[0_1px_2px_rgba(15,23,42,0.03)]',
+      'rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[#18181b] dark:text-zinc-100',
       className,
     )}
     {...props}
@@ -38,7 +38,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('text-sm font-semibold leading-none tracking-tight text-foreground', className)}
+    className={cn('text-[15px] font-semibold leading-none tracking-tight text-[#18181b] dark:text-zinc-100', className)}
     {...props}
   />
 ));
@@ -50,7 +50,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('text-xs text-muted-foreground', className)}
+    className={cn('text-[12.5px] text-[#71717a] dark:text-zinc-400', className)}
     {...props}
   />
 ));

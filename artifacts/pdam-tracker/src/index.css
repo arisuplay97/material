@@ -50,92 +50,92 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-heading: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 2px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ── Cloudflare Kumo UI Light Tokens ── */
+/* ── Cloudflare Dashboard Light Theme ── */
 :root {
-  --background: 220 14% 97.5%;
-  --foreground: 222 28% 11%;
+  --background: 240 5% 97.5%;
+  --foreground: 240 10% 10%;
 
-  --border: 220 13% 89%;
-  --input: 220 13% 84%;
-  --ring: 214 95% 42%;
+  --border: 240 6% 90%;
+  --input: 240 6% 88%;
+  --ring: 217 92% 52%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 28% 11%;
+  --card-foreground: 240 10% 10%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 28% 11%;
+  --popover-foreground: 240 10% 10%;
 
-  --primary: 214 95% 42%;
+  --primary: 217 92% 52%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 14% 95%;
-  --secondary-foreground: 222 28% 15%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 10% 12%;
 
-  --muted: 220 14% 95.5%;
-  --muted-foreground: 220 10% 44%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
 
-  --accent: 214 90% 95.5%;
-  --accent-foreground: 214 95% 34%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 10% 10%;
 
-  --destructive: 0 74% 48%;
+  --destructive: 0 72% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 152 60% 30%;
-  --success-soft: 150 48% 94%;
-  --warning: 34 86% 36%;
-  --warning-soft: 40 90% 93%;
-  --danger: 0 72% 46%;
+  --success: 152 60% 32%;
+  --success-soft: 150 45% 95%;
+  --warning: 34 86% 38%;
+  --warning-soft: 40 90% 94%;
+  --danger: 0 72% 48%;
   --danger-soft: 0 80% 96%;
 
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 222 20% 24%;
-  --sidebar-border: 220 13% 89%;
-  --sidebar-primary: 214 95% 42%;
+  --sidebar-foreground: 240 10% 12%;
+  --sidebar-border: 240 6% 90%;
+  --sidebar-primary: 217 92% 52%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 214 90% 96%;
-  --sidebar-accent-foreground: 214 95% 34%;
-  --sidebar-ring: 214 95% 42%;
+  --sidebar-accent: 240 5% 96%;
+  --sidebar-accent-foreground: 240 10% 10%;
+  --sidebar-ring: 217 92% 52%;
 
   --radius: 0.5rem;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.035);
+  --shadow-card: none;
 }
 
-/* ── Cloudflare Kumo UI Dark Tokens ── */
+/* ── Cloudflare Dashboard Dark Theme ── */
 .dark {
-  --background: 225 14% 6.5%;
-  --foreground: 220 15% 94%;
+  --background: 240 10% 6%;
+  --foreground: 240 5% 95%;
 
-  --border: 224 12% 16.5%;
-  --input: 224 12% 20%;
-  --ring: 214 90% 58%;
+  --border: 240 6% 16%;
+  --input: 240 6% 18%;
+  --ring: 217 92% 56%;
 
-  --card: 225 13% 9.5%;
-  --card-foreground: 220 15% 94%;
+  --card: 240 8% 9%;
+  --card-foreground: 240 5% 95%;
 
-  --popover: 225 13% 10.5%;
-  --popover-foreground: 220 15% 94%;
+  --popover: 240 8% 10%;
+  --popover-foreground: 240 5% 95%;
 
-  --primary: 214 90% 56%;
+  --primary: 217 92% 54%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 224 12% 14.5%;
-  --secondary-foreground: 220 15% 92%;
+  --secondary: 240 6% 14%;
+  --secondary-foreground: 240 5% 92%;
 
-  --muted: 224 12% 13%;
-  --muted-foreground: 220 10% 62%;
+  --muted: 240 6% 13%;
+  --muted-foreground: 240 5% 60%;
 
-  --accent: 214 45% 16%;
-  --accent-foreground: 214 90% 78%;
+  --accent: 240 6% 15%;
+  --accent-foreground: 240 5% 95%;
 
   --destructive: 0 70% 54%;
   --destructive-foreground: 0 0% 100%;
@@ -147,16 +147,16 @@
   --danger: 0 74% 64%;
   --danger-soft: 0 38% 14%;
 
-  --sidebar: 225 14% 7.5%;
-  --sidebar-foreground: 220 12% 76%;
-  --sidebar-border: 224 12% 15.5%;
-  --sidebar-primary: 214 90% 56%;
+  --sidebar: 240 8% 8.5%;
+  --sidebar-foreground: 240 5% 90%;
+  --sidebar-border: 240 6% 15%;
+  --sidebar-primary: 217 92% 54%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 214 35% 15%;
-  --sidebar-accent-foreground: 214 90% 82%;
-  --sidebar-ring: 214 90% 58%;
+  --sidebar-accent: 240 6% 14%;
+  --sidebar-accent-foreground: 240 5% 95%;
+  --sidebar-ring: 217 92% 56%;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-card: none;
 }
 
 @layer base {
@@ -170,7 +170,6 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    font-feature-settings: 'cv11', 'ss01';
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -191,19 +190,6 @@
   box-shadow: var(--shadow-card);
 }
 
-/* ── Staggered entrance (dashboard) ── */
-@keyframes d-rise {
-  from { opacity: 0; transform: translate3d(0, 8px, 0); }
-  to   { opacity: 1; transform: none; }
-}
-.d-rise {
-  animation: d-rise 0.35s cubic-bezier(0.22, 0.8, 0.24, 1) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
-}
-@media (prefers-reduced-motion: reduce) {
-  .d-rise { animation: none; }
-}
-
 /* ── Leaflet ── */
 .leaflet-container {
   font-family: var(--font-sans) !important;
@@ -214,7 +200,6 @@
   outline: none !important;
 }
 
-/* Hilangkan kotak hitam saat garis pipa, objek, atau popup diklik */
 .leaflet-container :focus,
 .leaflet-container path:focus,
 .leaflet-container svg:focus,
@@ -238,8 +223,8 @@ svg.leaflet-zoom-animated {
 
 .leaflet-popup-content-wrapper {
   padding: 0 !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 20px -4px hsl(222 30% 10% / 0.22) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.16) !important;
   border: 1px solid hsl(var(--border)) !important;
   background: hsl(var(--card)) !important;
   color: hsl(var(--card-foreground)) !important;
@@ -285,8 +270,8 @@ svg.leaflet-zoom-animated {
 
 .maplibregl-popup-content {
   padding: 0 !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 24px -4px hsl(222 30% 10% / 0.24) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.18) !important;
   border: 1px solid hsl(var(--border)) !important;
   background: hsl(var(--card)) !important;
   color: hsl(var(--card-foreground)) !important;
@@ -298,7 +283,7 @@ svg.leaflet-zoom-animated {
   font-size: 16px !important;
   padding: 4px 8px !important;
   color: hsl(var(--muted-foreground)) !important;
-  border-radius: 0 8px 0 6px !important;
+  border-radius: 0 10px 0 6px !important;
   right: 2px !important;
   top: 2px !important;
 }
@@ -323,24 +308,24 @@ svg.leaflet-zoom-animated {
 
 .pdam-ml-tooltip .maplibregl-popup-content {
   padding: 6px 10px !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   pointer-events: none !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14) !important;
 }
 
-/* Popup content (built as HTML string, values escaped) */
+/* Popup content */
 .gis-popup { width: 248px; padding: 12px; font-size: 12px; }
 .gis-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid hsl(var(--border)); }
-.gis-popup-code { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 600; font-size: 12.5px; }
+.gis-popup-code { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; }
 .gis-popup-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; }
-.gis-popup-tag { font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.gis-popup-tag { font-size: 10.5px; font-weight: 500; padding: 1px 6px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--muted)); color: hsl(var(--foreground)); }
 .gis-popup-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .gis-popup-muted { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.35; }
 .gis-popup-alert { margin: 8px 0; padding: 6px 8px; border-radius: 6px; font-size: 11px; background: hsl(var(--danger-soft)); color: hsl(var(--danger)); }
 .gis-popup-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: hsl(var(--muted-foreground)); }
 .gis-popup-meta strong { color: hsl(var(--foreground)); font-weight: 600; }
-.gis-popup-btn { width: 100%; margin-top: 10px; border: 1px solid #0344A3; padding: 7px 8px; font-size: 12px; font-weight: 500; border-radius: 6px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); cursor: pointer; }
-.gis-popup-btn:hover { filter: brightness(1.06); }
+.gis-popup-btn { width: 100%; margin-top: 10px; border: 1px solid #0b57d6; padding: 7px 8px; font-size: 12px; font-weight: 500; border-radius: 8px; background: #1368f6; color: #ffffff; cursor: pointer; }
+.gis-popup-btn:hover { background: #0b57d6; }
 
 /* Customer point marker */
 .gis-point-marker { background: transparent; border: none; cursor: pointer; }
@@ -357,7 +342,7 @@ svg.leaflet-zoom-animated {
   50% { transform: scale(1.9); opacity: 0.1; }
 }
 
-/* Marker clusters — modern sleek cartographic */
+/* Marker clusters */
 .marker-cluster {
   background-clip: padding-box;
   border-radius: 9999px;
@@ -409,10 +394,10 @@ svg.leaflet-zoom-animated {
 /* Scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.22); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.22); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
 
-/* Modern Clean 3D Perspective Tilt - Elegant, Non-Distorting, High-End Cartographic */
+/* 3D Tilt */
 .gis-3d-tilted {
   transform: perspective(1400px) rotateX(24deg) scale(1.02);
   transform-origin: 50% 85%;

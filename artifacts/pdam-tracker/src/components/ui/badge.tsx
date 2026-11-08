@@ -3,22 +3,21 @@ import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 /**
- * Cloudflare Kumo UI Badge Primitives
- * Compact 6px radius (rounded-md), crisp 1px tinted border, high legibility.
+ * Exact Cloudflare Kumo UI Badge (matching "New" / "No data" subtle pills in Cloudflare):
  */
 const badgeVariants = cva(
-  'whitespace-nowrap inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring/30',
+  'whitespace-nowrap inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none',
   {
     variants: {
       variant: {
         default:
-          'border-[#055AD4]/20 bg-[#055AD4]/10 text-[#055AD4] dark:border-blue-400/25 dark:bg-blue-500/15 dark:text-blue-300',
+          'border-[#d4d4d8] border-dashed bg-white dark:bg-zinc-900 text-[#18181b] dark:text-zinc-200 dark:border-zinc-700',
         secondary:
-          'border-border bg-muted text-muted-foreground',
+          'border-[#e4e4e7] bg-[#f4f4f5] text-[#52525b] dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300',
         destructive:
-          'border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300',
+          'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300',
         outline:
-          'text-foreground border-border bg-card',
+          'text-[#52525b] dark:text-zinc-300 border-[#e4e4e7] dark:border-zinc-700 bg-white dark:bg-zinc-900',
       },
     },
     defaultVariants: {

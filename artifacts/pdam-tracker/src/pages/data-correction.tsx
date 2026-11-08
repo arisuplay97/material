@@ -594,126 +594,103 @@ export default function DataCorrection() {
     wilayah,
   ]);
 
-  return (
-    <div className="min-h-screen bg-neutral-50/60 dark:bg-neutral-950 px-4 sm:px-6 md:px-8 py-6 space-y-6">
-      {/* ── Header ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-border">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-heading font-semibold tracking-tight text-foreground">
-              Koreksi Data Lokasi
-            </h1>
-            <Badge variant="default" className="font-mono text-[11px]">
-              Analisis Dekade &amp; Jarak
-            </Badge>
+  const wrongDekadePct = stats.totalWithCoords
+    ? ((stats.totalWrongDekade / stats.totalWithCoords) * 100).toFixed(1)
+    : '0.0';
+  const mencarPct = stats.totalWithCoords
+    ? ((stats.totalOutliersDistance / stats.totalWithCoords) * 100).toFixed(1)
+    : '0.0';
+
+  const renderSparkline = (empty: boolean, variant: 1 | 2 | 3 | 4) => {
+    if (empty) {
+      return (
+        <div className="relative h-[52px] w-full mt-3 select-none">
+          <svg viewBox="0 0 280 52" preserveAspectRatio="none" className="w-full h-full">
+            <path
+              d="M0,28 C18,24 32,32 50,28 C68,24 82,32 100,28 C118,24 132,32 150,28 C168,24 182,32 200,28 C218,24 232,32 250,28 C264,25 272,30 280,28"
+              fill="none"
+              stroke="#e4e4e7"
+              strokeWidth="1.25"
+              className="dark:stroke-zinc-800"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full border border-[#e4e4e7] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-0.5 text-[11px] font-normal text-[#71717a] dark:text-zinc-400">
+              No data
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Deteksi otomatis pelanggan yang titik GPS-nya berada di klaster dekade lain serta titik yang mencar jauh dari pusat dekadenya.
-          </p>
+        </div>
+      );
+    }
+
+    const line =
+      variant % 2 === 1
+        ? 'M0,50 L6,26 L12,30 L18,24 L24,50 L30,25 L36,38 L42,27 L48,50 L54,50 L60,24 L66,29 L72,26 L78,31 L84,27 L90,33 L96,28 L102,32 L108,24 L114,30 L120,26 L126,31 L132,50 L138,50 L144,44 L150,50 L156,50 L162,27 L168,26 L174,40 L180,50 L186,42 L192,50 L198,28 L204,44 L210,36 L216,50 L222,31 L228,48 L234,36 L240,29 L246,10 L252,26 L258,24 L264,29 L270,29'
+        : 'M0,48 L8,24 L16,28 L24,22 L32,48 L40,25 L48,34 L56,24 L64,48 L72,26 L80,23 L88,28 L96,25 L104,30 L112,24 L120,28 L128,22 L136,27 L144,24 L152,48 L160,42 L168,26 L176,24 L184,36 L192,46 L200,27 L208,38 L216,32 L224,29 L232,42 L240,28 L248,12 L256,24 L264,23 L270,28';
+    const area = `${line} L270,52 L0,52 Z`;
+
+    return (
+      <div className="relative h-[52px] w-full mt-3 select-none">
+        <svg viewBox="0 0 280 52" preserveAspectRatio="none" className="w-full h-full block">
+          <path d={area} fill="rgba(19, 104, 246, 0.13)" />
+          <path d={line} fill="none" stroke="#1368f6" strokeWidth="1.4" strokeLinejoin="round" />
+          <path
+            d="M270,28 L275,50 L280,26"
+            fill="none"
+            stroke="#1368f6"
+            strokeWidth="1.4"
+            strokeDasharray="2.5 2.5"
+          />
+        </svg>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-4 sm:p-6 space-y-5 max-w-[1440px] mx-auto text-[#18181b] dark:text-zinc-100">
+      {/* ── 1. Cloudflare "Traffic overview" Section Card ── */}
+      <div className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        {/* Row 1: Title & Actions */}
+        <div className="px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[16px] font-semibold text-[#18181b] dark:text-zinc-100 tracking-[-0.01em]">
+            Koreksi data lokasi
+          </h1>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              disabled={outliers.length === 0}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Ekspor Excel</span>
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={outliers.length === 0 || isExportingPdf}
+            >
+              {isExportingPdf ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
+              <span>Cetak PDF ({formatNumber(outliers.length)})</span>
+            </Button>
+          </div>
         </div>
 
-        {/* Action Buttons: PDF & Excel */}
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-          <Button
-            variant="destructive"
-            onClick={handleExportPdf}
-            disabled={outliers.length === 0 || isExportingPdf}
-          >
-            {isExportingPdf ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <FileText className="w-3.5 h-3.5" />
-            )}
-            <span>Cetak / Ekspor PDF ({formatNumber(outliers.length)})</span>
-          </Button>
+        {/* Row 2: Filter Bar */}
+        <div className="px-5 py-3 border-t border-[#e5e7eb] dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e4e4e7] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[13px] text-[#18181b] dark:text-zinc-100">
+              <Filter className="w-3.5 h-3.5 text-[#52525b] dark:text-zinc-400" />
+              <span>Filter</span>
+            </div>
 
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            disabled={outliers.length === 0}
-          >
-            <Download className="w-3.5 h-3.5 text-primary" />
-            <span>Ekspor Excel (.xlsx)</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Stats Cards (Kumo Metric Grid) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-[11px] font-medium text-muted-foreground block">
-              Pelanggan Teranalisis
-            </span>
-            <span className="text-2xl font-mono font-semibold text-foreground tabular mt-1 block">
-              {formatNumber(stats.totalWithCoords)}
-            </span>
-            <span className="text-[10.5px] font-mono text-muted-foreground block mt-1">
-              {selectedKecamatan === 'all' ? 'Seluruh Kabupaten' : `Kec. ${selectedKecamatan}`}
-            </span>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-500/30 bg-red-500/[0.03]">
-          <CardContent className="p-4">
-            <span className="text-[11px] font-medium text-red-600 dark:text-red-400 block">
-              Beda Dekade (Nyasar)
-            </span>
-            <span className="text-2xl font-mono font-semibold text-red-600 dark:text-red-400 tabular mt-1 block">
-              {formatNumber(stats.totalWrongDekade)}
-            </span>
-            <span className="text-[10.5px] text-muted-foreground block mt-1">
-              Titik GPS masuk dekade lain
-            </span>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">
-              Jarak {`>=`} {formatDistance(distanceThreshold)}
-            </span>
-            <span className="text-2xl font-mono font-semibold text-amber-600 dark:text-amber-400 tabular mt-1 block">
-              {formatNumber(stats.totalOutliersDistance)}
-            </span>
-            <span className="text-[10.5px] text-muted-foreground block mt-1">
-              Deviasi dari pusat dekade
-            </span>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-[11px] font-medium text-primary block">
-              Hanya Titik Estimasi
-            </span>
-            <span className="text-2xl font-mono font-semibold text-primary tabular mt-1 block">
-              {formatNumber(stats.totalEstimated)}
-            </span>
-            <span className="text-[10.5px] text-muted-foreground block mt-1">
-              Belum survei GPS fisik
-            </span>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Main Content Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* ── Left Panel: Filters & Thresholds ── */}
-        <Card className="lg:col-span-1 overflow-hidden">
-          <CardHeader className="px-4 py-3 border-b border-border bg-muted/25">
-            <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-primary" />
-              Filter &amp; Kategori
-            </CardTitle>
-            <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
-              Pilih jenis anomali dan cakupan wilayah
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* Anomaly Category Selector */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-foreground">Jenis Anomali Ditampilkan</Label>
+            <div className="w-[215px]">
               <Select
                 value={anomalyCategory}
                 onValueChange={(v) => setAnomalyCategory(v as AnomalyCategory)}
@@ -722,55 +699,15 @@ export default function DataCorrection() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Anomali (Beda Dekade &amp; Jarak Jauh)</SelectItem>
-                  <SelectItem value="wrong_dekade">Hanya Beda Dekade (Nyasar ke Wilayah Lain)</SelectItem>
-                  <SelectItem value="same_dekade_far">Sesuai Dekade tapi Jarak Jauh</SelectItem>
-                  <SelectItem value="estimated_only">Hanya Titik Estimasi (Tanpa GPS)</SelectItem>
+                  <SelectItem value="all">Semua anomali</SelectItem>
+                  <SelectItem value="wrong_dekade">Beda dekade (nyasar)</SelectItem>
+                  <SelectItem value="same_dekade_far">Sesuai dekade tapi mencar</SelectItem>
+                  <SelectItem value="estimated_only">Titik estimasi (tanpa GPS)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Distance Threshold Slider */}
-            <div className="space-y-2.5 pt-2.5 border-t border-border">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Ruler className="w-3.5 h-3.5 text-primary" />
-                  Batas Toleransi Jarak
-                </Label>
-                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-                  {formatDistance(distanceThreshold)}
-                </span>
-              </div>
-              <Slider
-                value={[distanceThreshold]}
-                onValueChange={([v]) => setDistanceThreshold(v)}
-                min={100}
-                max={5000}
-                step={50}
-                className="py-1"
-              />
-              {/* Quick Presets */}
-              <div className="grid grid-cols-4 gap-1 pt-0.5">
-                {[300, 500, 1000, 2000].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setDistanceThreshold(preset)}
-                    className={`text-[10.5px] py-1 px-1 rounded-md border text-center transition-colors font-mono cursor-pointer ${
-                      distanceThreshold === preset
-                        ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                        : 'bg-muted/40 hover:bg-muted text-muted-foreground border-border'
-                    }`}
-                  >
-                    {formatDistance(preset)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Kecamatan Filter */}
-            <div className="space-y-1.5 pt-2.5 border-t border-border">
-              <Label className="text-xs font-medium text-foreground">Kecamatan</Label>
+            <div className="w-[180px]">
               <Select
                 value={selectedKecamatan}
                 onValueChange={(v) => {
@@ -782,7 +719,7 @@ export default function DataCorrection() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Kecamatan</SelectItem>
+                  <SelectItem value="all">Semua kecamatan</SelectItem>
                   {KECAMATAN_LIST.map((k) => (
                     <SelectItem key={k.kode} value={k.kode}>
                       {k.kode} — {k.nama}
@@ -792,15 +729,13 @@ export default function DataCorrection() {
               </Select>
             </div>
 
-            {/* Wilayah / Dekade Filter */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-foreground">Wilayah / Dekade Terdaftar</Label>
+            <div className="w-[185px]">
               <Select value={selectedWilayah} onValueChange={setSelectedWilayah}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Wilayah</SelectItem>
+                  <SelectItem value="all">Semua wilayah</SelectItem>
                   {filteredWilayahOptions.map((w) => (
                     <SelectItem key={w.kode} value={w.kode}>
                       {w.kode} — {w.nama}
@@ -809,10 +744,142 @@ export default function DataCorrection() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {[300, 500, 1000, 2000].map((preset) => (
+              <Button
+                key={preset}
+                variant={distanceThreshold === preset ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDistanceThreshold(preset)}
+              >
+                ≥ {formatDistance(preset)}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 3: 4 Cloudflare Sparkline Metric Cards */}
+        <div className="px-5 pb-5 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div
+            onClick={() => setAnomalyCategory('all')}
+            className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 pt-4 overflow-hidden flex flex-col justify-between cursor-pointer hover:border-[#d4d4d8] transition-colors"
+          >
+            <div className="px-4">
+              <div className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                Pelanggan teranalisis
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-[24px] leading-tight font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums tracking-tight">
+                  {formatNumber(stats.totalWithCoords)}
+                </span>
+                <span className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                  ↗ {selectedKecamatan === 'all' ? '13 kecamatan' : `Kec. ${selectedKecamatan}`}
+                </span>
+              </div>
+            </div>
+            {renderSparkline(stats.totalWithCoords === 0, 1)}
+          </div>
+
+          <div
+            onClick={() => setAnomalyCategory('wrong_dekade')}
+            className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 pt-4 overflow-hidden flex flex-col justify-between cursor-pointer hover:border-[#d4d4d8] transition-colors"
+          >
+            <div className="px-4">
+              <div className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                Beda dekade (nyasar)
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-[24px] leading-tight font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums tracking-tight">
+                  {formatNumber(stats.totalWrongDekade)}
+                </span>
+                {stats.totalWrongDekade > 0 && (
+                  <span className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                    ↗ {wrongDekadePct}%
+                  </span>
+                )}
+              </div>
+            </div>
+            {renderSparkline(stats.totalWrongDekade === 0, 2)}
+          </div>
+
+          <div
+            onClick={() => setAnomalyCategory('same_dekade_far')}
+            className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 pt-4 overflow-hidden flex flex-col justify-between cursor-pointer hover:border-[#d4d4d8] transition-colors"
+          >
+            <div className="px-4">
+              <div className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                Jarak ≥ {formatDistance(distanceThreshold)}
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-[24px] leading-tight font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums tracking-tight">
+                  {formatNumber(stats.totalOutliersDistance)}
+                </span>
+                {stats.totalOutliersDistance > 0 && (
+                  <span className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                    ↗ {mencarPct}%
+                  </span>
+                )}
+              </div>
+            </div>
+            {renderSparkline(stats.totalOutliersDistance === 0, 3)}
+          </div>
+
+          <div
+            onClick={() => setAnomalyCategory('estimated_only')}
+            className="rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 pt-4 overflow-hidden flex flex-col justify-between cursor-pointer hover:border-[#d4d4d8] transition-colors"
+          >
+            <div className="px-4">
+              <div className="text-[12px] font-normal text-[#71717a] dark:text-zinc-400">
+                Titik estimasi (tanpa GPS)
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-[24px] leading-tight font-semibold text-[#18181b] dark:text-zinc-100 tabular-nums tracking-tight">
+                  {formatNumber(stats.totalEstimated)}
+                </span>
+              </div>
+            </div>
+            {renderSparkline(stats.totalEstimated === 0, 4)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main Content Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* ── Left Panel: Threshold & Top Wilayah ── */}
+        <Card className="lg:col-span-1 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800">
+            <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+              Parameter jarak &amp; wilayah
+            </h2>
+          </div>
+          <CardContent className="p-5 space-y-5">
+            {/* Distance Threshold Slider */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-[#52525b] dark:text-zinc-300">
+                  Batas toleransi jarak
+                </span>
+                <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 px-2.5 py-0.5 text-[11.5px] font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
+                  {formatDistance(distanceThreshold)}
+                </span>
+              </div>
+              <Slider
+                value={[distanceThreshold]}
+                onValueChange={([v]) => setDistanceThreshold(v)}
+                min={100}
+                max={5000}
+                step={50}
+                className="py-1"
+              />
+            </div>
 
             {/* Search Input */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-foreground">Cari Nama / ID / Wilayah</Label>
+            <div className="space-y-1.5 pt-3 border-t border-[#e5e7eb] dark:border-zinc-800">
+              <span className="text-[12.5px] text-[#52525b] dark:text-zinc-300 block">
+                Cari pelanggan
+              </span>
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -822,15 +889,12 @@ export default function DataCorrection() {
 
             {/* Per-Wilayah Breakdown */}
             {stats.perWilayah.size > 0 && (
-              <div className="space-y-2 pt-2.5 border-t border-border">
-                <p className="text-[10px] font-mono uppercase text-muted-foreground flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3" />
-                    Top Wilayah Anomali
-                  </span>
-                  <span className="text-[9px]">Salah / Total</span>
-                </p>
-                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+              <div className="space-y-2 pt-3 border-t border-[#e5e7eb] dark:border-zinc-800">
+                <div className="flex items-center justify-between text-[12px] text-[#71717a] dark:text-zinc-400">
+                  <span>Wilayah anomali tertinggi</span>
+                  <span>Salah / Total</span>
+                </div>
+                <div className="max-h-60 overflow-y-auto divide-y divide-[#e5e7eb] dark:divide-zinc-800 border border-[#e5e7eb] dark:border-zinc-800 rounded-lg">
                   {Array.from(stats.perWilayah.entries())
                     .sort(([, a], [, b]) => b.wrongCount - a.wrongCount || b.count - a.count)
                     .slice(0, 10)
@@ -842,30 +906,23 @@ export default function DataCorrection() {
                           setSelectedKecamatan(kode.slice(0, 2));
                           setSelectedWilayah(kode);
                         }}
-                        className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-[#fafafa] dark:hover:bg-zinc-800/60 transition-colors text-left cursor-pointer"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                          <span className="text-[11.5px] text-[#71717a] tabular-nums shrink-0">
                             {kode}
                           </span>
-                          <span className="text-[11px] text-foreground truncate">{info.nama}</span>
+                          <span className="text-[12.5px] text-[#18181b] dark:text-zinc-100 truncate">
+                            {info.nama}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0 text-[11.5px] tabular-nums">
                           {info.wrongCount > 0 && (
-                            <Badge
-                              variant="destructive"
-                              className="font-mono text-[9.5px] py-0 px-1.5"
-                              title={`${info.wrongCount} data beda dekade`}
-                            >
-                              {info.wrongCount} salah
-                            </Badge>
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              {info.wrongCount}
+                            </span>
                           )}
-                          <Badge
-                            variant="secondary"
-                            className="font-mono text-[9.5px] py-0 px-1.5"
-                          >
-                            {info.count}
-                          </Badge>
+                          <span className="text-[#71717a]">/ {info.count}</span>
                         </div>
                       </button>
                     ))}
@@ -877,66 +934,65 @@ export default function DataCorrection() {
 
         {/* ── Right Panel: Results Table ── */}
         <Card className="lg:col-span-3 overflow-hidden">
-          <CardHeader className="px-4 sm:px-5 py-3 border-b border-border bg-muted/25">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <CardTitle className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                Daftar Analisis Lokasi &amp; Kesesuaian Dekade
-                <Badge variant="outline" className="font-mono text-[10.5px] ml-1">
-                  {formatNumber(outliers.length)} baris
-                </Badge>
-              </CardTitle>
-              <p className="text-[11px] text-muted-foreground">
-                Membandingkan <strong>Dekade Terdaftar</strong> dengan <strong>Dekade Terdeteksi dari Titik GPS</strong>
-              </p>
+          <div className="px-5 py-3.5 border-b border-[#e5e7eb] dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-[15px] font-semibold text-[#18181b] dark:text-zinc-100">
+                Daftar analisis lokasi &amp; kesesuaian dekade
+              </h2>
+              <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 px-2.5 py-0.5 text-[11px] font-medium text-[#52525b] dark:text-zinc-300 tabular-nums">
+                {formatNumber(outliers.length)}
+              </span>
             </div>
-          </CardHeader>
+            <span className="text-[12px] text-[#71717a] dark:text-zinc-400">
+              Perbandingan dekade terdaftar vs dekade terdeteksi GPS
+            </span>
+          </div>
+
           <CardContent className="p-0">
             {outliers.length === 0 ? (
-              <div className="py-20 text-center space-y-2 text-muted-foreground">
-                <CheckCircle2 className="w-9 h-9 mx-auto text-emerald-500 opacity-70" />
-                <p className="text-sm font-medium text-foreground">Tidak Ada Anomali Ditemukan</p>
-                <p className="text-xs max-w-md mx-auto">
+              <div className="py-16 text-center space-y-1.5 text-[#71717a]">
+                <p className="text-[14px] font-medium text-[#18181b] dark:text-zinc-100">
+                  Tidak ada anomali ditemukan
+                </p>
+                <p className="text-[12.5px] max-w-md mx-auto">
                   Semua titik pelanggan pada filter ini berada dalam dekade yang sesuai dan dalam batas jarak toleransi.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-[13px] border-collapse">
                   <thead>
-                    <tr className="bg-muted/35 border-b border-border text-[10.5px] font-mono text-muted-foreground uppercase tracking-wider">
-                      <th className="py-2.5 px-3 w-10">#</th>
+                    <tr className="bg-[#fafafa] dark:bg-zinc-900/50 border-b border-[#e5e7eb] dark:border-zinc-800 text-[12px] text-[#71717a] dark:text-zinc-400">
+                      <th className="py-2.5 px-4 w-10 font-medium">#</th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors"
+                        className="py-2.5 px-3 font-medium cursor-pointer hover:text-[#18181b] transition-colors"
                         onClick={() => toggleSort('kode')}
                       >
                         <span className="flex items-center gap-1">
-                          Kode Pel. <SortIcon field="kode" />
+                          Kode pelanggan <SortIcon field="kode" />
                         </span>
                       </th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors"
+                        className="py-2.5 px-3 font-medium cursor-pointer hover:text-[#18181b] transition-colors"
                         onClick={() => toggleSort('nama')}
                       >
                         <span className="flex items-center gap-1">
-                          Nama &amp; Alamat <SortIcon field="nama" />
+                          Nama &amp; alamat <SortIcon field="nama" />
                         </span>
                       </th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors"
+                        className="py-2.5 px-3 font-medium cursor-pointer hover:text-[#18181b] transition-colors"
                         onClick={() => toggleSort('wilayah')}
                       >
                         <span className="flex items-center gap-1">
-                          Dekade Terdaftar <SortIcon field="wilayah" />
+                          Dekade terdaftar <SortIcon field="wilayah" />
                         </span>
                       </th>
-                      <th className="py-2.5 px-3">
-                        <span className="flex items-center gap-1 font-semibold text-foreground">
-                          Dekade Terdeteksi (GPS)
-                        </span>
+                      <th className="py-2.5 px-3 font-medium">
+                        Dekade terdeteksi (GPS)
                       </th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors text-center"
+                        className="py-2.5 px-3 font-medium cursor-pointer hover:text-[#18181b] transition-colors text-center"
                         onClick={() => toggleSort('kesesuaian')}
                       >
                         <span className="flex items-center justify-center gap-1">
@@ -944,235 +1000,158 @@ export default function DataCorrection() {
                         </span>
                       </th>
                       <th
-                        className="py-2.5 px-3 cursor-pointer hover:text-foreground transition-colors text-right"
+                        className="py-2.5 px-3 font-medium cursor-pointer hover:text-[#18181b] transition-colors text-right"
                         onClick={() => toggleSort('distance')}
                       >
                         <span className="flex items-center justify-end gap-1">
-                          Jarak ke Pusat <SortIcon field="distance" />
+                          Jarak <SortIcon field="distance" />
                         </span>
                       </th>
-                      <th className="py-2.5 px-3 text-center">Aksi</th>
+                      <th className="py-2.5 px-4 font-medium text-right">Tindakan</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-[#e5e7eb] dark:divide-zinc-800">
                     {outliers.slice(0, 200).map((p, idx) => {
                       const isExpanded = expandedRow === p.kode_pelanggan;
 
                       return (
                         <React.Fragment key={p.kode_pelanggan}>
-                          <tr
-                            className={`hover:bg-muted/40 transition-colors ${
-                              p.isWrongDekade ? 'bg-red-500/[0.03]' : ''
-                            } ${isExpanded ? 'bg-muted/25' : ''}`}
-                          >
-                            <td className="py-2.5 px-3 font-mono text-muted-foreground text-[10px]">
+                          <tr className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/50 transition-colors">
+                            <td className="py-3 px-4 text-[#71717a] text-[12px] tabular-nums">
                               {idx + 1}
                             </td>
-                            <td className="py-2.5 px-3">
-                              <span className="font-mono font-semibold text-foreground">
-                                {p.kode_pelanggan}
-                              </span>
+                            <td className="py-3 px-3 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
+                              {p.kode_pelanggan}
                             </td>
-                            <td className="py-2.5 px-3">
+                            <td className="py-3 px-3">
                               <div className="flex flex-col">
-                                <span className="text-foreground font-medium truncate max-w-[170px]">
+                                <span className="text-[#18181b] dark:text-zinc-100 truncate max-w-[170px]">
                                   {p.nama_pelanggan}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[170px]">
+                                <span className="text-[11.5px] text-[#71717a] truncate max-w-[170px]">
                                   {p.alamat || '-'}
                                 </span>
                               </div>
                             </td>
-                            {/* Dekade Terdaftar */}
-                            <td className="py-2.5 px-3">
+                            <td className="py-3 px-3">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] text-muted-foreground">
+                                <span className="text-[12px] text-[#71717a] tabular-nums">
                                   {p.kode_wilayah}
                                 </span>
-                                <span className="text-[11px] text-foreground font-medium">
+                                <span className="text-[12.5px] text-[#18181b] dark:text-zinc-200">
                                   {p.wilayahNamaAcuan}
                                 </span>
                               </div>
                             </td>
-                            {/* Dekade Terdeteksi (Posisi GPS Nyata) */}
-                            <td className="py-2.5 px-3">
+                            <td className="py-3 px-3">
                               {p.detectedWilayah ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-mono text-[10px] font-semibold text-foreground">
+                                  <span className="text-[12px] text-[#71717a] tabular-nums">
                                     {p.detectedWilayah.kode}
                                   </span>
-                                  <span className="text-[11px] font-semibold text-foreground">
+                                  <span className="text-[12.5px] font-medium text-[#18181b] dark:text-zinc-100">
                                     {p.detectedWilayah.nama}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-amber-600 dark:text-amber-400 text-[11px] font-medium">
-                                  Di Luar Klaster Dekade
+                                <span className="text-[#71717a] text-[12px]">
+                                  Di luar klaster dekade
                                 </span>
                               )}
                             </td>
-                            {/* Kesesuaian Badge */}
-                            <td className="py-2.5 px-3 text-center">
+                            <td className="py-3 px-3 text-center">
                               {p.isWrongDekade ? (
-                                <Badge variant="destructive" className="font-mono text-[10px]">
-                                  Beda Dekade!
-                                </Badge>
+                                <span className="inline-flex items-center rounded-full border border-dashed border-red-300 dark:border-red-800 bg-red-50/60 dark:bg-red-950/30 px-2.5 py-0.5 text-[11px] font-medium text-red-700 dark:text-red-300">
+                                  Beda dekade
+                                </span>
                               ) : isPointMencar(p) ? (
-                                <span className="inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                                  Titik Mencar
+                                <span className="inline-flex items-center rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 bg-[#fafafa] dark:bg-zinc-800 px-2.5 py-0.5 text-[11px] text-[#52525b] dark:text-zinc-300">
+                                  Titik mencar
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
-                                  Sesuai Dekade
+                                <span className="text-[12px] text-[#71717a]">
+                                  Sesuai
                                 </span>
                               )}
                             </td>
-                            {/* Jarak ke Pusat Dekade Terdaftar */}
-                            <td className="py-2.5 px-3 text-right">
-                              <span
-                                className={`font-mono font-semibold tabular ${
-                                  p.distanceToCenter >= 2000
-                                    ? 'text-red-600 dark:text-red-400'
-                                    : p.distanceToCenter >= 1000
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-foreground'
-                                }`}
-                              >
-                                {formatDistance(p.distanceToCenter)}
-                              </span>
+                            <td className="py-3 px-3 text-right tabular-nums font-medium text-[#18181b] dark:text-zinc-100">
+                              {formatDistance(p.distanceToCenter)}
                             </td>
-                            {/* Aksi */}
-                            <td className="py-2.5 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setExpandedRow(isExpanded ? null : p.kode_pelanggan)
-                                      }
-                                      className="h-7 w-7 rounded-md border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors cursor-pointer"
-                                      aria-label="Detail data"
-                                    >
-                                      <Eye className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs">
-                                    Detail Anomali
-                                  </TooltipContent>
-                                </Tooltip>
-
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <a
-                                      href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="h-7 w-7 rounded-md border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
-                                      aria-label="Buka Google Maps"
-                                    >
-                                      <MapIcon className="w-3.5 h-3.5" />
-                                    </a>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs">
-                                    Buka Google Maps
-                                  </TooltipContent>
-                                </Tooltip>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    setExpandedRow(isExpanded ? null : p.kode_pelanggan)
+                                  }
+                                  className="h-7 px-2.5 text-[12px]"
+                                >
+                                  Detail
+                                </Button>
+                                <a
+                                  href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[#e4e4e7] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-[#f4f4f5] dark:hover:bg-zinc-800 text-[12px] text-[#18181b] dark:text-zinc-100 transition-colors"
+                                >
+                                  <span>Maps</span>
+                                  <ExternalLink className="w-3 h-3 text-[#71717a]" />
+                                </a>
                               </div>
                             </td>
                           </tr>
 
-                          {/* Expanded Detail View */}
                           {isExpanded && (
-                            <tr className="bg-muted/20 border-y border-border">
-                              <td colSpan={8} className="px-5 py-3.5">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                                  {/* Col 1: Posisi GPS Pelanggan */}
-                                  <div className="space-y-1.5 p-3 rounded-md bg-card border border-border">
-                                    <p className="font-semibold text-foreground flex items-center gap-1.5">
-                                      <MapPin className="w-3.5 h-3.5 text-primary" />
-                                      Titik GPS Pelanggan
+                            <tr className="bg-[#fafafa] dark:bg-zinc-900/40 border-y border-[#e5e7eb] dark:border-zinc-800">
+                              <td colSpan={8} className="px-5 py-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[12.5px]">
+                                  <div className="space-y-1 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800">
+                                    <p className="font-semibold text-[#18181b] dark:text-zinc-100">
+                                      Titik GPS pelanggan
                                     </p>
-                                    <p className="font-mono text-xs text-muted-foreground">
+                                    <p className="text-[#71717a] tabular-nums">
                                       {p.latitude.toFixed(6)}, {p.longitude.toFixed(6)}
                                     </p>
-                                    <div className="pt-1">
-                                      <a
-                                        href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-[11px]"
-                                      >
-                                        Buka Titik di Google Maps <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    </div>
+                                    <a
+                                      href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[#1368f6] hover:underline font-medium text-[12px] pt-1"
+                                    >
+                                      Buka di Google Maps <ExternalLink className="w-3 h-3" />
+                                    </a>
                                   </div>
 
-                                  {/* Col 2: Perbandingan Dekade (Terdaftar vs Terdeteksi) */}
-                                  <div className="space-y-1.5 p-3 rounded-md bg-card border border-border">
-                                    <p className="font-semibold text-foreground flex items-center gap-1.5">
-                                      <Crosshair className="w-3.5 h-3.5 text-amber-500" />
-                                      Perbandingan Dekade &amp; Klaster
+                                  <div className="space-y-1 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800">
+                                    <p className="font-semibold text-[#18181b] dark:text-zinc-100">
+                                      Perbandingan dekade &amp; klaster
                                     </p>
-                                    <div className="space-y-1 text-[11px]">
-                                      <p className="text-muted-foreground">
-                                        Terdaftar: <strong className="text-foreground">{p.kode_wilayah} - {p.wilayahNamaAcuan}</strong>
-                                      </p>
-                                      {p.wilayahCenter && (
-                                        <p className="text-muted-foreground font-mono text-[10px]">
-                                          Pusat Klaster Dekade: {p.wilayahCenter.lat.toFixed(5)}, {p.wilayahCenter.lng.toFixed(5)} (Radius alami ±{formatDistance(p.ownNaturalRadius ?? 400)})
-                                        </p>
+                                    <p className="text-[#71717a]">
+                                      Terdaftar: <strong className="text-[#18181b] dark:text-zinc-100">{p.kode_wilayah} — {p.wilayahNamaAcuan}</strong>
+                                    </p>
+                                    <p className="text-[#71717a]">
+                                      Terdeteksi:{' '}
+                                      {p.detectedWilayah ? (
+                                        <strong className="text-[#18181b] dark:text-zinc-100">
+                                          {p.detectedWilayah.kode} — {p.detectedWilayah.nama}
+                                        </strong>
+                                      ) : (
+                                        <span>Di luar klaster ({formatDistance(p.distanceToCenter)})</span>
                                       )}
-                                      <p className="text-muted-foreground">
-                                        Terdeteksi di Dekade:{' '}
-                                        {p.detectedWilayah ? (
-                                          <strong className={p.isWrongDekade ? 'text-red-600 dark:text-red-400 font-bold' : 'text-emerald-600 font-semibold'}>
-                                            {p.detectedWilayah.kode} - {p.detectedWilayah.nama}
-                                          </strong>
-                                        ) : (
-                                          <strong className="text-amber-600 dark:text-amber-400 font-semibold">
-                                            Di Luar Klaster Dekade (Mencar {formatDistance(p.distanceToCenter)})
-                                          </strong>
-                                        )}
-                                      </p>
-                                      {p.isWrongDekade && (
-                                        <p className="text-red-600 dark:text-red-400 font-medium text-[10.5px]">
-                                          ⚠ Titik fisik berada di dalam klaster {p.detectedWilayah?.nama} (jarak {formatDistance(p.distanceToDetectedCenter)}), terpisah {formatDistance(p.distanceToCenter)} dari klaster {p.wilayahNamaAcuan}!
-                                        </p>
-                                      )}
-                                    </div>
+                                    </p>
                                   </div>
 
-                                  {/* Col 3: Informasi Audit & Status */}
-                                  <div className="space-y-1.5 p-3 rounded-md bg-card border border-border">
-                                    <p className="font-semibold text-foreground flex items-center gap-1.5">
-                                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                                      Data Master &amp; Status
+                                  <div className="space-y-1 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800">
+                                    <p className="font-semibold text-[#18181b] dark:text-zinc-100">
+                                      Data master &amp; status
                                     </p>
-                                    <div className="space-y-0.5 text-[11px] text-muted-foreground">
-                                      <p>
-                                        Kecamatan:{' '}
-                                        <span className="text-foreground font-medium">
-                                          {kecamatanName(p.kode_kecamatan)} ({p.kode_kecamatan})
-                                        </span>
-                                      </p>
-                                      <p>
-                                        Golongan / Status:{' '}
-                                        <span className="text-foreground font-medium">
-                                          {p.golongan} — {p.status_sambungan}
-                                        </span>
-                                      </p>
-                                      {p.spatial_anomaly && (
-                                        <p className="text-amber-600 dark:text-amber-400 font-medium">
-                                          ⚠ {p.spatial_anomaly}
-                                        </p>
-                                      )}
-                                      {(p.flag_reasons || []).length > 0 && (
-                                        <p className="text-red-600 dark:text-red-400">
-                                          Flag: {p.flag_reasons.join('; ')}
-                                        </p>
-                                      )}
-                                    </div>
+                                    <p className="text-[#71717a]">
+                                      Kecamatan: <span className="text-[#18181b] dark:text-zinc-100">{kecamatanName(p.kode_kecamatan)} ({p.kode_kecamatan})</span>
+                                    </p>
+                                    <p className="text-[#71717a]">
+                                      Golongan / Status: <span className="text-[#18181b] dark:text-zinc-100">{p.golongan} — {p.status_sambungan}</span>
+                                    </p>
                                   </div>
                                 </div>
                               </td>
@@ -1185,9 +1164,9 @@ export default function DataCorrection() {
                 </table>
 
                 {outliers.length > 200 && (
-                  <div className="py-3 px-4 text-center text-xs text-muted-foreground border-t border-border bg-muted/20">
-                    Menampilkan 200 data pertama dari total {formatNumber(outliers.length)} data anomali.
-                    Gunakan tombol <strong>Cetak / Ekspor PDF</strong> atau <strong>Ekspor Excel</strong> di atas untuk mengunduh seluruh baris lengkap.
+                  <div className="py-3 px-5 text-center text-[12.5px] text-[#71717a] border-t border-[#e5e7eb] dark:border-zinc-800">
+                    Menampilkan 200 baris pertama dari total {formatNumber(outliers.length)} baris anomali.
+                    Gunakan tombol <strong>Cetak PDF</strong> atau <strong>Ekspor Excel</strong> untuk mengunduh seluruh baris.
                   </div>
                 )}
               </div>
@@ -1195,23 +1174,6 @@ export default function DataCorrection() {
           </CardContent>
         </Card>
       </div>
-
-      {/* ── Guidance Card ── */}
-      <Card>
-        <CardContent className="p-3.5">
-          <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            <span className="font-semibold text-foreground flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-primary" /> Panduan Kesesuaian Dekade:
-            </span>
-            <Badge variant="destructive" className="font-mono text-[10px]">
-              Beda Dekade (Nyasar) — Titik GPS masuk ke dalam klaster dekade lain (rekomendasi: mutasi kode pelanggan)
-            </Badge>
-            <span className="inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-              Titik Mencar — Di luar klaster dekade namun tidak masuk ke klaster dekade lain
-            </span>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
