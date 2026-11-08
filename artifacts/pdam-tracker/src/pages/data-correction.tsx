@@ -84,28 +84,49 @@ function formatNumber(n: number): string {
   return n.toLocaleString('id-ID');
 }
 
-// ── Find nearest dekade centroid to a given GPS coordinate ──
-function findNearestDekade(
+function isEstimatedPoint(p: Pelanggan): boolean {
+  return (p.flag_reasons || []).some((r) => {
+    const low = r.toLowerCase();
+    return low.includes('belum ada titik gps') || low.includes('estimasi');
+  });
+}
+
+interface DekadeClusterInfo {
+  wilayah: WilayahAcuan;
+  centerLat: number;
+  centerLng: number;
+  naturalRadius: number; // Radius sebaran alami (P85) pelanggan di dekade ini (meter)
+  sampleCount: number;
+  isEmpirical: boolean; // true jika dihitung dari median titik GPS aktual pelanggan
+}
+
+// ── Find nearest real dekade cluster to a given GPS coordinate ──
+function findNearestDekadeCluster(
   lat: number,
   lng: number,
-  wilayahList: WilayahAcuan[],
-): { wilayah: WilayahAcuan; distance: number } | null {
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  clusters: DekadeClusterInfo[],
+): { cluster: DekadeClusterInfo; distance: number } | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || clusters.length === 0) return null;
 
-  let nearest: WilayahAcuan | null = null;
+  let nearest: DekadeClusterInfo | null = null;
   let minDistance = Infinity;
 
-  for (const w of wilayahList) {
-    if (Number.isFinite(w.centerLat) && Number.isFinite(w.centerLng)) {
-      const d = haversineDistance(lat, lng, w.centerLat, w.centerLng);
-      if (d < minDistance) {
-        minDistance = d;
-        nearest = w;
-      }
+  for (let i = 0; i < clusters.length; i++) {
+    const c = clusters[i];
+    // Pre-filter cepat berbasis derajat (~15 km) bila sudah menemukan kandidat dekat
+    if (minDistance < 15000) {
+      const dLatDeg = Math.abs(lat - c.centerLat);
+      const dLngDeg = Math.abs(lng - c.centerLng);
+      if (dLatDeg > 0.15 || dLngDeg > 0.15) continue;
+    }
+    const d = haversineDistance(lat, lng, c.centerLat, c.centerLng);
+    if (d < minDistance) {
+      minDistance = d;
+      nearest = c;
     }
   }
 
-  return nearest ? { wilayah: nearest, distance: minDistance } : null;
+  return nearest ? { cluster: nearest, distance: minDistance } : null;
 }
 
 type SortField = 'distance' | 'kode' | 'nama' | 'wilayah' | 'kesesuaian';
@@ -134,7 +155,122 @@ export default function DataCorrection() {
     return map;
   }, [wilayah]);
 
-  // ── Enriched data with distance + detected nearest dekade ──
+  // ── Hitung Titik Pusat Sebenarnya (Robust Median Centroid) & Radius Sebaran Alami (P85) tiap Dekade ──
+  // Mengatasi masalah titik acuan statis (DEFAULT_WILAYAH_LIST) yang meleset 3-13 km dari lokasi riil desa/dekade,
+  // sekaligus tahan terhadap titik mencar ekstrem (mis. titik nyasar ke luar pulau / kecamatan lain).
+  const { dekadeClusterMap, activeDekadeClusters } = useMemo(() => {
+    const byWilayah = new Map<string, Pelanggan[]>();
+
+    for (const p of pelanggan) {
+      if (
+        !Number.isFinite(p.latitude) ||
+        !Number.isFinite(p.longitude) ||
+        (p.latitude === 0 && p.longitude === 0)
+      ) {
+        continue;
+      }
+      if (isEstimatedPoint(p)) continue;
+      // Hanya gunakan koordinat valid di daratan Pulau Lombok untuk menghitung pusat klaster
+      if (
+        p.latitude < -9.2 ||
+        p.latitude > -8.1 ||
+        p.longitude < 115.7 ||
+        p.longitude > 116.8
+      ) {
+        continue;
+      }
+
+      let list = byWilayah.get(p.kode_wilayah);
+      if (!list) {
+        list = [];
+        byWilayah.set(p.kode_wilayah, list);
+      }
+      list.push(p);
+    }
+
+    const clusterMap = new Map<string, DekadeClusterInfo>();
+    const activeList: DekadeClusterInfo[] = [];
+
+    for (const [kode, pts] of byWilayah.entries()) {
+      const wRef = wilayahMap.get(kode);
+      if (pts.length >= 3) {
+        // Tahap 1: Median awal (tahan terhadap hingga 50% titik mencar ekstrem)
+        const lats = pts.map((p) => p.latitude).sort((a, b) => a - b);
+        const lngs = pts.map((p) => p.longitude).sort((a, b) => a - b);
+        const mid = Math.floor(pts.length / 2);
+        const medLat0 = lats[mid];
+        const medLng0 = lngs[mid];
+
+        // Tahap 2: Pertajam pusat klaster hanya dari inlier inti (<= 2.5 km dari median awal, atau 75% terdekat)
+        const withDist0 = pts
+          .map((p) => ({
+            p,
+            d: haversineDistance(p.latitude, p.longitude, medLat0, medLng0),
+          }))
+          .sort((a, b) => a.d - b.d);
+
+        let core = withDist0.filter((x) => x.d <= 2500);
+        if (core.length < Math.min(3, pts.length)) {
+          core = withDist0.slice(0, Math.max(3, Math.ceil(pts.length * 0.75)));
+        }
+
+        const coreLats = core.map((x) => x.p.latitude).sort((a, b) => a - b);
+        const coreLngs = core.map((x) => x.p.longitude).sort((a, b) => a - b);
+        const coreMid = Math.floor(core.length / 2);
+        const centerLat = coreLats[coreMid];
+        const centerLng = coreLngs[coreMid];
+
+        // Tahap 3: Hitung Radius Sebaran Alami (Persentil ke-85 dari klaster inti), dibatasi 250m - 1.600m
+        const coreDists = core
+          .map((x) => haversineDistance(x.p.latitude, x.p.longitude, centerLat, centerLng))
+          .sort((a, b) => a - b);
+        const p85 = coreDists[Math.floor(coreDists.length * 0.85)] || 350;
+        const naturalRadius = Math.max(250, Math.min(1600, p85));
+
+        const wilayahObj: WilayahAcuan = wRef
+          ? { ...wRef, centerLat, centerLng }
+          : {
+              kode,
+              nama: pts[0].nama_wilayah || `Wilayah ${kode}`,
+              kodeKecamatan: pts[0].kode_kecamatan || kode.slice(0, 2),
+              namaKecamatan: kecamatanName(pts[0].kode_kecamatan || kode.slice(0, 2)),
+              centerLat,
+              centerLng,
+              warna: '#0284c7',
+            };
+
+        const info: DekadeClusterInfo = {
+          wilayah: wilayahObj,
+          centerLat,
+          centerLng,
+          naturalRadius,
+          sampleCount: pts.length,
+          isEmpirical: true,
+        };
+        clusterMap.set(kode, info);
+        activeList.push(info);
+      }
+    }
+
+    // Fallback untuk wilayah yang punya < 3 titik GPS aktual
+    for (const w of wilayah) {
+      if (!clusterMap.has(w.kode) && Number.isFinite(w.centerLat) && Number.isFinite(w.centerLng)) {
+        const info: DekadeClusterInfo = {
+          wilayah: w,
+          centerLat: w.centerLat,
+          centerLng: w.centerLng,
+          naturalRadius: 500,
+          sampleCount: byWilayah.get(w.kode)?.length ?? 0,
+          isEmpirical: false,
+        };
+        clusterMap.set(w.kode, info);
+      }
+    }
+
+    return { dekadeClusterMap: clusterMap, activeDekadeClusters: activeList };
+  }, [pelanggan, wilayah, wilayahMap]);
+
+  // ── Enriched data with real distance to dekade cluster + accurate wrong-dekade detection ──
   const enrichedData = useMemo(() => {
     const result: PelangganOutlierItem[] = [];
     for (const p of pelanggan) {
@@ -146,35 +282,64 @@ export default function DataCorrection() {
         continue;
       }
 
+      const isEst = isEstimatedPoint(p);
+      const ownCluster = dekadeClusterMap.get(p.kode_wilayah);
       const wRef = wilayahMap.get(p.kode_wilayah);
+
       let distanceToCenter = 0;
       let wilayahCenter: { lat: number; lng: number } | null = null;
-      let wilayahNamaAcuan = p.nama_wilayah || `Wilayah ${p.kode_wilayah}`;
+      let wilayahNamaAcuan = wRef?.nama || p.nama_wilayah || `Wilayah ${p.kode_wilayah}`;
+      const ownNaturalRadius = ownCluster?.naturalRadius ?? 500;
 
-      if (wRef && Number.isFinite(wRef.centerLat) && Number.isFinite(wRef.centerLng)) {
-        wilayahCenter = { lat: wRef.centerLat, lng: wRef.centerLng };
-        wilayahNamaAcuan = wRef.nama;
+      if (ownCluster) {
+        wilayahCenter = { lat: ownCluster.centerLat, lng: ownCluster.centerLng };
+        wilayahNamaAcuan = ownCluster.wilayah.nama;
         distanceToCenter = haversineDistance(
           p.latitude,
           p.longitude,
-          wRef.centerLat,
-          wRef.centerLng,
+          ownCluster.centerLat,
+          ownCluster.centerLng,
         );
       } else if (p.kode_kecamatan && KECAMATAN_BOUNDS[p.kode_kecamatan]) {
-        // Fallback to kecamatan centroid
         const [cLat, cLng] = boundsCenter(KECAMATAN_BOUNDS[p.kode_kecamatan]);
         wilayahCenter = { lat: cLat, lng: cLng };
         wilayahNamaAcuan = `Kec. ${kecamatanName(p.kode_kecamatan)} (Estimasi Pusat)`;
         distanceToCenter = haversineDistance(p.latitude, p.longitude, cLat, cLng);
       }
 
-      // Deteksi dekade fisik terdekat (misal Bonder vs Karang Daye)
-      const nearest = findNearestDekade(p.latitude, p.longitude, wilayah);
-      const detectedWilayah = nearest?.wilayah ?? null;
-      const distanceToDetectedCenter = nearest?.distance ?? 0;
-      const isWrongDekade = Boolean(
-        detectedWilayah && detectedWilayah.kode !== p.kode_wilayah,
+      // Cari klaster dekade nyata terdekat dari titik GPS pelanggan
+      const nearest = findNearestDekadeCluster(
+        p.latitude,
+        p.longitude,
+        activeDekadeClusters,
       );
+      const nearestCluster = nearest?.cluster ?? null;
+      const distanceToDetectedCenter = nearest?.distance ?? 0;
+
+      // Pelanggan dinyatakan "Beda Dekade (Nyasar ke Dekade Lain)" HANYA JIKA:
+      // 1. Bukan titik estimasi (memiliki koordinat GPS nyata)
+      // 2. Berada di luar radius sebaran alami dekadenya sendiri (> max(350m, radiusAlami * 1.15))
+      // 3. Klaster dekade terdekat berbeda dengan dekade terdaftar
+      // 4. Titik GPS benar-benar masuk ke dalam klaster dekade lain tersebut (<= max(550m, radiusTarget * 1.3))
+      //    dan jaraknya secara signifikan lebih dekat ke pusat dekade lain (< 65% jarak ke pusat dekade sendiri)
+      const isWrongDekade = Boolean(
+        !isEst &&
+          nearestCluster &&
+          nearestCluster.wilayah.kode !== p.kode_wilayah &&
+          distanceToCenter > Math.max(350, ownNaturalRadius * 1.15) &&
+          distanceToDetectedCenter <= Math.max(550, nearestCluster.naturalRadius * 1.3) &&
+          distanceToDetectedCenter < distanceToCenter * 0.65,
+      );
+
+      // Bila titik pelanggan sesuai dekade (atau mencar jauh di luar klaster manapun),
+      // tampilkan dekade terdeteksi sesuai status riilnya agar tidak menyesatkan
+      const detectedWilayah: WilayahAcuan | null = isWrongDekade
+        ? nearestCluster!.wilayah
+        : distanceToCenter <= Math.max(500, ownNaturalRadius * 1.25)
+        ? ownCluster?.wilayah ?? wRef ?? null
+        : nearestCluster && distanceToDetectedCenter <= Math.max(800, nearestCluster.naturalRadius * 1.5)
+        ? nearestCluster.wilayah
+        : null;
 
       result.push({
         ...p,
@@ -184,10 +349,11 @@ export default function DataCorrection() {
         detectedWilayah,
         distanceToDetectedCenter,
         isWrongDekade,
+        ownNaturalRadius,
       });
     }
     return result;
-  }, [pelanggan, wilayahMap, wilayah]);
+  }, [pelanggan, dekadeClusterMap, activeDekadeClusters, wilayahMap]);
 
   // ── Scoped data based on selected kecamatan and wilayah ──
   const scopedData = useMemo(() => {
@@ -207,31 +373,34 @@ export default function DataCorrection() {
     return wilayah.filter((w) => w.kodeKecamatan === selectedKecamatan);
   }, [wilayah, selectedKecamatan]);
 
+  // Helper: apakah titik pelanggan ini mencar (keluar dari sebaran alami dekadenya & melewati batas toleransi jarak)
+  const isPointMencar = useCallback(
+    (p: PelangganOutlierItem) => {
+      if (isEstimatedPoint(p)) return false;
+      const minNatural = (p.ownNaturalRadius ?? 400) * 1.2;
+      const effectiveMinDist = Math.max(distanceThreshold, minNatural);
+      return p.distanceToCenter >= effectiveMinDist;
+    },
+    [distanceThreshold],
+  );
+
   // ── Filtered Outliers List ──
   const outliers = useMemo(() => {
     let filtered = scopedData;
 
     // Filter berdasarkan Kategori Anomali
     if (anomalyCategory === 'wrong_dekade') {
-      // Hanya yang salah dekade (terdaftar di A tapi titiknya di B, misal Bonder tapi di Karang Daye)
+      // Hanya yang salah dekade (terdaftar di A tapi titiknya berada di dalam klaster dekade B)
       filtered = filtered.filter((p) => p.isWrongDekade);
     } else if (anomalyCategory === 'same_dekade_far') {
-      // Sesuai dekadenya, tetapi jaraknya jauh (>= threshold)
-      filtered = filtered.filter((p) => !p.isWrongDekade && p.distanceToCenter >= distanceThreshold);
+      // Titik mencar / jaraknya jauh dari klaster dekadenya sendiri
+      filtered = filtered.filter((p) => !p.isWrongDekade && isPointMencar(p));
     } else if (anomalyCategory === 'estimated_only') {
       // Hanya pelanggan tanpa GPS (memakai titik estimasi)
-      filtered = filtered.filter((p) =>
-        (p.flag_reasons || []).some(
-          (r) =>
-            r.toLowerCase().includes('belum ada titik gps') ||
-            r.toLowerCase().includes('estimasi'),
-        ),
-      );
+      filtered = filtered.filter((p) => isEstimatedPoint(p));
     } else {
-      // Default 'all': Salah dekade ATAU jarak ke pusat >= threshold
-      filtered = filtered.filter(
-        (p) => p.isWrongDekade || p.distanceToCenter >= distanceThreshold,
-      );
+      // Default 'all': Salah dekade ATAU titik mencar jauh dari pusat dekadenya
+      filtered = filtered.filter((p) => p.isWrongDekade || isPointMencar(p));
     }
 
     // Filter Pencarian Teks
@@ -275,7 +444,7 @@ export default function DataCorrection() {
   }, [
     scopedData,
     anomalyCategory,
-    distanceThreshold,
+    isPointMencar,
     searchQuery,
     sortField,
     sortDir,
@@ -285,14 +454,8 @@ export default function DataCorrection() {
   const stats = useMemo(() => {
     const totalWithCoords = scopedData.length;
     const totalWrongDekade = scopedData.filter((p) => p.isWrongDekade).length;
-    const totalOutliersDistance = scopedData.filter((p) => p.distanceToCenter >= distanceThreshold).length;
-    const totalEstimated = scopedData.filter((p) =>
-      (p.flag_reasons || []).some(
-        (r) =>
-          r.toLowerCase().includes('belum ada titik gps') ||
-          r.toLowerCase().includes('estimasi'),
-      ),
-    ).length;
+    const totalOutliersDistance = scopedData.filter((p) => isPointMencar(p)).length;
+    const totalEstimated = scopedData.filter((p) => isEstimatedPoint(p)).length;
 
     // Per-wilayah breakdown of outliers
     const perWilayah = new Map<
@@ -316,7 +479,7 @@ export default function DataCorrection() {
     }
 
     return { totalWithCoords, totalWrongDekade, totalOutliersDistance, totalEstimated, perWilayah };
-  }, [scopedData, outliers, distanceThreshold]);
+  }, [scopedData, outliers, isPointMencar]);
 
   // ── Sort toggle ──
   const toggleSort = useCallback(
@@ -855,7 +1018,9 @@ export default function DataCorrection() {
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground text-[11px] italic">-</span>
+                                <span className="text-amber-600 dark:text-amber-400 text-[11px] font-medium">
+                                  Di Luar Klaster Dekade
+                                </span>
                               )}
                             </td>
                             {/* Kesesuaian Badge */}
@@ -866,6 +1031,13 @@ export default function DataCorrection() {
                                   className="font-mono text-[9.5px] py-0.5 px-2 bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-300 font-bold"
                                 >
                                   Beda Dekade!
+                                </Badge>
+                              ) : isPointMencar(p) ? (
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[9.5px] py-0.5 px-2 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 font-bold"
+                                >
+                                  Titik Mencar
                                 </Badge>
                               ) : (
                                 <Badge
@@ -961,21 +1133,32 @@ export default function DataCorrection() {
                                   <div className="space-y-1.5 p-3 rounded-xl bg-card border border-border/60">
                                     <p className="font-semibold text-foreground flex items-center gap-1.5">
                                       <Crosshair className="w-3.5 h-3.5 text-amber-500" />
-                                      Perbandingan Dekade
+                                      Perbandingan Dekade & Klaster
                                     </p>
                                     <div className="space-y-1 text-[11px]">
                                       <p className="text-muted-foreground">
                                         Terdaftar: <strong className="text-foreground">{p.kode_wilayah} - {p.wilayahNamaAcuan}</strong>
                                       </p>
+                                      {p.wilayahCenter && (
+                                        <p className="text-muted-foreground font-mono text-[10px]">
+                                          Pusat Klaster Dekade: {p.wilayahCenter.lat.toFixed(5)}, {p.wilayahCenter.lng.toFixed(5)} (Radius alami ±{formatDistance(p.ownNaturalRadius ?? 400)})
+                                        </p>
+                                      )}
                                       <p className="text-muted-foreground">
                                         Terdeteksi di Dekade:{' '}
-                                        <strong className={p.isWrongDekade ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-emerald-600 font-semibold'}>
-                                          {p.detectedWilayah?.kode} - {p.detectedWilayah?.nama}
-                                        </strong>
+                                        {p.detectedWilayah ? (
+                                          <strong className={p.isWrongDekade ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-emerald-600 font-semibold'}>
+                                            {p.detectedWilayah.kode} - {p.detectedWilayah.nama}
+                                          </strong>
+                                        ) : (
+                                          <strong className="text-amber-600 dark:text-amber-400 font-semibold">
+                                            Di Luar Klaster Dekade (Mencar {formatDistance(p.distanceToCenter)})
+                                          </strong>
+                                        )}
                                       </p>
                                       {p.isWrongDekade && (
                                         <p className="text-rose-600 dark:text-rose-400 font-medium text-[10.5px]">
-                                          ⚠ Titik fisik berada di area {p.detectedWilayah?.nama}, bukan di {p.wilayahNamaAcuan}!
+                                          ⚠ Titik fisik berada di dalam klaster {p.detectedWilayah?.nama} (jarak {formatDistance(p.distanceToDetectedCenter)}), terpisah {formatDistance(p.distanceToCenter)} dari klaster {p.wilayahNamaAcuan}!
                                         </p>
                                       )}
                                     </div>

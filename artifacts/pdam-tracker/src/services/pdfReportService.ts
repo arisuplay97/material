@@ -11,6 +11,8 @@ export interface PelangganOutlierItem extends Pelanggan {
   detectedWilayah: WilayahAcuan | null;
   distanceToDetectedCenter: number;
   isWrongDekade: boolean;
+  ownNaturalRadius?: number;
+  isMencar?: boolean;
 }
 
 export interface PdfReportOptions {

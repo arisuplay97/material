@@ -9,6 +9,14 @@ import { futuristicMapStyle } from '@/lib/futuristicMapStyle';
 import { futuristicLightMapStyle } from '@/lib/futuristicLightMapStyle';
 import { lombokTengahStyle } from '@/lib/lombokTengahStyle';
 
+// Gunakan worker mandiri di /maplibre-gl-worker.js (folder public) agar:
+// 1. Saat mode dev, Vite tidak menyuntikkan /@vite/client (yang memakai `document` dan membuat worker mati).
+// 2. Saat mode production (build Vercel), file worker selalu tersedia (tidak 404).
+try {
+  maplibregl.setWorkerUrl('/maplibre-gl-worker.js');
+  maplibregl.prewarm();
+} catch {}
+
 const EMPTY_FEATURE_COLLECTION = {
   type: 'FeatureCollection' as const,
   features: [],
@@ -339,9 +347,14 @@ export default function MapLibrePrimaryMap({
   getFeatureLayerKey,
 }: MapLibrePrimaryMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const instantCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const styleReadyRef = useRef<boolean>(false);
+  const webglCustomerReadyRef = useRef<boolean>(false);
+  const lastSentGeoJsonRef = useRef<any>(null);
   const currentBasemapRef = useRef<string>(basemapKey);
+  const filteredCustomersRef = useRef<Pelanggan[]>(filteredCustomers);
+  filteredCustomersRef.current = filteredCustomers;
 
   // Popups & Markers
   const clickPopupRef = useRef<maplibregl.Popup | null>(null);
@@ -740,6 +753,118 @@ export default function MapLibrePrimaryMap({
     return '#FFFFFF';
   }, []);
 
+  // ── Instant First-Paint Canvas (0ms Delay Bridge) ──
+  // Menggambar titik pelanggan secara instan (< 15ms di Frame 1) selagi Web Worker MapLibre
+  // memotong ubin vektor (geojson-vt) di latar belakang, lalu otomatis hilang begitu WebGL siap!
+  const paintInstantCanvas = useCallback(() => {
+    const canvas = instantCanvasRef.current;
+    const map = mapRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const state = latestDataRef.current;
+    // Jika WebGL sudah selesai memuat ubin titik pelanggan, atau mode klaster/sembunyi aktif, bersihkan kanvas jembatan
+    if (
+      !map ||
+      webglCustomerReadyRef.current ||
+      !state.showCustomerPoints ||
+      state.useCluster
+    ) {
+      if (canvas.width > 0 && canvas.height > 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const list = filteredCustomersRef.current;
+    if (!list || list.length === 0) {
+      ctx.restore();
+      return;
+    }
+
+    const bounds = map.getBounds();
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const south = bounds.getSouth();
+    const north = bounds.getNorth();
+    const zoom = map.getZoom();
+    const radius = zoom <= 10 ? 1.85 : zoom <= 13 ? 2.8 : zoom <= 16 ? 4.0 : 5.0;
+
+    // Kelompokkan koordinat layar per warna agar hanya 1x fill() & stroke() per warna
+    const byColor = new Map<string, number[]>();
+    const wMap = wilayahMapRef.current;
+    const mode = state.colorBy;
+
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const lngLat = toMapLibreLngLat(c.latitude, c.longitude);
+      if (!lngLat) continue;
+      const [lng, lat] = lngLat;
+      if (lng < west || lng > east || lat < south || lat > north) continue;
+
+      const pt = map.project(lngLat);
+      if (pt.x < -8 || pt.x > w + 8 || pt.y < -8 || pt.y > h + 8) continue;
+
+      let col = '#3B6EA8';
+      if (mode === 'status') {
+        col =
+          c.status_sambungan === 'Aktif'
+            ? '#10B981'
+            : c.status_sambungan === 'Nonaktif'
+              ? '#F59E0B'
+              : c.status_sambungan === 'Putus'
+                ? '#EF4444'
+                : '#3B6EA8';
+      } else {
+        col = safeColor(wMap.get(c.kode_wilayah)?.warna, '#3B6EA8');
+      }
+
+      let arr = byColor.get(col);
+      if (!arr) {
+        arr = [];
+        byColor.set(col, arr);
+      }
+      arr.push(pt.x, pt.y);
+    }
+
+    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.globalAlpha = 0.95;
+
+    const twoPi = Math.PI * 2;
+    for (const [col, coords] of byColor.entries()) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      for (let i = 0; i < coords.length; i += 2) {
+        const x = coords[i];
+        const y = coords[i + 1];
+        ctx.moveTo(x + radius, y);
+        ctx.arc(x, y, radius, 0, twoPi);
+      }
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }, []);
+
   // ── Fungsi Pemasang Seluruh Source & Layer GIS di atas Style MapLibre ──
   const setupGisLayersOnStyle = useCallback(
     (map: maplibregl.Map) => {
@@ -900,14 +1025,13 @@ export default function MapLibrePrimaryMap({
         map.addSource('pdam-customers-unclustered', {
           type: 'geojson',
           data: state.allCustomerGeoJson as any,
-          maxzoom: 14,
-          tolerance: 0,
-          buffer: 64,
         });
-      } else {
+        lastSentGeoJsonRef.current = state.allCustomerGeoJson;
+      } else if (lastSentGeoJsonRef.current !== state.allCustomerGeoJson) {
         (map.getSource('pdam-customers-unclustered') as maplibregl.GeoJSONSource).setData(
           state.allCustomerGeoJson as any
         );
+        lastSentGeoJsonRef.current = state.allCustomerGeoJson;
       }
 
       // Lingkaran utama titik pelanggan (GPU WebGL) — warna murni sesuai Wilayah/Status dengan border putih bersih
@@ -1094,15 +1218,44 @@ export default function MapLibrePrimaryMap({
         if (!((map as any).style && (map as any).style._loaded)) return;
         try {
           setupGisLayersOnStyle(map);
+          paintInstantCanvas();
           map.triggerRepaint();
           lastRenderMsRef.current = Math.round((performance.now() - tStart) * 10) / 10;
         } catch {}
       };
 
+      // Gambar titik secara instan di Frame 1 menggunakan kanvas jembatan sampai WebGL siap
+      paintInstantCanvas();
+
       map.on('style.load', handleStyleReady);
       map.on('styledata', handleStyleReady);
       map.on('load', handleStyleReady);
       handleStyleReady();
+
+      const checkWebglReady = () => {
+        if (!isMounted) return;
+        try {
+          if (
+            map.getSource('pdam-customers-unclustered') &&
+            map.isSourceLoaded('pdam-customers-unclustered')
+          ) {
+            if (!webglCustomerReadyRef.current) {
+              webglCustomerReadyRef.current = true;
+              paintInstantCanvas(); // Bersihkan kanvas jembatan karena WebGL sudah mengambil alih
+            }
+            return;
+          }
+        } catch {}
+        if (!webglCustomerReadyRef.current) {
+          paintInstantCanvas();
+        }
+      };
+
+      map.on('sourcedata', checkWebglReady);
+      map.on('move', () => {
+        if (!webglCustomerReadyRef.current) paintInstantCanvas();
+      });
+      map.on('render', checkWebglReady);
 
       // ── INTERAKSI KLIK & HOVER (Langsung Ditangkap oleh MapLibre GL) ──
       const interactiveLayers = [
@@ -1374,6 +1527,9 @@ export default function MapLibrePrimaryMap({
     if (!map || currentBasemapRef.current === basemapKey) return;
     currentBasemapRef.current = basemapKey;
     styleReadyRef.current = false;
+    webglCustomerReadyRef.current = false;
+    lastSentGeoJsonRef.current = null;
+    paintInstantCanvas();
 
     const nextStyle = resolveMapStyleSync(basemapKey);
     map.setStyle(nextStyle);
@@ -1386,7 +1542,7 @@ export default function MapLibrePrimaryMap({
     map.once('style.load', onStyleLoad);
     map.once('styledata', onStyleLoad);
     onStyleLoad();
-  }, [basemapKey, setupGisLayersOnStyle]);
+  }, [basemapKey, setupGisLayersOnStyle, paintInstantCanvas]);
 
   // ── Update Data Sumber Titik Pelanggan (All Customers) ──
   useEffect(() => {
@@ -1399,14 +1555,24 @@ export default function MapLibrePrimaryMap({
         return;
       }
     }
-    const t0 = performance.now();
     const src = map.getSource('pdam-customers-unclustered') as maplibregl.GeoJSONSource | undefined;
-    if (src) {
+    if (src && lastSentGeoJsonRef.current !== allCustomerGeoJson) {
+      const t0 = performance.now();
+      webglCustomerReadyRef.current = false;
+      lastSentGeoJsonRef.current = allCustomerGeoJson;
+      paintInstantCanvas();
       src.setData(allCustomerGeoJson as any);
       map.triggerRepaint();
       lastRenderMsRef.current = Math.round((performance.now() - t0) * 10) / 10;
     }
-  }, [allCustomerGeoJson, setupGisLayersOnStyle]);
+  }, [allCustomerGeoJson, setupGisLayersOnStyle, paintInstantCanvas]);
+
+  // ── Perbarui Kanvas Instan Saat Filter / Pewarnaan / Visibilitas Berubah Sebelum WebGL Siap ──
+  useEffect(() => {
+    if (!webglCustomerReadyRef.current) {
+      paintInstantCanvas();
+    }
+  }, [filteredCustomers, colorBy, showCustomerPoints, useCluster, paintInstantCanvas]);
 
   // ── Update Data Sumber Klaster ──
   useEffect(() => {
@@ -1601,5 +1767,13 @@ export default function MapLibrePrimaryMap({
     };
   }, [pulsePosition, pulseActive]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={containerRef} className="w-full h-full" />
+      <canvas
+        ref={instantCanvasRef}
+        className="pointer-events-none absolute inset-0 w-full h-full z-[1]"
+      />
+    </div>
+  );
 }
