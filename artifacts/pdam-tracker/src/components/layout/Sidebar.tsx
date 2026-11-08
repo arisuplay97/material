@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 export function Sidebar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const isAdmin = user?.role === 'admin';
   const isCollapsed = state === 'collapsed';
 
@@ -49,16 +49,25 @@ export function Sidebar() {
 
   const roleText = user?.role ? ROLE_LABEL[user.role] : 'Petugas';
 
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
-    <SidebarPrimitive collapsible="icon" className="z-40 border-r border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900 select-none">
-      {/* Tombol Show/Hide: Menempel di pinggir garis pembatas sidebar, tanpa border sama sekali */}
+    <SidebarPrimitive
+      collapsible="icon"
+      className="z-50 border-r border-border bg-card select-none"
+    >
+      {/* Tombol Show/Hide Desktop: Kumo square-rounded control */}
       <button
         id="sidebar-edge-toggle"
         type="button"
         onClick={toggleSidebar}
         aria-label={isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
         title={isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
-        className="absolute -right-3 top-5 z-50 hidden h-6 w-6 items-center justify-center rounded-full border border-neutral-200/80 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 shadow-2xs transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-900 md:flex cursor-pointer"
+        className="absolute -right-3 top-4 z-50 hidden h-6 w-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-2xs transition-colors duration-100 hover:bg-muted hover:text-foreground md:flex cursor-pointer"
       >
         <ChevronLeft
           className={cn('h-3.5 w-3.5 transition-transform duration-200', isCollapsed && 'rotate-180')}
@@ -67,16 +76,16 @@ export function Sidebar() {
       </button>
 
       {/* Brand Header */}
-      <SidebarHeader className="h-16 justify-center border-b border-neutral-200/60 dark:border-neutral-800/80 px-4">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1 border border-neutral-200/50 dark:border-neutral-700">
+      <SidebarHeader className="h-13 justify-center border-b border-border px-3.5">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/60 p-1 border border-border">
             <img src="/slip.png" alt="Logo PDAM" className="h-full w-full object-contain" />
           </span>
           <div className="flex min-w-0 flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-xs font-semibold tracking-tight text-neutral-900 dark:text-white">
+            <span className="truncate text-xs font-semibold tracking-tight text-foreground">
               PDAM Tirta Ardhia Rinjani
             </span>
-            <span className="truncate text-[10.5px] text-neutral-400">
+            <span className="truncate font-mono text-[10px] text-muted-foreground">
               Kab. Lombok Tengah
             </span>
           </div>
@@ -84,11 +93,11 @@ export function Sidebar() {
       </SidebarHeader>
 
       {/* Navigation Menu */}
-      <SidebarContent className="px-3 py-4">
-        <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 group-data-[collapsible=icon]:hidden">
-          Menu Utama
+      <SidebarContent className="px-2.5 py-3.5">
+        <p className="mb-1.5 px-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground group-data-[collapsible=icon]:hidden">
+          Navigasi
         </p>
-        <SidebarMenu className="gap-1">
+        <SidebarMenu className="gap-0.5">
           {navItems.map((item) => {
             const isActive = location === item.path || (item.path !== '/' && location.startsWith(item.path));
             const isRestricted = item.adminOnly && !isAdmin;
@@ -99,10 +108,10 @@ export function Sidebar() {
                 <SidebarMenuItem key={item.path}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex h-9.5 cursor-not-allowed items-center gap-3 rounded-xl px-3 text-xs text-neutral-400/60 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                      <div className="flex h-8.5 cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 text-xs text-muted-foreground/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                         <Icon className="h-4 w-4 shrink-0" />
                         <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
-                        <Lock className="ml-auto h-3 w-3 group-data-[collapsible=icon]:hidden text-neutral-300" />
+                        <Lock className="ml-auto h-3 w-3 group-data-[collapsible=icon]:hidden text-muted-foreground/40" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="right" className="text-xs">
@@ -115,21 +124,23 @@ export function Sidebar() {
 
             return (
               <SidebarMenuItem key={item.path}>
-                <Link href={item.path}>
+                <Link href={item.path} onClick={handleNavClick}>
                   <SidebarMenuButton
                     isActive={isActive}
                     tooltip={item.title}
                     className={cn(
-                      'group flex h-9.5 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-xs transition-colors duration-150',
+                      'group relative flex h-8.5 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors duration-100',
                       isActive
-                        ? 'bg-neutral-100 dark:bg-neutral-800 font-semibold text-neutral-900 dark:text-white shadow-2xs'
-                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-white font-medium',
+                        ? 'bg-[#055AD4]/10 dark:bg-blue-500/15 font-semibold text-[#055AD4] dark:text-blue-300 border border-[#055AD4]/20 dark:border-blue-400/25'
+                        : 'border border-transparent text-muted-foreground hover:bg-muted/80 hover:text-foreground font-medium',
                     )}
                   >
                     <Icon
                       className={cn(
                         'h-4 w-4 shrink-0 transition-colors',
-                        isActive ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200',
+                        isActive
+                          ? 'text-[#055AD4] dark:text-blue-400'
+                          : 'text-muted-foreground group-hover:text-foreground',
                       )}
                     />
                     <span className="truncate">{item.title}</span>
@@ -142,21 +153,21 @@ export function Sidebar() {
       </SidebarContent>
 
       {/* User Footer Profile */}
-      <SidebarFooter className="border-t border-neutral-200/60 dark:border-neutral-800/80 p-3">
-        <div className="flex items-center gap-2.5 rounded-xl p-1.5 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold">
+      <SidebarFooter className="border-t border-border p-2.5">
+        <div className="flex items-center gap-2.5 rounded-md p-1.5 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
+          <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-mono text-[11px] font-semibold border border-border">
             {initials}
           </div>
           <div className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-xs font-semibold text-neutral-900 dark:text-white">{user?.name || 'Petugas'}</span>
-            <span className="truncate text-[10.5px] text-neutral-400">{roleText}</span>
+            <span className="truncate text-xs font-semibold text-foreground">{user?.name || 'Petugas'}</span>
+            <span className="truncate font-mono text-[10px] text-muted-foreground">{roleText}</span>
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={logout}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white focus-visible:outline-none group-data-[collapsible=icon]:hidden cursor-pointer"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground focus-visible:outline-none group-data-[collapsible=icon]:hidden cursor-pointer"
                 aria-label="Keluar"
               >
                 <LogOut className="h-3.5 w-3.5" />

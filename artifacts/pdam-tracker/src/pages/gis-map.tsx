@@ -1133,8 +1133,10 @@ export default function GisMap() {
   const [pulseActive, setPulseActive] = useState<boolean>(false);
   const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Drawers & Panes
-  const [showLegend, setShowLegend] = useState<boolean>(true);
+  // Drawers & Panes (sembunyikan legenda secara default di layar HP agar peta leluasa)
+  const [showLegend, setShowLegend] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 640 : true
+  );
   const [legendTab, setLegendTab] = useState<'pipa' | 'wilayah'>('pipa');
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
   const [showTechnicalSymbols, setShowTechnicalSymbols] = useState<boolean>(false);
@@ -1194,6 +1196,7 @@ export default function GisMap() {
 
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isPseudoFullscreen, setIsPseudoFullscreen] = useState<boolean>(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   // Quick anomaly filter toggle
@@ -1734,26 +1737,106 @@ export default function GisMap() {
     }
   }, [pelangganList, handleSelectCustomer, update]);
 
-  // Fullscreen listener
+  const triggerMapResize = useCallback(() => {
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 180);
+  }, []);
+
+  // Fullscreen listener (mendukung Fullscreen API standar, WebKit, dan fallback layar penuh CSS di HP/iOS Safari)
   useEffect(() => {
     const handler = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const fsEl =
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        null;
+      const active = Boolean(fsEl);
+      setIsFullscreen(active);
+      if (!active) {
+        setIsPseudoFullscreen(false);
+        document.body.style.overflow = '';
+      }
+      triggerMapResize();
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPseudoFullscreen) {
+        setIsPseudoFullscreen(false);
+        setIsFullscreen(false);
+        document.body.style.overflow = '';
+        triggerMapResize();
+      }
     };
     document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
+    document.addEventListener('webkitfullscreenchange', handler);
+    window.addEventListener('keydown', keyHandler);
+    return () => {
+      document.removeEventListener('fullscreenchange', handler);
+      document.removeEventListener('webkitfullscreenchange', handler);
+      window.removeEventListener('keydown', keyHandler);
+      document.body.style.overflow = '';
+    };
+  }, [isPseudoFullscreen, triggerMapResize]);
 
-  // Fullscreen toggle
+  // Fullscreen toggle (kompatibel penuh di Desktop, Android, dan iPhone iOS Safari)
   const toggleFullscreen = useCallback(() => {
-    const el = mapContainerRef.current;
+    const el = mapContainerRef.current as any;
     if (!el) return;
 
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    const fsEl =
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      null;
+
+    // Keluar dari mode layar penuh
+    if (fsEl || isPseudoFullscreen || isFullscreen) {
+      if (fsEl) {
+        const exitFn =
+          document.exitFullscreen ||
+          (document as any).webkitExitFullscreen;
+        if (exitFn) {
+          Promise.resolve(exitFn.call(document)).catch(() => {});
+        }
+      }
+      setIsPseudoFullscreen(false);
+      setIsFullscreen(false);
+      document.body.style.overflow = '';
+      triggerMapResize();
+      return;
     }
-  }, []);
+
+    // Masuk ke mode layar penuh: coba Native Fullscreen API, fallback otomatis ke CSS Viewport Fullscreen untuk iOS/HP
+    const reqFn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (reqFn) {
+      try {
+        const res = reqFn.call(el);
+        if (res && typeof res.then === 'function') {
+          res
+            .then(() => {
+              setIsFullscreen(true);
+              triggerMapResize();
+            })
+            .catch(() => {
+              setIsPseudoFullscreen(true);
+              setIsFullscreen(true);
+              document.body.style.overflow = 'hidden';
+              triggerMapResize();
+            });
+        } else {
+          setIsFullscreen(true);
+          triggerMapResize();
+        }
+      } catch {
+        setIsPseudoFullscreen(true);
+        setIsFullscreen(true);
+        document.body.style.overflow = 'hidden';
+        triggerMapResize();
+      }
+    } else {
+      setIsPseudoFullscreen(true);
+      setIsFullscreen(true);
+      document.body.style.overflow = 'hidden';
+      triggerMapResize();
+    }
+  }, [isFullscreen, isPseudoFullscreen, triggerMapResize]);
 
   // Filter customers by selected kecamatan
   const kecamatanCustomers = useMemo(() => {
@@ -1885,32 +1968,34 @@ export default function GisMap() {
   return (
     <div
       ref={mapContainerRef}
-      className={`relative w-full overflow-hidden bg-background ${
-        isFullscreen ? 'h-screen' : 'h-[calc(100vh-3.5rem)]'
+      className={`w-full overflow-hidden bg-background ${
+        isFullscreen || isPseudoFullscreen
+          ? 'fixed inset-0 z-[1500] w-screen h-[100dvh]'
+          : 'relative h-[calc(100dvh-3.25rem)]'
       }`}
     >
-      {/* ── Top Left Control Cluster (Search, Kecamatan, Quick Filters) ── */}
+      {/* ── Top Left Control Cluster (Cloudflare Kumo UI Toolbar) ── */}
       <div
-        className="absolute top-3 left-3 z-[1000] flex flex-col gap-2"
-        style={{ maxWidth: 'calc(100% - 75px)' }}
+        className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 flex flex-col gap-1.5"
+        style={{ maxWidth: 'calc(100% - 54px)' }}
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
-        {/* Row 1: Search Bar + Kecamatan Dropdown + Anomali Batas + Titik Dobel */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Row 1: Search Bar + Kecamatan Dropdown */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Search Box */}
-          <div className="relative shadow-sm rounded-xl w-60 sm:w-80">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative w-44 xs:w-52 sm:w-72">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Cari kode atau nama pelanggan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 h-9 text-xs rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs font-sans text-foreground focus-visible:ring-1 focus-visible:ring-primary"
+              className="pl-8 pr-6 h-8 text-xs rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] font-sans text-foreground"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
               >
                 ✕
               </button>
@@ -1918,28 +2003,28 @@ export default function GisMap() {
 
             {/* Autocomplete Dropdown */}
             {searchResults.length > 0 && (
-              <div className="absolute top-10 left-0 right-0 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl p-1.5 space-y-0.5 z-50">
+              <div className="absolute top-9 left-0 w-72 sm:w-80 bg-card border border-border rounded-lg shadow-lg p-1 space-y-0.5 z-50">
                 {searchResults.map((item: Pelanggan) => (
                   <div
                     key={item.id}
                     onClick={() => handleSelectSearchResult(item)}
-                    className="p-2 rounded-lg hover:bg-muted/70 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                    className="p-2 rounded-md hover:bg-muted cursor-pointer flex items-center justify-between text-xs transition-colors"
                   >
                     <div className="flex items-center gap-2 truncate">
                       <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: safeColor(wilayahMap.get(item.kode_wilayah)?.warna, '#3B6EA8') }}
                       />
                       <div className="flex flex-col truncate">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-foreground text-xs">{item.kode_pelanggan}</span>
+                          <span className="font-mono font-semibold text-foreground text-xs">{item.kode_pelanggan}</span>
                           {item.spatial_anomaly && (
-                            <span className="text-[9px] bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1 py-0.2 rounded font-semibold border border-rose-500/20">
+                            <span className="text-[9px] bg-red-500/10 text-red-600 dark:text-red-400 px-1 py-0.2 rounded-[4px] font-semibold border border-red-500/20">
                               Anomali
                             </span>
                           )}
                           {item.colocation_anomaly && (
-                            <span className="text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1 py-0.2 rounded font-semibold border border-purple-500/20">
+                            <span className="text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1 py-0.2 rounded-[4px] font-semibold border border-purple-500/20">
                               Titik Dobel
                             </span>
                           )}
@@ -1959,7 +2044,7 @@ export default function GisMap() {
           </div>
 
           {/* Kecamatan Dropdown */}
-          <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl px-2 py-0.5 shadow-xs flex items-center gap-1.5 h-9">
+          <div className="bg-card border border-border rounded-md px-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex items-center gap-1.5 h-8">
             <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <Select
               value={selectedKecamatan}
@@ -1991,10 +2076,10 @@ export default function GisMap() {
                 }
               }}
             >
-              <SelectTrigger className="h-7 border-0 bg-transparent text-xs font-medium focus:ring-0 p-0 pr-1 w-[130px]">
+              <SelectTrigger className="h-7 border-0 bg-transparent shadow-none text-xs font-medium focus:ring-0 p-0 pr-1 w-[124px] sm:w-[140px]">
                 <SelectValue placeholder="Kecamatan" />
               </SelectTrigger>
-              <SelectContent className="max-h-80 border-border bg-card">
+              <SelectContent container={mapContainerRef.current} className="max-h-80 border-border bg-card z-[9999]">
                 <SelectItem value="all" className="text-xs">
                   Semua Kecamatan ({KECAMATAN_LIST.length})
                 </SelectItem>
@@ -2006,8 +2091,29 @@ export default function GisMap() {
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          {/* Anomaly Quick Filter Pill (sebelah kanan Kecamatan) */}
+        {/* Row 2: Kumo Action Controls (Single horizontal scroll row on mobile, wraps cleanly on desktop) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto sm:flex-wrap max-w-full pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Filter Popover Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`h-7.5 px-2.5 rounded-md border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card shrink-0 ${
+              filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all'
+                ? 'border-primary text-primary font-semibold'
+                : 'border-border text-foreground hover:bg-muted'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filter</span>
+            {(filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all') && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            )}
+          </Button>
+
+          {/* Anomaly Quick Filter Button */}
           {anomalyCount > 0 && (
             <Button
               variant="outline"
@@ -2019,22 +2125,22 @@ export default function GisMap() {
                   update({ quality: 'all' });
                 }
               }}
-              className={`h-9 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+              className={`h-7.5 px-2.5 rounded-md border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card shrink-0 ${
                 onlyAnomaly
-                  ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold'
+                  ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-semibold'
                   : 'border-border text-foreground hover:bg-muted'
               }`}
               title="Filter hanya pelanggan dengan anomali batas wilayah"
             >
-              <AlertOctagon className="w-3.5 h-3.5 text-rose-500" />
+              <AlertOctagon className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
               <span>Anomali Batas</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-mono font-semibold">
+              <span className="px-1.5 py-0.2 rounded-[4px] text-[9.5px] bg-red-500/10 text-red-700 dark:text-red-300 font-mono font-semibold border border-red-500/20">
                 {anomalyCount}
               </span>
             </Button>
           )}
 
-          {/* Colocation Anomaly Quick Filter Pill (sebelah kanan Anomali) */}
+          {/* Colocation Anomaly Quick Filter Button */}
           {colocationCount > 0 && (
             <Button
               variant="outline"
@@ -2043,56 +2149,35 @@ export default function GisMap() {
                 setOnlyAnomaly(false);
                 update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
               }}
-              className={`h-9 px-2.5 rounded-xl border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+              className={`h-7.5 px-2.5 rounded-md border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card shrink-0 ${
                 filters.quality === 'colocation'
                   ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold'
                   : 'border-border text-foreground hover:bg-muted'
               }`}
               title="Filter pelanggan dengan koordinat sama di wilayah berbeda"
             >
-              <MapPin className="w-3.5 h-3.5 text-purple-500" />
+              <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               <span>Titik Dobel</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-mono font-semibold">
+              <span className="px-1.5 py-0.2 rounded-[4px] text-[9.5px] bg-purple-500/10 text-purple-700 dark:text-purple-300 font-mono font-semibold border border-purple-500/20">
                 {colocationCount}
               </span>
             </Button>
           )}
-        </div>
-
-        {/* Row 2: Action Pills (Filter, Klaster, Kamera, Basemap, Sinkron, QGIS, Titik Pelanggan) */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Filter Popover Toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={`h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
-              filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all'
-                ? 'border-primary text-primary font-semibold'
-                : 'text-foreground hover:bg-muted'
-            }`}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filter</span>
-            {(filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all') && (
-              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            )}
-          </Button>
 
           {/* Mode Titik vs Klaster Toggle */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setUseCluster(!useCluster)}
-            className={`h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md ${
+            className={`h-7.5 px-2.5 rounded-md border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card shrink-0 ${
               useCluster
-                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
-                : 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400 font-medium'
+                ? 'border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-semibold'
+                : 'border-emerald-500/50 text-emerald-700 dark:text-emerald-300 font-medium'
             }`}
             title={
               useCluster
                 ? 'Mode Klaster aktif. Klik untuk beralih ke Mode Sebaran Titik (HTML - Cepat & Ringan)'
-                : 'Mode Sebaran Titik (HTML) aktif: Sangat cepat, 60 FPS, tanpa lag. Klik untuk beralih ke Mode Klaster'
+                : 'Mode Sebaran Titik aktif: Sangat cepat, 60 FPS, tanpa lag. Klik untuk beralih ke Mode Klaster'
             }
           >
             <span className={`w-2 h-2 rounded-full ${useCluster ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
@@ -2104,14 +2189,14 @@ export default function GisMap() {
             variant="outline"
             size="sm"
             onClick={() => setIsTilted(!isTilted)}
-            className={`h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md transition-all ${
+            className={`h-7.5 px-2.5 rounded-md border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card shrink-0 transition-all ${
               isTilted
-                ? 'border-sky-500 bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-semibold shadow-sm'
-                : 'text-foreground hover:bg-muted'
+                ? 'border-primary bg-primary/10 text-primary font-semibold'
+                : 'border-border text-foreground hover:bg-muted'
             }`}
             title={isTilted ? 'Kembalikan ke kamera datar 2D standar' : 'Aktifkan kamera miring 3D perspektif kartografis'}
           >
-            <Compass className={`w-3.5 h-3.5 transition-transform duration-500 ${isTilted ? 'rotate-45 text-sky-600 dark:text-sky-400' : 'text-muted-foreground'}`} />
+            <Compass className={`w-3.5 h-3.5 transition-transform duration-500 ${isTilted ? 'rotate-45 text-primary' : 'text-muted-foreground'}`} />
             <span>{isTilted ? 'Kamera 3D' : 'Kamera 2D'}</span>
           </Button>
 
@@ -2125,7 +2210,7 @@ export default function GisMap() {
               } catch {}
             }}
           >
-            <SelectTrigger className="h-8 px-2.5 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs text-[11px] font-medium w-auto sm:w-48">
+            <SelectTrigger className="h-7.5 px-2.5 rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-[11px] font-medium w-40 sm:w-48 shrink-0">
               <Layers className="w-3.5 h-3.5 mr-1 text-primary shrink-0" />
               <SelectValue />
             </SelectTrigger>
@@ -2159,29 +2244,29 @@ export default function GisMap() {
                 toast.error('Gagal sinkron: ' + e.message);
               }
             }}
-            className="h-8 px-2.5 rounded-xl border-border shadow-xs gap-1.5 text-[11px] font-medium bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all"
+            className="h-7.5 px-2.5 rounded-md border-border shadow-[0_1px_2px_rgba(0,0,0,0.05)] gap-1.5 text-[11px] font-medium bg-card hover:bg-muted text-foreground shrink-0"
             title="Sinkronkan data pelanggan atau segarkan data lokal"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-primary" />
             <span className="hidden sm:inline">Sinkron Data</span>
           </Button>
 
-          {/* QGIS Live Sync Pill */}
-          <div className="flex items-center bg-card/95 backdrop-blur-md border border-border rounded-xl p-0.5 shadow-xs">
+          {/* QGIS Live Sync Control Group */}
+          <div className="flex items-center bg-card border border-border rounded-md p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] shrink-0">
             <button
               type="button"
               onClick={() => setQgisLayerActive(!qgisLayerActive)}
-              className={`h-7 px-2.5 rounded-lg flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
+              className={`h-6.5 px-2 rounded-[4px] flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
                 qgisLayerActive
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold'
+                  ? 'bg-primary/10 text-primary font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Klik untuk tampilkan / sembunyikan jaringan pipa QGIS"
             >
-              <span className={`w-2 h-2 rounded-full ${qgisLayerActive ? 'bg-blue-600 animate-pulse' : 'bg-neutral-300'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${qgisLayerActive ? 'bg-primary animate-pulse' : 'bg-neutral-300'}`} />
               <span>QGIS Pipa</span>
               {qgisStats.pipes > 0 && (
-                <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold">
+                <span className="text-[9px] px-1 py-0.2 rounded-[3px] font-mono bg-primary/15 text-primary font-bold">
                   {qgisStats.pipes}
                 </span>
               )}
@@ -2191,45 +2276,45 @@ export default function GisMap() {
               type="button"
               onClick={() => fetchQgisData(true)}
               disabled={qgisLoading}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+              className="h-6.5 w-6.5 rounded-[4px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
               title="Sinkronkan data dari file QGIS sekarang"
             >
-              <RefreshCw className={`w-3 h-3 ${qgisLoading ? 'animate-spin text-blue-600' : ''}`} />
+              <RefreshCw className={`w-3 h-3 ${qgisLoading ? 'animate-spin text-primary' : ''}`} />
             </button>
 
             <button
               type="button"
               onClick={() => setShowQgisModal(true)}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+              className="h-6.5 w-6.5 rounded-[4px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
               title="Pengaturan & Panduan QGIS Realtime"
             >
-              <Radio className="w-3 h-3 text-blue-500" />
+              <Radio className="w-3 h-3 text-primary" />
             </button>
           </div>
 
-          {/* Toggle Titik Pelanggan (Lingkaran Biru) */}
+          {/* Toggle Titik Pelanggan */}
           <button
             type="button"
             onClick={() => setShowCustomerPoints(!showCustomerPoints)}
-            className={`h-8 px-2.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card/95 backdrop-blur-md shadow-xs ${
+            className={`h-7.5 px-2.5 rounded-md border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] shrink-0 ${
               showCustomerPoints
-                ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold'
+                ? 'border-primary/40 bg-primary/10 text-primary font-semibold'
                 : 'border-border text-muted-foreground hover:text-foreground'
             }`}
             title="Klik untuk tampilkan / sembunyikan lingkaran titik pelanggan"
           >
-            <span className={`w-2 h-2 rounded-full ${showCustomerPoints ? 'bg-blue-600' : 'bg-neutral-300'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${showCustomerPoints ? 'bg-primary' : 'bg-neutral-300'}`} />
             <span>Titik Pelanggan</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold">
+            <span className="text-[9.5px] px-1.5 py-0.2 rounded-[4px] font-mono bg-primary/15 text-primary font-bold">
               {filteredCustomers.length}
             </span>
           </button>
         </div>
       </div>
 
-      {/* ── Expandable Filter Modal/Card ── */}
+      {/* ── Expandable Filter Modal/Card (Kumo Panel) ── */}
       {showFilters && (
-        <Card className="absolute top-[6.75rem] left-3 z-[450] w-80 rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl animate-in fade-in slide-in-from-top-2">
+        <Card className="absolute top-[5.25rem] left-2.5 sm:left-3 z-30 w-80 rounded-lg border border-border bg-card shadow-lg animate-in fade-in slide-in-from-top-2">
           <CardContent className="p-3.5 space-y-3">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <span className="font-heading font-semibold text-xs text-foreground flex items-center gap-1.5">
@@ -2258,12 +2343,12 @@ export default function GisMap() {
                 value={filters.wilayah.includes(',') ? 'multiple' : filters.wilayah}
                 onValueChange={(val) => update({ wilayah: val })}
               >
-                <SelectTrigger className="h-8 text-xs rounded-xl border-border bg-background">
+                <SelectTrigger className="h-8 text-xs rounded-md border-border bg-background">
                   <SelectValue placeholder="Semua Wilayah">
                     {filters.wilayah.includes(',') ? `${selectedWilayahSet.size} Wilayah Terpilih` : undefined}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="max-h-56 border-border bg-card">
+                <SelectContent container={mapContainerRef.current} className="max-h-56 border-border bg-card z-[9999]">
                   {filters.wilayah.includes(',') && (
                     <SelectItem value="multiple" disabled>
                       {selectedWilayahSet.size} Wilayah Terpilih (Multi-seleksi)
@@ -2299,10 +2384,10 @@ export default function GisMap() {
                   value={filters.golongan}
                   onValueChange={(val) => update({ golongan: val })}
                 >
-                  <SelectTrigger className="h-8 text-xs rounded-xl border-border bg-background">
+                  <SelectTrigger className="h-8 text-xs rounded-md border-border bg-background">
                     <SelectValue placeholder="Semua" />
                   </SelectTrigger>
-                  <SelectContent className="border-border bg-card">
+                  <SelectContent container={mapContainerRef.current} className="border-border bg-card z-[9999]">
                     <SelectItem value="all">Semua Golongan</SelectItem>
                     {availableGolongan.map((g) => {
                       const label = golonganLabelMap[g] || GOLONGAN_META[g]?.label || '';
@@ -2324,10 +2409,10 @@ export default function GisMap() {
                   value={filters.status}
                   onValueChange={(val) => update({ status: val })}
                 >
-                  <SelectTrigger className="h-8 text-xs rounded-xl border-border bg-background">
+                  <SelectTrigger className="h-8 text-xs rounded-md border-border bg-background">
                     <SelectValue placeholder="Semua" />
                   </SelectTrigger>
-                  <SelectContent className="border-border bg-card">
+                  <SelectContent container={mapContainerRef.current} className="border-border bg-card z-[9999]">
                     <SelectItem value="all">Semua Status</SelectItem>
                     <SelectItem value="Aktif">Aktif</SelectItem>
                     <SelectItem value="Nonaktif">Nonaktif</SelectItem>
@@ -2345,9 +2430,9 @@ export default function GisMap() {
                   variant="outline"
                   size="sm"
                   onClick={() => setOnlyAnomaly(!onlyAnomaly)}
-                  className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                  className={`h-6 px-2 rounded-md text-xs font-mono ${
                     onlyAnomaly
-                      ? 'bg-rose-500/10 text-rose-500 border-rose-500/30 font-semibold'
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 font-semibold'
                       : 'text-muted-foreground border-border'
                   }`}
                 >
@@ -2361,7 +2446,7 @@ export default function GisMap() {
                   variant="outline"
                   size="sm"
                   onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
-                  className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                  className={`h-6 px-2 rounded-md text-xs font-mono ${
                     filters.quality === 'colocation'
                       ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 font-semibold'
                       : 'text-muted-foreground border-border'
@@ -2377,9 +2462,9 @@ export default function GisMap() {
                   variant="outline"
                   size="sm"
                   onClick={() => update({ quality: filters.quality === 'flagged' ? 'all' : 'flagged' })}
-                  className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                  className={`h-6 px-2 rounded-md text-xs font-mono ${
                     filters.quality === 'flagged'
-                      ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 font-semibold'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold'
                       : 'text-muted-foreground border-border'
                   }`}
                 >
@@ -2397,7 +2482,7 @@ export default function GisMap() {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowBoundaries(!showBoundaries)}
-                        className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                        className={`h-6 px-2 rounded-md text-xs font-mono ${
                           showBoundaries
                             ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30 font-semibold'
                             : 'text-muted-foreground border-border'
@@ -2413,7 +2498,7 @@ export default function GisMap() {
                         variant="outline"
                         size="sm"
                         onClick={() => setColorBy(colorBy === 'wilayah' ? 'status' : 'wilayah')}
-                        className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                        className={`h-6 px-2 rounded-md text-xs font-mono ${
                           colorBy === 'status'
                             ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold'
                             : 'bg-primary/10 text-primary border-primary/30 font-semibold'
@@ -2437,7 +2522,7 @@ export default function GisMap() {
                         localStorage.setItem('pdam_map_engine', next);
                       } catch {}
                     }}
-                    className={`h-6 px-2 rounded-lg text-xs font-mono ${
+                    className={`h-6 px-2 rounded-md text-xs font-mono ${
                       mapEngine === 'maplibre'
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold'
                         : 'text-muted-foreground border-border'
@@ -2452,9 +2537,9 @@ export default function GisMap() {
         </Card>
       )}
 
-      {/* ── Floating Right Action Buttons ── */}
+      {/* ── Floating Right Action Buttons (Kumo Square-Rounded Controls) ── */}
       <div
-        className="absolute top-3 right-3 z-[1000] flex flex-col gap-1.5"
+        className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 flex flex-col gap-1.5"
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
@@ -2462,17 +2547,21 @@ export default function GisMap() {
           variant="outline"
           size="sm"
           onClick={toggleFullscreen}
-          className="w-9 h-9 p-0 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs hover:bg-muted text-foreground"
-          title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh'}
+          className="w-8.5 h-8.5 p-0 rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-muted text-foreground"
+          title={isFullscreen || isPseudoFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh'}
         >
-          {isFullscreen ? <Minimize2 className="w-4 h-4 text-primary" /> : <Maximize2 className="w-4 h-4 text-primary" />}
+          {isFullscreen || isPseudoFullscreen ? (
+            <Minimize2 className="w-4 h-4 text-primary" />
+          ) : (
+            <Maximize2 className="w-4 h-4 text-primary" />
+          )}
         </Button>
 
         <Button
           variant="outline"
           size="sm"
           onClick={handleGeolocation}
-          className="w-9 h-9 p-0 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs hover:bg-muted text-foreground"
+          className="w-8.5 h-8.5 p-0 rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-muted text-foreground"
           title="Lokasi GPS Saya"
         >
           <Navigation className="w-4 h-4 text-primary" />
@@ -2482,7 +2571,7 @@ export default function GisMap() {
           variant="outline"
           size="sm"
           onClick={handleResetMap}
-          className="w-9 h-9 p-0 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs hover:bg-muted text-foreground"
+          className="w-8.5 h-8.5 p-0 rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-muted text-foreground"
           title="Reset Sudut Pandang & Filter"
         >
           <Compass className="w-4 h-4 text-muted-foreground" />
@@ -2492,8 +2581,8 @@ export default function GisMap() {
           variant="outline"
           size="sm"
           onClick={() => setShowLegend(!showLegend)}
-          className={`w-9 h-9 p-0 rounded-xl border-border bg-card/95 backdrop-blur-md shadow-xs hover:bg-muted ${
-            showLegend ? 'text-primary' : 'text-muted-foreground'
+          className={`w-8.5 h-8.5 p-0 rounded-md border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-muted ${
+            showLegend ? 'text-primary border-primary/40' : 'text-muted-foreground'
           }`}
           title="Tampilkan / Sembunyikan Legenda Wilayah"
         >
@@ -2503,31 +2592,31 @@ export default function GisMap() {
 
       {/* ── Empty State Notice only if selected kecamatan has NO data ── */}
       {selectedKecamatan !== 'all' && kecamatanCustomers.length === 0 && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 backdrop-blur-md border border-border rounded-2xl p-4 shadow-xl max-w-md text-center space-y-2 animate-in fade-in">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 bg-card border border-border rounded-lg p-4 shadow-lg max-w-md text-center space-y-2 animate-in fade-in">
           <div className="flex items-center justify-center gap-2 text-muted-foreground font-semibold text-xs">
             <Building2 className="w-4 h-4 text-primary" />
             <span>Kecamatan {selectedKecamatanObj?.nama || selectedKecamatan}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Belum ada data pelanggan untuk kecamatan ini. Silakan unggah file data di menu Settingan.
+            Belum ada data pelanggan untuk kecamatan ini. Silakan unggah file data di menu Pengaturan.
           </p>
         </div>
       )}
 
-      {/* ── Slide-over Detail & Map View Drawer ── */}
+      {/* ── Slide-over Detail & Map View Drawer (Kumo Panel) ── */}
       {selectedCustomer && (
-        <Card className="absolute top-3 right-14 bottom-4 z-[1100] w-full max-w-sm rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4">
+        <Card className="absolute top-2.5 right-12 sm:top-3 sm:right-14 bottom-3 z-30 w-[calc(100%-3.5rem)] max-w-sm rounded-lg border border-border bg-card shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4">
           {/* Header */}
-          <div className="p-3.5 border-b border-border flex items-center justify-between bg-muted/40">
+          <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between bg-muted/30">
             <div className="flex items-center gap-2">
               <span
-                className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{
                   backgroundColor: safeColor(wilayahMap.get(selectedCustomer.kode_wilayah)?.warna, '#3B6EA8'),
                 }}
               />
               <div>
-                <span className="font-heading font-semibold text-sm text-foreground block">
+                <span className="font-heading font-semibold text-xs sm:text-sm text-foreground block">
                   Detail Pelanggan
                 </span>
                 <span className="text-[10px] font-mono text-muted-foreground">
@@ -2544,7 +2633,7 @@ export default function GisMap() {
                 setPulseActive(false);
                 setPulsePosition(null);
               }}
-              className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground"
+              className="w-7 h-7 rounded-md text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -2554,15 +2643,15 @@ export default function GisMap() {
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
             {/* Spatial Anomaly Notice */}
             {selectedCustomer.spatial_anomaly && (
-              <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 text-xs space-y-1.5">
-                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-semibold">
-                  <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0" />
+              <div className="p-3 rounded-md border border-red-500/25 bg-red-500/5 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-300 font-semibold">
+                  <AlertOctagon className="w-4 h-4 text-red-600 shrink-0" />
                   <span>Anomali Batas Wilayah Terdeteksi</span>
                 </div>
-                <p className="text-rose-800 dark:text-rose-200 leading-relaxed text-[11px]">
+                <p className="text-red-800 dark:text-red-200 leading-relaxed text-[11px]">
                   {selectedCustomer.spatial_anomaly}
                 </p>
-                <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                <div className="text-[10px] text-red-600 dark:text-red-400 font-medium">
                   Rekomendasi: Koordinasikan dengan tim survei lapangan untuk penyesuaian kode wilayah acuan.
                 </div>
               </div>
@@ -2570,7 +2659,7 @@ export default function GisMap() {
 
             {/* Co-location Anomaly Notice */}
             {selectedCustomer.colocation_anomaly && (
-              <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/80 dark:bg-purple-950/40 text-xs space-y-1.5">
+              <div className="p-3 rounded-md border border-purple-500/25 bg-purple-500/5 text-xs space-y-1.5">
                 <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300 font-semibold">
                   <MapPin className="w-4 h-4 text-purple-600 shrink-0" />
                   <span>Titik Dobel Multi-Wilayah</span>
@@ -2586,7 +2675,7 @@ export default function GisMap() {
 
             {/* General Flag Notice */}
             {!selectedCustomer.spatial_anomaly && !selectedCustomer.colocation_anomaly && selectedCustomer.is_flagged && (
-              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/40 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+              <div className="p-3 rounded-md border border-amber-500/25 bg-amber-500/5 text-xs text-amber-800 dark:text-amber-200 space-y-1">
                 <div className="flex items-center gap-1.5 font-semibold">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span>Data Bertanda (Perlu Verifikasi)</span>
@@ -2596,9 +2685,9 @@ export default function GisMap() {
             )}
 
             {/* Identity Card */}
-            <div className="p-3 rounded-xl bg-muted/40 border border-border/60 space-y-2.5">
+            <div className="p-3 rounded-md bg-muted/35 border border-border space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-base font-bold text-foreground">
+                <span className="font-mono text-sm font-bold text-foreground">
                   {selectedCustomer.kode_pelanggan}
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -2606,7 +2695,7 @@ export default function GisMap() {
                     {selectedCustomer.golongan}
                   </Badge>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${
                       STATUS_CONNECTION_META[selectedCustomer.status_sambungan]?.badgeClass ||
                       'bg-muted text-muted-foreground'
                     }`}
@@ -2621,7 +2710,7 @@ export default function GisMap() {
                 <div className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <span>{displayName(selectedCustomer.nama_pelanggan, user?.role)}</span>
                   {!userCanSeePII && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-muted text-muted-foreground font-mono">
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-[4px] bg-muted text-muted-foreground font-mono border border-border">
                       UU PDP
                     </span>
                   )}
@@ -2637,7 +2726,7 @@ export default function GisMap() {
             </div>
 
             {/* Coordinates Box */}
-            <div className="p-2.5 rounded-xl border border-border bg-card flex items-center justify-between">
+            <div className="p-2.5 rounded-md border border-border bg-card flex items-center justify-between">
               <div className="font-mono text-xs text-foreground">
                 <span className="text-muted-foreground mr-1">GPS:</span>
                 <span className="font-semibold">
@@ -2649,7 +2738,7 @@ export default function GisMap() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleCopyCoords(selectedCustomer.latitude, selectedCustomer.longitude)}
-                  className="h-6 px-2 text-[10px] rounded-lg gap-1 border-border"
+                  className="h-6.5 px-2 text-[10px] rounded-md gap-1"
                 >
                   {copiedCoords ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedCoords ? 'Tersalin' : 'Salin'}</span>
@@ -2668,7 +2757,7 @@ export default function GisMap() {
               </div>
 
               {!userCanSeePII ? (
-                <div className="p-4 rounded-xl border border-border bg-muted/20 text-center space-y-1.5">
+                <div className="p-4 rounded-md border border-border bg-muted/20 text-center space-y-1.5">
                   <ShieldCheck className="w-6 h-6 text-muted-foreground mx-auto" />
                   <p className="text-xs font-medium text-foreground">Pratinjau Dibatasi</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -2676,8 +2765,8 @@ export default function GisMap() {
                   </p>
                 </div>
               ) : !loadStreetView ? (
-                <div className="p-4 rounded-xl border border-dashed border-border bg-muted/20 text-center space-y-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                <div className="p-4 rounded-md border border-dashed border-border bg-muted/20 text-center space-y-2">
+                  <div className="w-8 h-8 rounded-md bg-primary/10 text-primary flex items-center justify-center mx-auto border border-primary/20">
                     <Navigation className="w-4 h-4" />
                   </div>
                   <div className="text-xs font-medium text-foreground">
@@ -2690,13 +2779,13 @@ export default function GisMap() {
                     size="sm"
                     variant="outline"
                     onClick={() => setLoadStreetView(true)}
-                    className="h-7 text-xs rounded-xl border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
+                    className="h-7.5 text-xs rounded-md border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
                   >
                     <span>Muat Street View</span>
                   </Button>
                 </div>
               ) : (
-                <div className="relative w-full h-52 rounded-xl border border-border overflow-hidden bg-slate-950 shadow-inner">
+                <div className="relative w-full h-52 rounded-md border border-border overflow-hidden bg-slate-950">
                   <iframe
                     src={`https://maps.google.com/maps?layer=c&cbll=${selectedCustomer.latitude},${selectedCustomer.longitude}&cbp=12,0,0,0,0&output=svembed`}
                     width="100%"
@@ -2708,13 +2797,13 @@ export default function GisMap() {
                     title={`Street View ${selectedCustomer.kode_pelanggan}`}
                     className="absolute inset-0 w-full h-full"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 py-2 flex items-center justify-between pointer-events-auto">
+                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/75 px-3 py-1.5 flex items-center justify-between pointer-events-auto border-t border-white/10">
                     <span className="text-[10px] text-white/90 font-medium">Google Street View</span>
                     <a
                       href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selectedCustomer.latitude},${selectedCustomer.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[10px] text-sky-300 hover:text-sky-200 font-medium flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md"
+                      className="text-[10px] text-sky-300 hover:text-sky-200 font-medium flex items-center gap-1"
                     >
                       <ExternalLink className="w-3 h-3" />
                       Tab Baru
@@ -2726,7 +2815,7 @@ export default function GisMap() {
 
             {/* Technical Specifications */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl border border-border bg-card">
+              <div className="p-2.5 rounded-md border border-border bg-card">
                 <span className="text-[10px] text-muted-foreground uppercase font-mono">Wilayah Acuan</span>
                 <div className="font-semibold text-foreground truncate mt-0.5">
                   {selectedCustomer.nama_wilayah}
@@ -2736,7 +2825,7 @@ export default function GisMap() {
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl border border-border bg-card">
+              <div className="p-2.5 rounded-md border border-border bg-card">
                 <span className="text-[10px] text-muted-foreground uppercase font-mono">Kecamatan</span>
                 <div className="font-semibold text-foreground mt-0.5">
                   {KECAMATAN_LIST.find((k) => k.kode === selectedCustomer.kode_kecamatan)?.nama || 'Praya Barat'}
@@ -2746,7 +2835,7 @@ export default function GisMap() {
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl border border-border bg-card">
+              <div className="p-2.5 rounded-md border border-border bg-card">
                 <span className="text-[10px] text-muted-foreground uppercase font-mono flex items-center gap-1">
                   <Gauge className="w-3 h-3 text-primary" />
                   Nomor Meter
@@ -2760,7 +2849,7 @@ export default function GisMap() {
                 href={`https://www.google.com/maps?q=${selectedCustomer.latitude},${selectedCustomer.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all group block cursor-pointer"
+                className="p-2.5 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all group block cursor-pointer"
                 title="Buka lokasi koordinat titik pelanggan langsung di Google Maps"
               >
                 <span className="text-[10px] text-primary uppercase font-mono flex items-center justify-between font-semibold">
@@ -2768,7 +2857,7 @@ export default function GisMap() {
                     <MapPin className="w-3 h-3 text-primary" />
                     Google Maps
                   </span>
-                  <ExternalLink className="w-3 h-3 text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <ExternalLink className="w-3 h-3 text-primary" />
                 </span>
                 <div className="font-semibold text-foreground text-xs mt-1 truncate">
                   Buka di Google Maps &rarr;
@@ -2790,7 +2879,7 @@ export default function GisMap() {
                   handleSelectCustomer(selectedCustomer);
                 }
               }}
-              className="flex-1 h-8 rounded-xl text-xs gap-1.5"
+              className="flex-1 h-8 rounded-md text-xs gap-1.5"
             >
               <Compass className="w-3.5 h-3.5" />
               <span>Fokuskan Titik</span>
@@ -2803,7 +2892,7 @@ export default function GisMap() {
                 setPulseActive(false);
                 setPulsePosition(null);
               }}
-              className="h-8 px-4 rounded-xl text-xs"
+              className="h-8 px-4 rounded-md text-xs"
             >
               Tutup
             </Button>
@@ -2811,21 +2900,21 @@ export default function GisMap() {
         </Card>
       )}
 
-      {/* ── Interactive GIS Legend Card (Pipelines & Wilayah) ── */}
+      {/* ── Interactive GIS Legend Card (Kumo Panel) ── */}
       {showLegend && !selectedCustomer && (
-        <Card className="absolute bottom-5 right-3 z-[1000] w-80 max-h-[460px] rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+        <Card className="absolute bottom-3 right-2.5 sm:bottom-5 sm:right-3 z-20 w-72 sm:w-80 max-h-[380px] sm:max-h-[460px] rounded-lg border border-border bg-card shadow-lg flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2">
           {/* Header with Tab Switcher */}
-          <div className="p-2 border-b border-border flex items-center justify-between bg-muted/40 gap-1">
-            <span className="font-heading font-semibold text-xs text-foreground shrink-0 pl-1">
+          <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-muted/30 gap-1">
+            <span className="font-heading font-semibold text-xs text-foreground shrink-0">
               Legenda GIS
             </span>
-            <div className="flex items-center bg-muted/70 rounded-lg p-0.5 border border-border/40">
+            <div className="flex items-center bg-muted/70 rounded-md p-0.5 border border-border">
               <button
                 type="button"
                 onClick={() => setLegendTab('pipa')}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded-[4px] text-[10px] font-medium transition-all cursor-pointer ${
                   legendTab === 'pipa'
-                    ? 'bg-background text-primary shadow-xs font-semibold'
+                    ? 'bg-card text-primary shadow-2xs font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -2834,9 +2923,9 @@ export default function GisMap() {
               <button
                 type="button"
                 onClick={() => setLegendTab('wilayah')}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded-[4px] text-[10px] font-medium transition-all cursor-pointer ${
                   legendTab === 'wilayah'
-                    ? 'bg-background text-primary shadow-xs font-semibold'
+                    ? 'bg-card text-primary shadow-2xs font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >

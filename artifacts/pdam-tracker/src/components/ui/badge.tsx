@@ -2,25 +2,23 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
+/**
+ * Cloudflare Kumo UI Badge Primitives
+ * Compact 6px radius (rounded-md), crisp 1px tinted border, high legibility.
+ */
 const badgeVariants = cva(
-  // @replit
-  // Whitespace-nowrap: Badges should never wrap.
-  'whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2' +
-    ' hover-elevate ',
+  'whitespace-nowrap inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring/30',
   {
     variants: {
       variant: {
         default:
-          // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
-          'border-transparent bg-primary text-primary-foreground shadow-xs',
+          'border-[#055AD4]/20 bg-[#055AD4]/10 text-[#055AD4] dark:border-blue-400/25 dark:bg-blue-500/15 dark:text-blue-300',
         secondary:
-          // @replit no hover because we use hover-elevate
-          'border-transparent bg-secondary text-secondary-foreground',
+          'border-border bg-muted text-muted-foreground',
         destructive:
-          // @replit shadow-xs instead of shadow, no hover because we use hover-elevate
-          'border-transparent bg-destructive text-destructive-foreground shadow-xs',
-        // @replit shadow-xs" - use badge outline variable
-        outline: 'text-foreground border [border-color:var(--badge-outline)]',
+          'border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300',
+        outline:
+          'text-foreground border-border bg-card',
       },
     },
     defaultVariants: {
