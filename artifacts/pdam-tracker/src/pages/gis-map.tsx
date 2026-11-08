@@ -2097,7 +2097,7 @@ export default function GisMap() {
           {/* Filter Popover Toggle */}
           <Button
             variant={
-              filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all'
+              filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all' || onlyAnomaly
                 ? 'default'
                 : 'outline'
             }
@@ -2107,50 +2107,10 @@ export default function GisMap() {
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Filter</span>
+            {(filters.wilayah !== 'all' || filters.golongan !== 'all' || filters.status !== 'all' || filters.quality !== 'all' || onlyAnomaly) && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            )}
           </Button>
-
-          {/* Anomaly Quick Filter Button */}
-          {anomalyCount > 0 && (
-            <Button
-              variant={onlyAnomaly ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                const next = !onlyAnomaly;
-                setOnlyAnomaly(next);
-                if (next && filters.quality === 'colocation') {
-                  update({ quality: 'all' });
-                }
-              }}
-              className="h-8 px-2.5 text-[12px] shrink-0"
-              title="Filter hanya pelanggan dengan anomali batas wilayah"
-            >
-              <AlertOctagon className="w-3.5 h-3.5" />
-              <span>Anomali batas</span>
-              <span className="rounded-full border border-dashed border-current/30 px-1.5 py-0 text-[10.5px] tabular-nums">
-                {anomalyCount}
-              </span>
-            </Button>
-          )}
-
-          {/* Colocation Anomaly Quick Filter Button */}
-          {colocationCount > 0 && (
-            <Button
-              variant={filters.quality === 'colocation' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setOnlyAnomaly(false);
-                update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
-              }}
-              className="h-8 px-2.5 text-[12px] shrink-0"
-              title="Filter pelanggan dengan koordinat sama di wilayah berbeda"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Titik dobel</span>
-              <span className="rounded-full border border-dashed border-current/30 px-1.5 py-0 text-[10.5px] tabular-nums">
-                {colocationCount}
-              </span>
-            </Button>
-          )}
 
           {/* Mode Titik vs Klaster Toggle */}
           <Button
@@ -2206,30 +2166,6 @@ export default function GisMap() {
               <SelectItem value="positron">Positron terang (OpenFreeMap)</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Sinkronisasi Data Pelanggan Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              toast.info('Memeriksa pembaruan data pelanggan...');
-              try {
-                const res = await pdamService.syncFromCloud(true);
-                if (res.ok) {
-                  toast.success(res.message || `Data pelanggan tersinkron (${res.count} titik).`);
-                } else {
-                  toast.info(`Data lokal siap (${res.count} titik). ${res.message || ''}`);
-                }
-              } catch (e: any) {
-                toast.error('Gagal sinkron: ' + e.message);
-              }
-            }}
-            className="h-8 px-2.5 text-[12px] shrink-0"
-            title="Sinkronkan data pelanggan"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sinkron data</span>
-          </Button>
 
           {/* QGIS Live Sync Control Group */}
           <div className="flex items-center bg-white dark:bg-zinc-900 border border-[#e4e4e7] dark:border-zinc-700 rounded-lg p-0.5 h-8 shrink-0">
@@ -2289,10 +2225,10 @@ export default function GisMap() {
         </div>
       </div>
 
-      {/* ── Expandable Filter Modal/Card (Cloudflare Panel) ── */}
+      {/* ── Expandable Filter Modal/Card (Cloudflare Panel dengan Scroll Down) ── */}
       {showFilters && (
-        <Card className="absolute top-[5.25rem] left-2.5 sm:left-3 z-30 w-80 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg">
-          <CardContent className="p-4 space-y-3">
+        <Card className="absolute top-[5.25rem] left-2.5 sm:left-3 z-30 w-80 max-h-[calc(100dvh-6.5rem)] rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg flex flex-col overflow-hidden">
+          <CardContent className="p-4 space-y-3 overflow-y-auto flex-1 [scrollbar-width:thin]">
             <div className="flex items-center justify-between border-b border-[#e5e7eb] dark:border-zinc-800 pb-2.5">
               <span className="font-semibold text-[13.5px] text-[#18181b] dark:text-zinc-100">
                 Filter titik sebaran GIS
@@ -2307,6 +2243,50 @@ export default function GisMap() {
                 className="h-6 px-2 text-[11.5px] text-[#71717a]"
               >
                 Reset
+              </Button>
+            </div>
+
+            {/* Quick Action Filter Buttons: Anomali batas & Titik dobel */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={onlyAnomaly ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const next = !onlyAnomaly;
+                  setOnlyAnomaly(next);
+                  if (next && filters.quality === 'colocation') {
+                    update({ quality: 'all' });
+                  }
+                }}
+                className="h-8 px-2 text-[11.5px] justify-between"
+                title="Filter hanya pelanggan dengan anomali batas wilayah"
+              >
+                <span className="flex items-center gap-1.5 truncate">
+                  <AlertOctagon className="w-3.5 h-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                  <span className="truncate">Anomali</span>
+                </span>
+                <span className="rounded-full border border-dashed border-current/30 px-1.5 py-0 text-[10px] tabular-nums shrink-0">
+                  {anomalyCount}
+                </span>
+              </Button>
+
+              <Button
+                variant={filters.quality === 'colocation' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setOnlyAnomaly(false);
+                  update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' });
+                }}
+                className="h-8 px-2 text-[11.5px] justify-between"
+                title="Filter pelanggan dengan koordinat sama di wilayah berbeda"
+              >
+                <span className="flex items-center gap-1.5 truncate">
+                  <MapPin className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  <span className="truncate">Titik dobel</span>
+                </span>
+                <span className="rounded-full border border-dashed border-current/30 px-1.5 py-0 text-[10px] tabular-nums shrink-0">
+                  {colocationCount}
+                </span>
               </Button>
             </div>
 
@@ -2401,30 +2381,6 @@ export default function GisMap() {
             {/* Toggles */}
             <div className="pt-2 border-t border-[#e5e7eb] dark:border-zinc-800 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[12.5px] text-[#18181b] dark:text-zinc-200">Anomali batas wilayah</span>
-                <Button
-                  variant={onlyAnomaly ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setOnlyAnomaly(!onlyAnomaly)}
-                  className="h-6 px-2.5 text-[11.5px]"
-                >
-                  {onlyAnomaly ? 'Aktif' : 'Semua'}
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[12.5px] text-[#18181b] dark:text-zinc-200">Titik dobel beda wilayah</span>
-                <Button
-                  variant={filters.quality === 'colocation' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => update({ quality: filters.quality === 'colocation' ? 'all' : 'colocation' })}
-                  className="h-6 px-2.5 text-[11.5px]"
-                >
-                  {filters.quality === 'colocation' ? 'Aktif' : 'Semua'}
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between">
                 <span className="text-[12.5px] text-[#18181b] dark:text-zinc-200">Perlu verifikasi (flag)</span>
                 <Button
                   variant={filters.quality === 'flagged' ? 'default' : 'outline'}
@@ -2483,6 +2439,32 @@ export default function GisMap() {
                     {mapEngine === 'maplibre' ? 'MapLibre GL' : 'Leaflet'}
                   </Button>
                 </div>
+              </div>
+
+              {/* Tombol Sinkron Data Pelanggan di dalam Filter */}
+              <div className="pt-2 border-t border-[#e5e7eb] dark:border-zinc-800">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    toast.info('Memeriksa pembaruan data pelanggan...');
+                    try {
+                      const res = await pdamService.syncFromCloud(true);
+                      if (res.ok) {
+                        toast.success(res.message || `Data pelanggan tersinkron (${res.count} titik).`);
+                      } else {
+                        toast.info(`Data lokal siap (${res.count} titik). ${res.message || ''}`);
+                      }
+                    } catch (e: any) {
+                      toast.error('Gagal sinkron: ' + e.message);
+                    }
+                  }}
+                  className="w-full h-8 text-[12px] gap-1.5 justify-center"
+                  title="Sinkronkan data pelanggan"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sinkron data</span>
+                </Button>
               </div>
             </div>
           </CardContent>
