@@ -83,10 +83,17 @@ const BASEMAPS = {
     url: '',
     attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
   },
-  futuristik: {
-    name: 'Modern Futuristik Gelap (Cyber Neon GL)',
-    url: '',
-    attribution: '&copy; OpenFreeMap &copy; OpenMapTiles',
+  google_hybrid: {
+    name: 'Citra Satelit Google (Hybrid + Jalan)',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    subdomains: '0123',
+    attribution: '&copy; Google Maps',
+  },
+  google_satellite: {
+    name: 'Citra Satelit Google (Murni)',
+    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    subdomains: '0123',
+    attribution: '&copy; Google Maps',
   },
   vektor: {
     name: 'Peta Vektor Mandiri (GL)',
@@ -246,10 +253,7 @@ function MapLibreLayer({
           if (cancelled) return;
 
           let targetStyle: any = style;
-          if (targetStyle === 'futuristik') {
-            const { futuristicMapStyle } = await import('@/lib/futuristicMapStyle');
-            targetStyle = futuristicMapStyle;
-          } else if (targetStyle === 'futuristik_light') {
+          if (targetStyle === 'futuristik_light') {
             const { futuristicLightMapStyle } = await import('@/lib/futuristicLightMapStyle');
             targetStyle = futuristicLightMapStyle;
           } else if (targetStyle === 'vektor' || !targetStyle) {
@@ -1086,6 +1090,7 @@ export default function GisMap() {
   const [basemapKey, setBasemapKey] = useState<keyof typeof BASEMAPS>(() => {
     try {
       const saved = localStorage.getItem('pdam_basemap_pref');
+      if (saved === 'futuristik') return 'google_hybrid';
       if (saved && saved in BASEMAPS) return saved as keyof typeof BASEMAPS;
     } catch {}
     return 'light';
@@ -2158,9 +2163,10 @@ export default function GisMap() {
               <SelectItem value="light">Abu-abu terang (Esri Canvas)</SelectItem>
               <SelectItem value="cerah">Peta cerah (Humaniter)</SelectItem>
               <SelectItem value="osm">OpenStreetMap (Standar)</SelectItem>
+              <SelectItem value="google_hybrid">Citra satelit (Google Hybrid)</SelectItem>
+              <SelectItem value="google_satellite">Citra satelit (Google Murni)</SelectItem>
               <SelectItem value="satellite">Citra satelit (Esri)</SelectItem>
               <SelectItem value="futuristik_light">Aero White GL</SelectItem>
-              <SelectItem value="futuristik">Cyber Neon GL</SelectItem>
               <SelectItem value="vektor">Peta vektor mandiri (GL)</SelectItem>
               <SelectItem value="dark">Mode gelap vektor</SelectItem>
               <SelectItem value="positron">Positron terang (OpenFreeMap)</SelectItem>
@@ -3282,7 +3288,6 @@ export default function GisMap() {
               zoomControl={false}
             >
               {basemapKey !== 'vektor' &&
-                basemapKey !== 'futuristik' &&
                 basemapKey !== 'futuristik_light' &&
                 basemapKey !== 'positron' &&
                 basemapKey !== 'dark' && (
@@ -3290,23 +3295,20 @@ export default function GisMap() {
                   key={basemapKey}
                   attribution={(BASEMAPS[basemapKey] || BASEMAPS.light).attribution}
                   url={(BASEMAPS[basemapKey] || BASEMAPS.light).url}
-                  subdomains="abc"
+                  subdomains={(BASEMAPS[basemapKey] as any)?.subdomains || 'abc'}
                   maxZoom={MAX_ZOOM}
                 />
               )}
 
               <MapLibreLayer
                 active={
-                  basemapKey === 'futuristik' ||
                   basemapKey === 'futuristik_light' ||
                   basemapKey === 'vektor' ||
                   basemapKey === 'positron' ||
                   basemapKey === 'dark'
                 }
                 style={
-                  basemapKey === 'futuristik'
-                    ? 'futuristik'
-                    : basemapKey === 'futuristik_light'
+                  basemapKey === 'futuristik_light'
                     ? 'futuristik_light'
                     : basemapKey === 'dark'
                     ? 'https://tiles.openfreemap.org/styles/dark'

@@ -5,7 +5,6 @@ import { Pelanggan, WilayahAcuan, UserRole } from '@/types/pdam';
 import { KECAMATAN_BOUNDS, KECAMATAN_LIST } from '@/services/pdamDataService';
 import { escapeHtml, safeColor } from '@/lib/escape';
 import { displayName, displayAddress } from '@/lib/privacy';
-import { futuristicMapStyle } from '@/lib/futuristicMapStyle';
 import { futuristicLightMapStyle } from '@/lib/futuristicLightMapStyle';
 import { lombokTengahStyle } from '@/lib/lombokTengahStyle';
 
@@ -190,7 +189,25 @@ function createRasterBasemapStyle(basemapKey: string): maplibregl.StyleSpecifica
   let attribution = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
   let bgColor = '#e2e8f0';
 
-  if (basemapKey === 'cerah') {
+  if (basemapKey === 'google_hybrid' || basemapKey === 'futuristik') {
+    tiles = [
+      'https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      'https://mt2.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      'https://mt3.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    ];
+    attribution = '&copy; Google Maps';
+    bgColor = '#0f172a';
+  } else if (basemapKey === 'google_satellite') {
+    tiles = [
+      'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    ];
+    attribution = '&copy; Google Maps';
+    bgColor = '#0f172a';
+  } else if (basemapKey === 'cerah') {
     tiles = [
       'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
       'https://b.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
@@ -219,7 +236,7 @@ function createRasterBasemapStyle(basemapKey: string): maplibregl.StyleSpecifica
         tiles,
         tileSize: 256,
         attribution,
-        maxzoom: 19,
+        maxzoom: 20,
       },
     },
     layers: [
@@ -233,7 +250,7 @@ function createRasterBasemapStyle(basemapKey: string): maplibregl.StyleSpecifica
         type: 'raster',
         source: 'raster-tiles',
         minzoom: 0,
-        maxzoom: 20,
+        maxzoom: 22,
       },
     ],
   };
@@ -243,9 +260,6 @@ function createRasterBasemapStyle(basemapKey: string): maplibregl.StyleSpecifica
  * Resolve style objek atau URL untuk basemap yang dipilih secara sinkron (0ms delay)
  */
 function resolveMapStyleSync(basemapKey: string): string | maplibregl.StyleSpecification {
-  if (basemapKey === 'futuristik') {
-    return futuristicMapStyle as maplibregl.StyleSpecification;
-  }
   if (basemapKey === 'futuristik_light') {
     return futuristicLightMapStyle as maplibregl.StyleSpecification;
   }
