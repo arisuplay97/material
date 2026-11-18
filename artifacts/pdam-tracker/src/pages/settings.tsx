@@ -141,8 +141,13 @@ export default function Settings() {
         const result = await ValidationService.parseAndValidateFile(validFiles[0], wilayahList);
         setValidationResult(result);
         setFileSummaries([{ name: validFiles[0].name, rows: result.parsedRecords.length, size: validFiles[0].size }]);
+        const sheetCount = result.sheetSummaries?.length || 1;
         if (result.summary.canProceed) {
-          toast.success(`Validasi selesai: ${result.summary.validCount.toLocaleString('id-ID')} data siap diterapkan.`);
+          toast.success(
+            sheetCount > 1
+              ? `Validasi ${sheetCount} sheet selesai: ${result.summary.validCount.toLocaleString('id-ID')} data siap diterapkan.`
+              : `Validasi selesai: ${result.summary.validCount.toLocaleString('id-ID')} data siap diterapkan.`
+          );
         } else {
           toast.error(`Validasi menemukan ${result.summary.errorCount} format kolom tidak valid.`);
         }
@@ -312,6 +317,15 @@ export default function Settings() {
       counts.set(kec, (counts.get(kec) || 0) + 1);
     }
     return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [validationResult]);
+
+  const { displayedValidationIssues, totalValidationIssues } = useMemo(() => {
+    if (!validationResult) return { displayedValidationIssues: [], totalValidationIssues: 0 };
+    const all = [...validationResult.summary.errors, ...validationResult.summary.warnings];
+    return {
+      displayedValidationIssues: all.slice(0, 200),
+      totalValidationIssues: all.length,
+    };
   }, [validationResult]);
 
   // Auto-register missing wilayah codes and re-validate
@@ -519,7 +533,7 @@ export default function Settings() {
                         Pilih atau tarik file ke sini
                       </span>
                       <span className="text-[12px] text-[#71717a] dark:text-zinc-400 mt-1 block">
-                        Bisa pilih 1 file atau banyak file Excel sekaligus
+                        Bisa pilih 1 file (mendukung multi-sheet 13 wilayah) atau banyak file sekaligus
                       </span>
                     </>
                   ) : selectedFiles.length === 1 ? (
@@ -721,7 +735,32 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {/* Detected Kecamatans Breakdown across all uploaded files */}
+                    {/* Detected Sheets Breakdown (Multi-Sheet Excel Support) */}
+                    {validationResult.sheetSummaries && validationResult.sheetSummaries.length > 1 && (
+                      <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 space-y-2">
+                        <div className="flex items-center justify-between text-[12.5px] font-medium text-[#18181b] dark:text-zinc-100">
+                          <span>Sheet Excel terbaca ({validationResult.sheetSummaries.length} sheet digabung)</span>
+                          <span className="rounded-full border border-dashed border-[#d4d4d8] dark:border-zinc-700 px-2.5 py-0.5 text-[11px] text-[#52525b] dark:text-zinc-300">
+                            Multi-sheet aktif
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto">
+                          {validationResult.sheetSummaries.map((s, idx) => (
+                            <div
+                              key={`${s.fileName || ''}-${s.name}-${idx}`}
+                              className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-800 text-[12px] flex items-center gap-1.5"
+                            >
+                              <span className="font-medium text-[#18181b] dark:text-zinc-100">
+                                {selectedFiles.length > 1 && s.fileName ? `${s.fileName} (${s.name})` : s.name}
+                              </span>
+                              <span className="text-[#71717a] tabular-nums">• {s.rows.toLocaleString('id-ID')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Detected Kecamatans Breakdown across all uploaded files/sheets */}
                     {detectedKecamatans.length > 0 && (
                       <div className="p-3.5 rounded-xl border border-[#e5e7eb] dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/50 space-y-2">
                         <div className="flex items-center justify-between text-[12.5px] font-medium text-[#18181b] dark:text-zinc-100">
@@ -781,44 +820,51 @@ export default function Settings() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#e5e7eb] dark:divide-zinc-800">
-                          {validationResult.summary.errors.length === 0 &&
-                          validationResult.summary.warnings.length === 0 ? (
+                          {totalValidationIssues === 0 ? (
                             <tr>
                               <td colSpan={4} className="py-8 text-center text-[#71717a] text-[12.5px]">
                                 Tidak ada error atau catatan anomali pada file ini.
                               </td>
                             </tr>
                           ) : (
-                            [...validationResult.summary.errors, ...validationResult.summary.warnings].map(
-                              (item, idx) => (
-                                <tr key={idx} className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/40">
-                                  <td className="py-2.5 px-4 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums">
-                                    {item.rowNumber}
-                                  </td>
-                                  <td className="py-2.5 px-4 text-[#71717a]">
-                                    {item.field}
-                                  </td>
-                                  <td className="py-2.5 px-4 text-[#18181b] dark:text-zinc-200">
-                                    {item.message}
-                                  </td>
-                                  <td className="py-2.5 px-4">
-                                    {item.severity === 'error' ? (
-                                      <span className="rounded-full border border-dashed border-red-300 bg-red-50/60 px-2.5 py-0.5 text-[11px] text-red-700">
-                                        Error
-                                      </span>
-                                    ) : (
-                                      <span className="rounded-full border border-dashed border-[#d4d4d8] bg-[#fafafa] px-2.5 py-0.5 text-[11px] text-[#52525b]">
-                                        Peringatan
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              )
-                            )
+                            displayedValidationIssues.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-[#fafafa] dark:hover:bg-zinc-800/40">
+                                <td className="py-2.5 px-4 font-medium text-[#18181b] dark:text-zinc-100 tabular-nums whitespace-nowrap">
+                                  <span>{item.rowNumber}</span>
+                                  {item.sheetName && (
+                                    <span className="ml-1.5 text-[11px] font-normal text-[#71717a] bg-[#f4f4f5] dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                                      {item.sheetName}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-4 text-[#71717a]">
+                                  {item.field}
+                                </td>
+                                <td className="py-2.5 px-4 text-[#18181b] dark:text-zinc-200">
+                                  {item.message}
+                                </td>
+                                <td className="py-2.5 px-4">
+                                  {item.severity === 'error' ? (
+                                    <span className="rounded-full border border-dashed border-red-300 bg-red-50/60 px-2.5 py-0.5 text-[11px] text-red-700">
+                                      Error
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full border border-dashed border-[#d4d4d8] bg-[#fafafa] px-2.5 py-0.5 text-[11px] text-[#52525b]">
+                                      Peringatan
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
                           )}
                         </tbody>
                       </table>
                     </div>
+                    {totalValidationIssues > 200 && (
+                      <p className="text-[11.5px] text-[#71717a] text-right">
+                        Menampilkan 200 dari {formatNumber(totalValidationIssues)} catatan validasi teratas agar tampilan tetap ringan.
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>

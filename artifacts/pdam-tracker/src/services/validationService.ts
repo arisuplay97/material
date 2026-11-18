@@ -2,6 +2,7 @@ import { Pelanggan, WilayahAcuan, ValidationErrorItem, ValidationSummary, Golong
 import { boundsCenter, checkSpatialAnomaly, isInBounds, KECAMATAN_BOUNDS, SERVICE_AREA_BOUNDS } from './pdamDataService';
 import { GOLONGAN_LIST, GOLONGAN_META, MAX_UPLOAD_BYTES } from '@/lib/constants';
 import type { SpreadsheetWorkerResponse } from './spreadsheet.worker';
+import { parseSpreadsheetBuffer, type ParsedSpreadsheetResult, type SheetSummary } from './spreadsheetParser';
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const ALLOWED_EXTENSIONS = /\.(xlsx|xls|csv)$/i;
@@ -9,16 +10,17 @@ const ALLOWED_EXTENSIONS = /\.(xlsx|xls|csv)$/i;
 export interface ValidationOutput {
   summary: ValidationSummary;
   parsedRecords: Pelanggan[];
+  sheetSummaries?: SheetSummary[];
 }
 
 type RawRow = Record<string, unknown>;
 
-function parseInWorker(buffer: ArrayBuffer): Promise<RawRow[]> {
+function parseInWorker(buffer: ArrayBuffer): Promise<ParsedSpreadsheetResult> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./spreadsheet.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<SpreadsheetWorkerResponse>) => {
       worker.terminate();
-      if (e.data.ok) resolve(e.data.rows);
+      if (e.data.ok) resolve({ rows: e.data.rows, sheets: e.data.sheets });
       else reject(new Error(e.data.error));
     };
     worker.onerror = () => {
@@ -29,13 +31,14 @@ function parseInWorker(buffer: ArrayBuffer): Promise<RawRow[]> {
   });
 }
 
-async function parseOnMainThread(buffer: ArrayBuffer): Promise<RawRow[]> {
+async function parseOnMainThread(buffer: ArrayBuffer): Promise<ParsedSpreadsheetResult> {
   const XLSX = await import('xlsx');
   try {
-    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true, dense: true });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return XLSX.utils.sheet_to_json<RawRow>(sheet, { raw: false, defval: '' });
-  } catch {
+    return parseSpreadsheetBuffer(XLSX, buffer);
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('Sheet') || err.message.includes('header'))) {
+      throw err;
+    }
     throw new Error('Format file tidak didukung atau file korup. Pastikan file berupa Excel (.xlsx, .xls) atau CSV.');
   }
 }
@@ -53,8 +56,12 @@ export class ValidationService {
       throw new Error(`Ukuran file ${(file.size / 1024 / 1024).toFixed(1)} MB melebihi batas 20 MB.`);
     }
     const buffer = await file.arrayBuffer();
-    const rows = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
-    return this.validateRawRows(rows, wilayahAcuanList);
+    const { rows, sheets } = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
+    const result = this.validateRawRows(rows, wilayahAcuanList);
+    return {
+      ...result,
+      sheetSummaries: sheets.map((s) => ({ ...s, fileName: file.name })),
+    };
   }
 
   public static async parseAndValidateMultipleFiles(
@@ -67,6 +74,7 @@ export class ValidationService {
     }
 
     const fileSummaries: { name: string; rows: number; size: number }[] = [];
+    const sheetSummaries: SheetSummary[] = [];
     const allRows: (RawRow & { _source_file?: string })[] = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -82,8 +90,11 @@ export class ValidationService {
       }
 
       const buffer = await file.arrayBuffer();
-      const rows = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
+      const { rows, sheets } = typeof Worker !== 'undefined' ? await parseInWorker(buffer) : await parseOnMainThread(buffer);
       fileSummaries.push({ name: file.name, rows: rows.length, size: file.size });
+      for (const s of sheets) {
+        sheetSummaries.push({ ...s, fileName: file.name });
+      }
 
       for (const r of rows) {
         (r as any)._source_file = file.name;
@@ -95,13 +106,14 @@ export class ValidationService {
     return {
       ...result,
       fileSummaries,
+      sheetSummaries,
     };
   }
 
   public static validateRawRows(rows: RawRow[], wilayahAcuanList: WilayahAcuan[]): ValidationOutput {
     const errors: ValidationErrorItem[] = [];
     const warnings: ValidationErrorItem[] = [];
-    const parsedRecords: Pelanggan[] = [];
+    const parsedMap = new Map<string, Pelanggan>();
     const seenIds = new Set<string>();
     const wilayahMap = new Map<string, WilayahAcuan>(wilayahAcuanList.map((w) => [w.kode, w]));
 
@@ -119,24 +131,27 @@ export class ValidationService {
       };
     }
 
-    const recordRowMap = new Map<string, number>();
+    const recordMetaMap = new Map<string, { rowNumber: number; sheetName?: string; fileName?: string }>();
 
     rows.forEach((row, index) => {
-      const rowNum = index + 2; // header is row 1
+      const sheetName = typeof row._sheet_name === 'string' ? row._sheet_name : undefined;
+      const fileName = typeof row._source_file === 'string' ? row._source_file : undefined;
+      const rowNum = typeof row._sheet_row === 'number' ? row._sheet_row : index + 2;
       let rowHasFatalError = false;
       const flagReasons: string[] = [];
       const warn = (field: string, value: unknown, message: string, flag?: string) => {
-        warnings.push({ rowNumber: rowNum, field, value, message, severity: 'warning' });
+        warnings.push({ rowNumber: rowNum, sheetName, fileName, field, value, message, severity: 'warning' });
         if (flag) flagReasons.push(flag);
       };
       const fail = (field: string, value: unknown, message: string) => {
-        errors.push({ rowNumber: rowNum, field, value, message, severity: 'error' });
+        errors.push({ rowNumber: rowNum, sheetName, fileName, field, value, message, severity: 'error' });
         rowHasFatalError = true;
       };
 
       // Normalize keys into a prototype-less object (blocks prototype pollution).
       const r: Record<string, unknown> = Object.create(null);
       for (const key of Object.keys(row)) {
+        if (key === '_sheet_name' || key === '_sheet_row' || key === '_source_file') continue;
         const cleanKey = key.trim().toLowerCase().replace(/[\s\-.]+/g, '_');
         if (FORBIDDEN_KEYS.has(cleanKey)) continue;
         const value = row[key];
@@ -172,10 +187,7 @@ export class ValidationService {
           `ID "${kodePelanggan}" duplikat. Nilai otomatis diperbarui dengan data baris terbaru.`,
           'ID duplikat diperbarui otomatis'
         );
-        const prevIdx = parsedRecords.findIndex((p) => p.kode_pelanggan === kodePelanggan);
-        if (prevIdx !== -1) {
-          parsedRecords.splice(prevIdx, 1);
-        }
+        parsedMap.delete(kodePelanggan);
       } else {
         seenIds.add(kodePelanggan);
       }
@@ -286,9 +298,11 @@ export class ValidationService {
         warn('koordinat', `${lat}, ${lng}`, anomaly, anomaly);
       }
       record.is_flagged = record.flag_reasons.length > 0;
-      parsedRecords.push(record);
-      recordRowMap.set(kodePelanggan, rowNum);
+      parsedMap.set(kodePelanggan, record);
+      recordMetaMap.set(kodePelanggan, { rowNumber: rowNum, sheetName, fileName });
     });
+
+    const parsedRecords = Array.from(parsedMap.values());
 
     // ── Post-pass: Deteksi 1 titik koordinat sama tapi wilayah/kecamatan berbeda ──
     const coordMap = new Map<string, Pelanggan[]>();
@@ -316,8 +330,11 @@ export class ValidationService {
               item.flag_reasons.push(warnMsg);
             }
             item.is_flagged = true;
+            const meta = recordMetaMap.get(item.kode_pelanggan);
             warnings.push({
-              rowNumber: recordRowMap.get(item.kode_pelanggan) || 0,
+              rowNumber: meta?.rowNumber || 0,
+              sheetName: meta?.sheetName,
+              fileName: meta?.fileName,
               field: 'koordinat',
               value: `${item.latitude}, ${item.longitude}`,
               message: `Pelanggan ${item.kode_pelanggan}: ${warnMsg}`,

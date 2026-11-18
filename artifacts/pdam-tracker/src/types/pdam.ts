@@ -64,6 +64,8 @@ export interface UploadSnapshot {
 
 export interface ValidationErrorItem {
   rowNumber: number;
+  sheetName?: string;
+  fileName?: string;
   field: string;
   value: any;
   message: string;
